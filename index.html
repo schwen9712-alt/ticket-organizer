@@ -2874,10 +2874,10 @@ const STATE = {
       'Y': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'G': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'B': 'Economy'
     },
     'DL': {
-      'F': 'First', 'P': 'First', 'G': 'First',
+      'F': 'First', 'P': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
-      'A': 'Premium', 'W': 'Premium', 'S': 'Premium',
-      'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy'
+      'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
     }
   },
   collapsedOrders: new Set()  // in-memory collapse state; restored from sessionStorage on load
@@ -2919,10 +2919,10 @@ const DEFAULT_SETTINGS = {
       'Y': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'G': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'B': 'Economy'
     },
     'DL': {
-      'F': 'First', 'P': 'First', 'G': 'First',
+      'F': 'First', 'P': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
-      'A': 'Premium', 'W': 'Premium', 'S': 'Premium',
-      'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy'
+      'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
     }
   },
   cardholders: [],
@@ -3014,7 +3014,7 @@ async function loadSettings() {
   // Migration: fix known incorrect mappings (one-time, idempotent)
   // UA-T was incorrectly labeled Premium; per IATA & UA fare chart, T is deep-discount Economy.
   // Migration version stored in settings.fareClassMigrationVersion so we only fix once.
-  const FARE_CLASS_MIGRATION_VERSION = 3;
+  const FARE_CLASS_MIGRATION_VERSION = 4;
   if ((settings.fareClassMigrationVersion || 0) < FARE_CLASS_MIGRATION_VERSION) {
     if (settings.fareClassByAirline && settings.fareClassByAirline['UA']) {
       // Force-correct UA T (was Premium → should be Economy)
@@ -3026,6 +3026,14 @@ async function loadSettings() {
       // Force-correct DL A (was First → should be Premium, per DL's Premium Select product)
       if (settings.fareClassByAirline['DL']['A'] === 'First') {
         settings.fareClassByAirline['DL']['A'] = 'Premium';
+      }
+      // Fix DL G: was First → should be Premium (Premium Select)
+      if (settings.fareClassByAirline['DL']['G'] === 'First') {
+        settings.fareClassByAirline['DL']['G'] = 'Premium';
+      }
+      // Fix DL W: was Premium → should be Economy (Comfort+)
+      if (settings.fareClassByAirline['DL']['W'] === 'Premium') {
+        settings.fareClassByAirline['DL']['W'] = 'Economy';
       }
     }
     settings.fareClassMigrationVersion = FARE_CLASS_MIGRATION_VERSION;
