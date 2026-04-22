@@ -4738,9 +4738,11 @@ function parseSingleBooking(raw) {
     // Chinese cabin word + price (possibly with text in between):
     //   "普通经济17793", "商务舱45638", "经济舱 17793", "经济舱一件行李 10300"
     const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
-    // Baggage + fare line: "2pc  48596", "1pc 23400" — Npc followed by fare amount
+    // Baggage + fare line — two orders:
+    //   "2pc  48596"  (baggage first)
+    //   "32392   2pc" (fare first)
     const pBagFare = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin
-      && trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i);
+      && (trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i) || trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i));
     // Bare price line: "24568", "24568  *2"
     const pC = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin && !pBagFare && trimmed.match(/^(\d{3,6})\s*\*?\s*\d{0,2}\s*$/);
     // TravelSky fare line (no currency suffix): "02 XHX00NM6              9847"
@@ -4790,7 +4792,9 @@ function parseSingleBooking(raw) {
       const amt = parseFloat(pC[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pBagFare) {
-      const amt = parseFloat(pBagFare[1]);
+      const m1 = trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i);
+      const m2 = trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i);
+      const amt = parseFloat((m1 || m2)[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pTravelSkyFare) {
       const amt = parseFloat(pTravelSkyFare[1]);
@@ -11988,6 +11992,7 @@ const SHARED_BIN_ID = '69e49b6636566621a8cbe729';
 let cloudSyncEnabled = true;   // always on for everyone
 let cloudSyncKey = SHARED_BIN_ID;
 let cloudPushTimer = null;
+let _initialPullComplete = false;
 
 async function createCloudAccount() {
   toast('正在创建云账号...');
@@ -12072,24 +12077,23 @@ async function cloudPull(silent) {
     const data = await res.json();
     const record = data.record || {};
 
-    // ── ALWAYS MERGE: local + cloud ticketed records are unioned by id ────
-    // Never skip merging based on counts — different devices may have
-    // different records even if counts are equal or local appears "ahead".
+    // ── CLOUD IS SOURCE OF TRUTH ──────────────────────────────────────────
+    // Cloud data overwrites local for all fields.
+    // Exception: ticketed records are additive (union by id) to prevent
+    // losing records that were just written locally but not yet pushed.
     const localSettings = await storageGet('ticket-organizer-settings') || {};
     const cloudTicketed = ((record.settings && record.settings.ticketed) || []).length;
-    const localTicketed = (localSettings.ticketed || []).length;
 
-    // Merge cloud + local — always keep the union of ticketed records
     if (record.settings) {
       const cloudSettings = { ...DEFAULT_SETTINGS, ...record.settings };
-      // SMART MERGE: take union of cloud + local ticketed by id (additive, never discard)
+      // Ticketed: union of cloud + local (additive only, cloud wins on conflict)
       const localTicketedArr = (localSettings.ticketed || []);
       const cloudTicketedArr = (cloudSettings.ticketed || []);
       const mergedById = new Map();
       localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); }); // cloud overwrites local on same id
       const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
-      settings = cloudSettings;
+      settings = cloudSettings; // cloud wins
       settings.ticketed = mergedTicketed;
       if (!Array.isArray(settings.presetAgents) || settings.presetAgents.length === 0) {
         settings.presetAgents = [...DEFAULT_SETTINGS.presetAgents];
@@ -12128,31 +12132,16 @@ async function cloudPull(silent) {
   } catch (e) {
     if (!silent) alert(`拉取失败：${e.message}`);
     else console.warn('cloudPull error:', e);
+  } finally {
+    // Always mark initial pull as complete — even if it failed.
+    // This unblocks autoCloudPush so normal sync can resume.
+    _initialPullComplete = true;
   }
 }
 
 async function cloudPush(silent) {
   if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
   try {
-    // Always fetch+merge before pushing — ensures no records are lost
-    // even when multiple devices push concurrently.
-    let cloudTicketedArr = [];
-    try {
-      const fetchRes = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
-        headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-      });
-      if (fetchRes.ok) {
-        const fetchData = await fetchRes.json();
-        cloudTicketedArr = ((fetchData.record && fetchData.record.settings && fetchData.record.settings.ticketed) || []);
-      }
-    } catch (e) { /* ignore fetch error, push local as-is */ }
-    const localTicketedArr = (settings.ticketed || []);
-    const mergedById = new Map();
-    localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-    cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-    const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
-    settings.ticketed = mergedTicketed;
-
     const now = Date.now();
     settings.updatedAt = now;
     await storageSet('ticket-organizer-settings', settings);
@@ -12442,6 +12431,9 @@ async function restoreGistRevision(sha, dateStr, overlay) {
 function autoCloudPush() {
   // Debounced auto-push triggered after every data change
   if (!cloudSyncEnabled || !cloudSyncKey) return;
+  // CRITICAL: never push before the initial cloudPull completes on startup.
+  // This prevents stale/empty local data from overwriting the cloud.
+  if (!_initialPullComplete) return;
   if (cloudPushTimer) clearTimeout(cloudPushTimer);
   cloudPushTimer = setTimeout(() => { cloudPush(true); }, 2000);
 }
@@ -12709,32 +12701,21 @@ async function mergeImportData(event) {
     if (pendingCount > 0) toast(`已恢复 ${pendingCount} 单待处理订单`);
   }
 
-  // Load cloud config; if enabled, auto-pull so we get latest cross-device data
+  // Load cloud config; if enabled, ALWAYS pull from cloud immediately.
+  // Cloud is the single source of truth — local is only a fallback.
   await loadCloudConfig();
   await loadGistConfig();
   if (cloudSyncEnabled && cloudSyncKey) {
-    // Safety mechanism 1: Smart startup pull.
-    // If local data looks like a "fresh file" (no ticketed orders AND no meaningful pending),
-    // this is almost certainly a newly downloaded HTML — auto-pull cloud WITHOUT asking,
-    // so the user's data comes back immediately without any manual steps.
-    const localTicketed = (settings.ticketed || []).length;
-    const localPending = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
-    const looksLikeNewFile = localTicketed === 0 && localPending === 0;
-    if (looksLikeNewFile) {
-      // New file detected — pull silently right away
-      setTimeout(async () => {
-        await cloudPull(true);
-        // After pull, show a clear toast so user knows data was restored
-        const afterTicketed = (settings.ticketed || []).length;
-        const afterPending = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
-        if (afterTicketed > 0 || afterPending > 0) {
-          toast(`☁ 新版本已自动从云端恢复数据：${afterTicketed} 单已出票 · ${afterPending} 单待出票`);
-        }
-      }, 500);
-    } else {
-      // Normal startup with existing local data — still pull, but only after a short delay
-      // so local renders first. If cloud has more data, silent merge happens.
-      setTimeout(() => cloudPull(true), 300);
+    // Always pull from cloud on startup — no delays, no local-wins logic.
+    try {
+      await cloudPull(true);
+      const afterTicketed = (settings.ticketed || []).length;
+      const afterPending = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
+      if (afterTicketed > 0 || afterPending > 0) {
+        toast(`☁ 已从云端同步：${afterTicketed} 单已出票 · ${afterPending} 单待出票`);
+      }
+    } catch(e) {
+      console.warn('[Startup] cloudPull failed, using local data:', e);
     }
   } else if (cloudSyncEnabled === false) {
     // Safety mechanism 2: No cloud sync configured — show a one-time nudge.
