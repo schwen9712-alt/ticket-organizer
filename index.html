@@ -8664,7 +8664,7 @@ async function markAllTicketed() {
 
   // SAFETY: Rolling local backup + immediate cloud push after batch ticketing
   await saveRollingBackup(`批量出票 ${toSave.length} 单`);
-  if (cloudSyncEnabled && cloudSyncKey) cloudPush(true, true);
+  if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
   if (gistToken) gistPush(true);
 
   STATE.orders = [newOrder()];
@@ -9114,7 +9114,7 @@ async function submitManualTicket(btn) {
   settings.ticketed.unshift(entry);
   await storageSet('ticket-organizer-settings', settings);
   await saveRollingBackup(`手动补录 ${pnr || paxRaw.split('\n')[0]}`);
-  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true, true);
+  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true);
   if (typeof gistPush === 'function' && gistToken) gistPush(true);
 
   btn.closest('.verify-modal-overlay').remove();
@@ -11250,7 +11250,7 @@ async function doMarkTicketed(idx) {
     await saveRollingBackup(`出票 #${idx+1} ${entry.pnr || ''}`);
 
     // Push to cloud immediately (bypass debounce)
-    if (cloudSyncEnabled && cloudSyncKey) cloudPush(true, true);
+    if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
     if (gistToken) gistPush(true);
 
     toast(`✓ 订单 #${idx+1} 已出票`);
@@ -12072,43 +12072,12 @@ async function cloudPull(silent) {
     const data = await res.json();
     const record = data.record || {};
 
-    // ── SMART MERGE: never silently downgrade local data ──────────────────
-    // Compare cloud vs local by two signals:
-    //   1. updatedAt timestamp (more reliable, set on every push)
-    //   2. ticketed count (more data = more recent as a tie-breaker)
-    const cloudUpdatedAt = record.updatedAt || 0;
-    const cloudTicketed = ((record.settings && record.settings.ticketed) || []).length;
-    const cloudPending = (record.orders || []).length;
-
+    // ── ALWAYS MERGE: local + cloud ticketed records are unioned by id ────
+    // Never skip merging based on counts — different devices may have
+    // different records even if counts are equal or local appears "ahead".
     const localSettings = await storageGet('ticket-organizer-settings') || {};
-    const localUpdatedAt = localSettings.updatedAt || 0;
+    const cloudTicketed = ((record.settings && record.settings.ticketed) || []).length;
     const localTicketed = (localSettings.ticketed || []).length;
-    const localPending = (await storageGet('ticket-organizer-pending') || {}).orders?.length || 0;
-
-    const cloudIsNewer = cloudUpdatedAt > localUpdatedAt;
-    const cloudHasMoreData = cloudTicketed > localTicketed ||
-                             (cloudTicketed === localTicketed && cloudPending > localPending);
-
-    // If local is clearly newer (has more ticketed data and a later timestamp),
-    // push local to cloud instead of letting cloud overwrite local.
-    if (!cloudIsNewer && localTicketed > cloudTicketed && !silent) {
-      if (confirm(
-        `⚠️ 本地数据比云端更新！\n\n` +
-        `本地：${localTicketed} 单已出票 · ${localPending} 单待出票\n` +
-        `云端：${cloudTicketed} 单已出票 · ${cloudPending} 单待出票\n\n` +
-        `点【确定】= 把本地推送到云端（推荐）\n` +
-        `点【取消】= 强制用云端数据覆盖本地`
-      )) {
-        await cloudPush(true);
-        toast('✓ 本地数据更新，已推送到云端');
-        return;
-      }
-    } else if (!cloudIsNewer && localTicketed > cloudTicketed && silent) {
-      // Silent mode: local has more data → push local to cloud, don't overwrite
-      console.log(`[CloudSync] Local has more data (${localTicketed} vs ${cloudTicketed}), pushing local instead of pulling`);
-      await cloudPush(true);
-      return;
-    }
 
     // Merge cloud + local — always keep the union of ticketed records
     if (record.settings) {
@@ -12162,29 +12131,27 @@ async function cloudPull(silent) {
   }
 }
 
-async function cloudPush(silent, mergeTicketed) {
+async function cloudPush(silent) {
   if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
   try {
-    // Only fetch+merge when explicitly requested (e.g. right after ticketing).
-    // Regular setting changes push directly to avoid doubling API calls.
-    if (mergeTicketed) {
-      let cloudTicketedArr = [];
-      try {
-        const fetchRes = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
-          headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-        });
-        if (fetchRes.ok) {
-          const fetchData = await fetchRes.json();
-          cloudTicketedArr = ((fetchData.record && fetchData.record.settings && fetchData.record.settings.ticketed) || []);
-        }
-      } catch (e) { /* ignore, push local as-is */ }
-      const localTicketedArr = (settings.ticketed || []);
-      const mergedById = new Map();
-      localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-      const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
-      settings.ticketed = mergedTicketed;
-    }
+    // Always fetch+merge before pushing — ensures no records are lost
+    // even when multiple devices push concurrently.
+    let cloudTicketedArr = [];
+    try {
+      const fetchRes = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
+        headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
+      });
+      if (fetchRes.ok) {
+        const fetchData = await fetchRes.json();
+        cloudTicketedArr = ((fetchData.record && fetchData.record.settings && fetchData.record.settings.ticketed) || []);
+      }
+    } catch (e) { /* ignore fetch error, push local as-is */ }
+    const localTicketedArr = (settings.ticketed || []);
+    const mergedById = new Map();
+    localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+    cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+    const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
+    settings.ticketed = mergedTicketed;
 
     const now = Date.now();
     settings.updatedAt = now;
