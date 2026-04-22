@@ -4102,6 +4102,8 @@ function splitIntoBookings(raw) {
   const isNameLike = (s) => {
     const t = s.trim();
     if (!t.includes('/')) return false;
+    // Ignore labeled field lines like "名字：CHEN/GONGHAI" — these are NOT split boundaries
+    if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
     return /^(?:\d+[\.\s]+)?[A-Z]{2,}\/\s?[A-Z]+/.test(t);
   };
   const isSegLike = (s) => {
