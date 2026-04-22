@@ -12082,9 +12082,18 @@ async function cloudPull(silent) {
       return;
     }
 
-    // Cloud is newer or has more data — safe to overwrite local
+    // Merge cloud + local — always keep the union of ticketed records
     if (record.settings) {
-      settings = { ...DEFAULT_SETTINGS, ...record.settings };
+      const cloudSettings = { ...DEFAULT_SETTINGS, ...record.settings };
+      // SMART MERGE: take union of cloud + local ticketed by id (additive, never discard)
+      const localTicketedArr = (localSettings.ticketed || []);
+      const cloudTicketedArr = (cloudSettings.ticketed || []);
+      const mergedById = new Map();
+      localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+      const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
+      settings = cloudSettings;
+      settings.ticketed = mergedTicketed;
       if (!Array.isArray(settings.presetAgents) || settings.presetAgents.length === 0) {
         settings.presetAgents = [...DEFAULT_SETTINGS.presetAgents];
       }
@@ -12093,8 +12102,6 @@ async function cloudPull(silent) {
       if (!settings.agentDiscounts || typeof settings.agentDiscounts !== 'object') {
         settings.agentDiscounts = { ...DEFAULT_SETTINGS.agentDiscounts };
       }
-      // Re-apply settings migrations — cloud may have pushed stale state from a
-      // device that predates the fix (bad rule still has cabin='公务舱' etc.)
       runSettingsMigrations();
       await storageSet('ticket-organizer-settings', settings);
     }
