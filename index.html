@@ -4272,7 +4272,18 @@ function parseSingleBooking(raw) {
     '苏黎世':'ZRH','维也纳':'VIE','罗马':'FCO','马德里':'MAD',
     '悉尼':'SYD','墨尔本':'MEL','奥克兰':'AKL','温哥华':'YVR',
     '多伦多':'YYZ','蒙特利尔':'YUL','仰光':'RGN','金边':'PNH',
-    '迪拜':'DXB','多哈':'DOH','阿布扎比':'AUH'
+    '迪拜':'DXB','多哈':'DOH','阿布扎比':'AUH',
+    '圣何塞胡安':'SJO','圣何塞':'SJO','哥斯达黎加':'SJO',
+    '墨西哥城':'MEX','坎昆':'CUN','瓜达拉哈拉':'GDL',
+    '圣地亚哥智利':'SCL','波哥大':'BOG','利马':'LIM','基多':'UIO',
+    '布宜诺斯艾利斯':'EZE','圣保罗':'GRU','里约热内卢':'GIG',
+    '法兰克福':'FRA','慕尼黑':'MUC','杜塞尔多夫':'DUS',
+    '布鲁塞尔':'BRU','哥本哈根':'CPH','斯德哥尔摩':'ARN',
+    '赫尔辛基':'HEL','奥斯陆':'OSL','伊斯坦布尔':'IST',
+    '莫斯科':'SVO','圣彼得堡':'LED','开罗':'CAI',
+    '约翰内斯堡':'JNB','内罗毕':'NBO','拉各斯':'LOS',
+    '孟买':'BOM','德里':'DEL','班加罗尔':'BLR','金奈':'MAA',
+    '科伦坡':'CMB','达卡':'DAC','卡拉奇':'KHI','拉合尔':'LHE'
   };
   function cnCityToIATA(city) {
     const c = (city || '').trim();
@@ -4552,21 +4563,27 @@ function parseSingleBooking(raw) {
 
     // ── Chinese format segment: "1. 联合航空UA771  06月04日  洛杉矶 - 北京首都  23:35出发  04:40+2到达"
     // Also: "1. UA771  06月04日  洛杉矶 - 北京首都" (no Chinese airline name)
+    // Also 恒途: "1. AS1352  06月03日(星期三)  洛杉矶T6 - 圣何塞胡安　圣玛利亚M  16:40  23:33"
     const cnSeg = trimmed.match(
-      /^\s*\d+\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日\s*([\u4e00-\u9fa5A-Za-z]+)\s*[-→]\s*([\u4e00-\u9fa5A-Za-z]+)\s+(\d{1,2}:\d{2})/
+      /^\s*\d+\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
     );
     if (cnSeg) {
       const carrier = cnSeg[1];
       const flight = cnSeg[2];
       const date = cnDateToIATA(cnSeg[3], cnSeg[4]);
-      const from = cnCityToIATA(cnSeg[5]);
-      const to = cnCityToIATA(cnSeg[6]);
+      // Strip terminal suffix (single letter/digit at end, e.g. "T6", "B", "M")
+      const fromRaw = cnSeg[5].replace(/\s*[A-Z\d]\s*$/i, '').trim();
+      const toRaw   = cnSeg[6].replace(/\s*[A-Z\d]\s*$/i, '').trim();
+      const from = cnCityToIATA(fromRaw) || cnCityToIATA(cnSeg[5].trim());
+      const to   = cnCityToIATA(toRaw)   || cnCityToIATA(cnSeg[6].trim());
       const depTime = cnSeg[7];
-      // Try to capture arrival time
+      // Try to capture arrival time (second time on the line)
+      const timesAll = [...trimmed.matchAll(/(\d{1,2}:\d{2})/g)];
+      const arrTime = timesAll.length >= 2 ? timesAll[timesAll.length - 1][1] : '';
       const arrMatch = trimmed.match(/(\d{1,2}:\d{2})(?:\+\d+)?到达/);
-      const arrTime = arrMatch ? arrMatch[1] : '';
+      const finalArr = arrMatch ? arrMatch[1] : arrTime;
       if (carrier && flight && from && to && date) {
-        segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime });
+        segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime: finalArr });
         if (!airline) airline = carrier;
         matched = true;
       }
@@ -4708,6 +4725,8 @@ function parseSingleBooking(raw) {
     const pPrefix = !pA && !pB && trimmed.match(/(CNY|RMB|人民币|USD|美金|美元)\s*(\d+(?:\.\d+)?)/i);
     // Chinese 运价/票价 prefix: "运价18512", "运价 18512", "票价 18512"
     const pYunjia = !pA && !pB && !pPrefix && trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]?\s*(\d+(?:\.\d+)?)/);
+    // 元 suffix: "3820元", "3820元/人"
+    const pYuan = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^(\d{3,6}(?:\.\d+)?)元/);
     // CO prefix = 运价 in RMB: "CO7850", "CO 7850", "CO15689 每位 *2"
     const pCO = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^\s*CO\s*(\d{3,6})(?:\s+每位)?(?:\s*\*\s*\d+)?\s*$/i);
     // Decimal discount on a header line: "18单  0.87  AA经济" → discount = 87
@@ -4747,6 +4766,9 @@ function parseSingleBooking(raw) {
     } else if (pYunjia) {
       const amt = parseFloat(pYunjia[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+    } else if (pYuan) {
+      const amt = parseFloat(pYuan[1]);
+      if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pCO) {
       const amt = parseFloat(pCO[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
