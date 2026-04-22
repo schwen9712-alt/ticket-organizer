@@ -880,7 +880,23 @@ textarea.raw-input {
       </div>
     </div>
   </div>
-  <div style="padding: 6px 0 0 0; display: flex; justify-content: flex-end; border-top: 1px solid var(--line-soft); margin-top: 8px;">
+  <div style="padding: 6px 0 0 0; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line-soft); margin-top: 8px;">
+    <div id="worldClocks" style="display:flex; gap:16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">
+      <div style="display:flex; align-items:center; gap:5px;">
+        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">北京</span>
+        <span id="clock-beijing" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+      </div>
+      <div style="color:var(--line); font-size:10px; align-self:center;">|</div>
+      <div style="display:flex; align-items:center; gap:5px;">
+        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">洛杉矶</span>
+        <span id="clock-la" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+      </div>
+      <div style="color:var(--line); font-size:10px; align-self:center;">|</div>
+      <div style="display:flex; align-items:center; gap:5px;">
+        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">纽约</span>
+        <span id="clock-ny" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+      </div>
+    </div>
     <button class="btn ghost small" onclick="refreshAllOrders()" title="用最新逻辑重跑所有订单：重新解析价格/舱位/儿童/航段，并补全乘客信息">🔄 用最新逻辑重跑</button>
   </div>
 </header>
@@ -2862,9 +2878,9 @@ const STATE = {
   // Per-airline fare-class mapping. When set, overrides generic classMap for that airline.
   fareClassByAirline: {
     'UA': {
-      'F': 'First', 'A': 'First',
+      'F': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business',
-      'R': 'Premium', 'O': 'Premium',
+      'A': 'Premium', 'R': 'Premium', 'O': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'E': 'Economy', 'U': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'V': 'Economy', 'W': 'Economy', 'S': 'Economy', 'L': 'Economy', 'K': 'Economy', 'T': 'Economy', 'G': 'Economy', 'N': 'Economy'
     },
     'AA': {
@@ -2907,9 +2923,9 @@ const DEFAULT_SETTINGS = {
   // Each entry: airline -> { CLASS_CODE: 'Economy'|'Premium'|'Business'|'First' }
   fareClassByAirline: {
     'UA': {
-      'F': 'First', 'A': 'First',
+      'F': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business',
-      'R': 'Premium', 'O': 'Premium',
+      'A': 'Premium', 'R': 'Premium', 'O': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'E': 'Economy', 'U': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'V': 'Economy', 'W': 'Economy', 'S': 'Economy', 'L': 'Economy', 'K': 'Economy', 'T': 'Economy', 'G': 'Economy', 'N': 'Economy'
     },
     'AA': {
@@ -3014,12 +3030,16 @@ async function loadSettings() {
   // Migration: fix known incorrect mappings (one-time, idempotent)
   // UA-T was incorrectly labeled Premium; per IATA & UA fare chart, T is deep-discount Economy.
   // Migration version stored in settings.fareClassMigrationVersion so we only fix once.
-  const FARE_CLASS_MIGRATION_VERSION = 4;
+  const FARE_CLASS_MIGRATION_VERSION = 5;
   if ((settings.fareClassMigrationVersion || 0) < FARE_CLASS_MIGRATION_VERSION) {
     if (settings.fareClassByAirline && settings.fareClassByAirline['UA']) {
-      // Force-correct UA T (was Premium → should be Economy)
+      // Fix UA T (was Premium → Economy)
       if (settings.fareClassByAirline['UA']['T'] === 'Premium') {
         settings.fareClassByAirline['UA']['T'] = 'Economy';
+      }
+      // Fix UA A (was First → Premium / Premium Plus)
+      if (settings.fareClassByAirline['UA']['A'] === 'First') {
+        settings.fareClassByAirline['UA']['A'] = 'Premium';
       }
     }
     if (settings.fareClassByAirline && settings.fareClassByAirline['DL']) {
@@ -3141,6 +3161,24 @@ function setToday() {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   document.getElementById('todayDate').textContent = `${y}.${m}.${d}`;
+}
+
+function updateWorldClocks() {
+  const fmt = (tz) => {
+    const now = new Date();
+    const t = now.toLocaleTimeString('en-US', {
+      timeZone: tz, hour: '2-digit', minute: '2-digit',
+      hour12: true
+    });
+    // e.g. "02:34 PM" → "2:34PM"
+    return t.replace(/^0/, '').replace(' ', '');
+  };
+  const beijing = document.getElementById('clock-beijing');
+  const la = document.getElementById('clock-la');
+  const ny = document.getElementById('clock-ny');
+  if (beijing) beijing.textContent = fmt('Asia/Shanghai');
+  if (la) la.textContent = fmt('America/Los_Angeles');
+  if (ny) ny.textContent = fmt('America/New_York');
 }
 
 // ============================================
@@ -4168,11 +4206,18 @@ function extractDOB(text) {
   if (!text) return null;
   const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const toYY = (y) => y.length === 4 ? y.slice(2) : y.padStart(2, '0');
-  // OCR correction: replace digit 0 with letter O inside likely month abbreviations
-  // e.g. "N0V" → "NOV", "0CT" → "OCT", "J0N" → "JON" (won't match anyway)
+  // OCR correction 1: replace digit 0 with letter O inside likely month abbreviations
   text = text.replace(/\b([A-Za-z]{0,2})0([A-Za-z]{0,2})\b/g, (m, a, b) => {
     const candidate = (a + 'O' + b).toUpperCase();
     return MONTHS.includes(candidate) ? (a + 'O' + b) : m;
+  });
+  // OCR correction 2: fix extra letters appended to month names
+  // e.g. "31MARA82" → "31MAR82", "08APRR88" → "08APR88"
+  // Use lookahead/lookbehind since \b doesn't work between digit and letter
+  text = text.replace(/(?<=\d)([A-Za-z]{4,5})(?=\d)/g, (m) => {
+    const up = m.toUpperCase();
+    if (MONTHS.includes(up.slice(0, 3))) return m.slice(0, 3);
+    return m;
   });
   // Try Chinese "YYYY年M月D[日]" format (year first)
   const cnM = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
@@ -4667,19 +4712,26 @@ function parseSingleBooking(raw) {
     const fareTypeMatch = trimmed.match(/^(大人|成人|儿童|小儿|婴儿)/);
     const inlineInfMatch = !fareTypeMatch && trimmed.match(/\bINF\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     const inlineCnnMatch = !fareTypeMatch && !inlineInfMatch && trimmed.match(/\bCNN\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
-    if (fareTypeMatch || inlineInfMatch || inlineCnnMatch) {
-      const fareKind = fareTypeMatch ? fareTypeMatch[1] : (inlineInfMatch ? 'INFANT' : 'CHILD');
+    // GDS adult fare line: "02 SKW7RJYS+*   13585 CNY" (no CNN/INF/CHD code → adult)
+    // Only treat as explicit adult fare when we already have (or will have) a child/infant line
+    const inlineAdultFare = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch
+      && trimmed.match(/^\d{1,2}\s+[A-Z0-9]+[+*]?\s+(\d{3,6})\s*(?:CNY|RMB|人民币)\s*$/i);
+    if (fareTypeMatch || inlineInfMatch || inlineCnnMatch || inlineAdultFare) {
+      const fareKind = fareTypeMatch ? fareTypeMatch[1]
+        : inlineInfMatch ? 'INFANT'
+        : inlineCnnMatch ? 'CHILD'
+        : 'ADULT';
       // Extract the CNY/RMB amount from this line
       const amtMatch = trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
       if (amtMatch) {
         const amt = parseFloat(amtMatch[1]);
         if (amt >= 100 && amt <= 500000) {
           if (!parsedFareByType) var parsedFareByType = {};
-          if (fareKind === '大人' || fareKind === '成人') parsedFareByType.adult = amt;
+          if (fareKind === '大人' || fareKind === '成人' || fareKind === 'ADULT') parsedFareByType.adult = amt;
           else if (fareKind === '儿童' || fareKind === '小儿' || fareKind === 'CHILD') parsedFareByType.child = amt;
           else if (fareKind === '婴儿' || fareKind === 'INFANT') parsedFareByType.infant = amt;
           // Set rmb to adult fare as default if not set
-          if ((fareKind === '大人' || fareKind === '成人') && !rmb) rmb = amt;
+          if ((fareKind === '大人' || fareKind === '成人' || fareKind === 'ADULT') && !rmb) rmb = amt;
           continue;
         }
       }
@@ -4768,7 +4820,7 @@ function parseSingleBooking(raw) {
     // 元 suffix: "3820元", "3820元/人"
     const pYuan = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^(\d{3,6}(?:\.\d+)?)元/);
     // CO prefix = 运价 in RMB: "CO7850", "CO 7850", "CO15689 每位 *2"
-    const pCO = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^\s*CO\s*(\d{3,6})(?:\s+每位)?(?:\s*\*\s*\d+)?\s*$/i);
+    const pCO = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位|\s*\*\s*\d+)?\s*$/i);
     // Decimal discount on a header line: "18单  0.87  AA经济" → discount = 87
     const pDecimalDiscountM = trimmed.match(/\b(0\.\d{2})\b/);
     if (pDecimalDiscountM && !parsedDiscount && trimmed.match(/单|AA|UA|DL|CA|MU|CZ|经济|商务/)) {
@@ -4907,7 +4959,7 @@ function parseSingleBooking(raw) {
       const age = getAgeAtFlight(p.dob);
       if (age === null) return parsedFareByType.adult || null;
       if (age < 2) return parsedFareByType.infant || parsedFareByType.adult || null;
-      if (age < 18) return parsedFareByType.child || parsedFareByType.adult || null;
+      if (age < 12) return parsedFareByType.child || parsedFareByType.adult || null; // airline standard: 2-11 = child
       return parsedFareByType.adult || null;
     });
     // Only use as paxPrices if at least one price differs (otherwise single basePrice is cleaner)
@@ -6032,17 +6084,17 @@ function renderPendingOrderGroupExtras(group, o, idx) {
       </div>
       <div class="finalize-grid">
         <div class="finalize-field">
-          <label>编码 PNR</label>
-          <input type="text" value="${escapeAttr(o.pnr || '')}" placeholder="NDPYKN" style="text-transform:uppercase" oninput="updatePendingField(${idx}, 'pnr', this.value.toUpperCase())">
+          <label>编码 PNR <span style="color:#c0392b; font-size:10px;">*二选一</span></label>
+          <input type="text" id="pnr-${idx}" value="${escapeAttr(o.pnr || '')}" placeholder="NDPYKN" style="text-transform:uppercase;${!o.pnr && !o.tkt ? 'border-color:#e67e22;' : ''}" oninput="updatePendingField(${idx}, 'pnr', this.value.toUpperCase())">
         </div>
         ${o.passengers.length <= 1 ? `
         <div class="finalize-field">
-          <label>票号 TKT</label>
-          <input type="text" value="${escapeAttr((o.passengers[0] && o.passengers[0].tkt) || o.tkt || '')}" placeholder="暂未提供" oninput="updatePendingTkt(${idx}, 0, this.value)">
+          <label>票号 TKT <span style="color:#c0392b; font-size:10px;">*二选一</span></label>
+          <input type="text" value="${escapeAttr((o.passengers[0] && o.passengers[0].tkt) || o.tkt || '')}" placeholder="暂未提供" style="${!o.pnr && !o.tkt ? 'border-color:#e67e22;' : ''}" oninput="updatePendingTkt(${idx}, 0, this.value)">
         </div>
         ` : o.passengers.map((p, pi) => `
         <div class="finalize-field">
-          <label>TKT · P${pi+1} ${escapeHtml((p.name || '').split('/')[0] || '')}</label>
+          <label>TKT · P${pi+1} ${escapeHtml((p.name || '').split('/')[0] || '')} <span style="color:#c0392b; font-size:10px;">*二选一</span></label>
           <input type="text" value="${escapeAttr(p.tkt || '')}" placeholder="暂未提供" oninput="updatePendingTkt(${idx}, ${pi}, this.value)">
         </div>
         `).join('')}
@@ -7911,7 +7963,7 @@ function buildCardHTML(o, idx) {
               const age = calculateAgeAtFlight(p.dob, firstSegDate2);
               if (age != null) {
                 if (age < 2) type = 'INFANT';
-                else if (age < 18) type = 'CHILD';
+                else if (age < 12) type = 'CHILD'; // airline standard: 2-11 = child
               }
             }
           }
@@ -8233,9 +8285,19 @@ function matchKnownPassengers(o) {
       const age = calculateAgeAtFlight(entry.dob, firstSegDate);
       if (age != null) {
         entry.ageAtFlight = age;
-        if (age < 2) entry.paxType = 'INFANT';
-        else if (age < 18) entry.paxType = 'CHILD';
-        else entry.paxType = 'ADULT';
+        if (age < 2) {
+          entry.paxType = 'INFANT';
+          entry.fareType = 'INFANT';
+        } else if (age < 12) {
+          entry.paxType = 'CHILD';  // display badge
+          entry.fareType = 'CHILD'; // airline fare standard
+        } else if (age < 18) {
+          entry.paxType = 'CHILD';  // display badge (minor)
+          entry.fareType = 'ADULT'; // pays adult fare
+        } else {
+          entry.paxType = 'ADULT';
+          entry.fareType = 'ADULT';
+        }
       }
     }
     matched.push(entry);
@@ -11249,8 +11311,16 @@ async function doMarkTicketed(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
 
-  // SAFETY: Save rolling backup BEFORE any mutation — if something goes wrong mid-way,
-  // user can always restore to the pre-ticketing state.
+  // VALIDATION: PNR 编码或票号 TKT 必须至少填一个
+  const hasPnr = (o.pnr || '').trim().length > 0;
+  const hasTkt = (o.tkt || '').trim().length > 0;
+  if (!hasPnr && !hasTkt) {
+    alert('⚠️ 请先填写 PNR 编码 或 票号 TKT，至少填一项才能出票。');
+    // Focus the PNR field
+    const pnrInput = document.getElementById(`pnr-${idx}`);
+    if (pnrInput) pnrInput.focus();
+    return;
+  }
   await saveRollingBackup(`出票前备份 #${idx+1} ${o.pnr || ''}`);
 
   try {
@@ -11903,7 +11973,12 @@ function formatTime(t) {
   else if (num.length === 3) { h = num[0]; min = num.slice(1); }
   else { h = num.slice(0, 2); min = num.slice(2); }
   if (ampm) return `${parseInt(h)}:${min}${ampm === 'A' ? 'AM' : 'PM'}`;
-  return `${h.padStart(2, '0')}:${min}`;
+  // Convert 24h to AM/PM
+  let hour = parseInt(h, 10);
+  const suffix = hour < 12 ? 'AM' : 'PM';
+  if (hour === 0) hour = 12;
+  else if (hour > 12) hour -= 12;
+  return `${hour}:${min}${suffix}`;
 }
 
 let toastTimer;
@@ -12665,6 +12740,8 @@ async function mergeImportData(event) {
 
 (async function init() {
   setToday();
+  updateWorldClocks();
+  setInterval(updateWorldClocks, 1000);
   await loadSettings();
 
   const restored = await loadPersistedOrders();
