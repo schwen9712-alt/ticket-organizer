@@ -4166,6 +4166,12 @@ function extractDOB(text) {
   if (!text) return null;
   const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const toYY = (y) => y.length === 4 ? y.slice(2) : y.padStart(2, '0');
+  // OCR correction: replace digit 0 with letter O inside likely month abbreviations
+  // e.g. "N0V" → "NOV", "0CT" → "OCT", "J0N" → "JON" (won't match anyway)
+  text = text.replace(/\b([A-Za-z]{0,2})0([A-Za-z]{0,2})\b/g, (m, a, b) => {
+    const candidate = (a + 'O' + b).toUpperCase();
+    return MONTHS.includes(candidate) ? (a + 'O' + b) : m;
+  });
   // Try Chinese "YYYY年M月D[日]" format (year first)
   const cnM = text.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
   if (cnM) {
@@ -4337,6 +4343,38 @@ function parseSingleBooking(raw) {
       const cnName = cnPaxMatch[1].trim();
       if (cnName && !pax.find(p => p.name === cnName)) {
         pax.push({ name: cnName, gender: '', dob: '' });
+      }
+      continue;
+    }
+
+    // Labeled field format (multi-line passenger info):
+    //   "名字：CHEN/GONGHAI" / "姓名：WANG/LI"
+    //   "出生日期 1969-06-14" / "出生日期：1969-06-14"
+    //   "性别：男" / "性别：女"
+    const labeledName = trimmed.match(/^(?:名字|姓名)[：:\s]\s*([A-Z]{2,}\/[A-Z][A-Z\s]*)/i);
+    if (labeledName) {
+      const name = labeledName[1].trim().replace(/\s+/g, ' ');
+      if (name && !pax.find(p => p.name === name)) {
+        pax.push({ name, gender: '', dob: '' });
+      }
+      continue;
+    }
+    const labeledDob = trimmed.match(/^出生日期[：:\s]\s*(.+)/);
+    if (labeledDob) {
+      const dob = extractDOB(labeledDob[1]);
+      if (dob && pax.length > 0) {
+        const last = pax[pax.length - 1];
+        if (!last.dob) last.dob = dob;
+      }
+      continue;
+    }
+    const labeledGender = trimmed.match(/^性别[：:\s]\s*([男女MF])/i);
+    if (labeledGender) {
+      const g = labeledGender[1];
+      const gender = (g === '男' || g.toUpperCase() === 'M') ? 'MALE' : 'FEMALE';
+      if (pax.length > 0) {
+        const last = pax[pax.length - 1];
+        if (!last.gender) last.gender = gender;
       }
       continue;
     }
@@ -11989,10 +12027,10 @@ const JSONBIN_API = 'https://api.jsonbin.io/v3/b';
 const JSONBIN_MASTER_KEY = '$2a$10$keeTXj5XpCyQVOSLSNAREObkBTsF6h4EguGoFHTDfoIvAKI8OkkZG';
 const SHARED_BIN_ID = '69e49b6636566621a8cbe729';
 
-let cloudSyncEnabled = true;   // always on for everyone
-let cloudSyncKey = SHARED_BIN_ID;
+let cloudSyncEnabled = false;  // DISABLED — cloud sync turned off
+let cloudSyncKey = null;       // DISABLED
 let cloudPushTimer = null;
-let _initialPullComplete = false;
+let _initialPullComplete = true; // skip initial pull guard
 
 async function createCloudAccount() {
   toast('正在创建云账号...');
@@ -12701,33 +12739,10 @@ async function mergeImportData(event) {
     if (pendingCount > 0) toast(`已恢复 ${pendingCount} 单待处理订单`);
   }
 
-  // Load cloud config; if enabled, ALWAYS pull from cloud immediately.
-  // Cloud is the single source of truth — local is only a fallback.
+  // Cloud sync disabled — skip startup pull
   await loadCloudConfig();
   await loadGistConfig();
-  if (cloudSyncEnabled && cloudSyncKey) {
-    // Always pull from cloud on startup — no delays, no local-wins logic.
-    try {
-      await cloudPull(true);
-      const afterTicketed = (settings.ticketed || []).length;
-      const afterPending = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
-      if (afterTicketed > 0 || afterPending > 0) {
-        toast(`☁ 已从云端同步：${afterTicketed} 单已出票 · ${afterPending} 单待出票`);
-      }
-    } catch(e) {
-      console.warn('[Startup] cloudPull failed, using local data:', e);
-    }
-  } else if (cloudSyncEnabled === false) {
-    // Safety mechanism 2: No cloud sync configured — show a one-time nudge.
-    // Only show if user has data (don't nag on first ever launch).
-    const hasData = (settings.ticketed || []).length > 0 || STATE.orders.filter(o => isMeaningfulOrder(o)).length > 0;
-    const lastNudge = localStorage.getItem('ticket-organizer-cloud-nudge');
-    const nudgeAge = lastNudge ? (Date.now() - parseInt(lastNudge)) : Infinity;
-    if (hasData && nudgeAge > 7 * 24 * 3600 * 1000) {
-      localStorage.setItem('ticket-organizer-cloud-nudge', String(Date.now()));
-      setTimeout(() => toast('⚠ 云同步未开启 — 换版本时数据可能丢失。建议在【设置】开启云同步。', 6000), 2000);
-    }
-  }
+  // Cloud sync disabled — no startup pull
 
   // Safety mechanism 3: Daily backup reminder.
   // Once per day, remind the user to export a JSON backup.
