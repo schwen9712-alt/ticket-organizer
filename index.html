@@ -5370,11 +5370,10 @@ function renderAirlineUsdPanel(orders) {
   const grid = document.getElementById('airlineUsdGrid');
   if (!panel || !grid) return;
 
-  // Show ALL meaningful orders, sorted to match the order-card grouping (by agent first-seen).
-  // This way美金面板的 #N == 下方订单卡片的 ORDER #N，避免错位。
+  // Show ALL meaningful orders except 表G (which only appears in CHASE TRAVEL tab)
   const meaningful = STATE.orders
     .map((o, i) => ({ o, i }))
-    .filter(({o}) => isMeaningfulOrder(o));
+    .filter(({o}) => isMeaningfulOrder(o) && o.tableLabel !== 'G');
 
   // Compute agent first-appearance order
   const agentFirstSeen = {};
@@ -7247,7 +7246,7 @@ function toggleNoAvailability(idx) {
   if (!o) return;
   o.noAvailability = !o.noAvailability;
   persistOrders();
-  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord));
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
   toast(o.noAvailability ? '⏸ 已标记为暂时无位' : '✓ 已恢复');
 }
@@ -7261,7 +7260,7 @@ function toggleWaitingForRelease(idx) {
   const actionsEl = document.getElementById(`order-actions-${idx}`);
   if (actionsEl) renderPendingOrderActions(actionsEl, o, idx);
   // Update USD list badge in place
-  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord));
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
   toast(o.waitingForRelease ? '🔒 已标记为等待放位' : '✓ 已标记为放位完成');
 }
@@ -7448,7 +7447,7 @@ function _cpSelect(chId) {
   // Update revenue/stats that depend on cardholder without full re-render
   refreshPendingOrderPreview(_cp.idx);
   // Re-render the USD amount list (lightweight)
-  const meaningful = STATE.orders.filter(o => isMeaningfulOrder(o));
+  const meaningful = STATE.orders.filter(o => isMeaningfulOrder(o) && o.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
 }
 
@@ -7535,7 +7534,7 @@ function chPickerClear(idx) {
   if (clearBtn) clearBtn.style.display = 'none';
   if (arrow) arrow.style.display = 'inline';
   refreshPendingOrderPreview(idx);
-  const meaningful = STATE.orders.filter(o => isMeaningfulOrder(o));
+  const meaningful = STATE.orders.filter(o => isMeaningfulOrder(o) && o.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
 }
 
