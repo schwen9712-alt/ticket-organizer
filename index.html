@@ -4719,8 +4719,11 @@ function parseSingleBooking(raw) {
     // Chinese cabin word + price (possibly with text in between):
     //   "普通经济17793", "商务舱45638", "经济舱 17793", "经济舱一件行李 10300"
     const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
+    // Baggage + fare line: "2pc  48596", "1pc 23400" — Npc followed by fare amount
+    const pBagFare = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin
+      && trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i);
     // Bare price line: "24568", "24568  *2"
-    const pC = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin && trimmed.match(/^(\d{3,6})\s*\*?\s*\d{0,2}\s*$/);
+    const pC = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin && !pBagFare && trimmed.match(/^(\d{3,6})\s*\*?\s*\d{0,2}\s*$/);
     // TravelSky fare line (no currency suffix): "02 XHX00NM6              9847"
     // Pattern: 1-2 digit index, space, alphanumeric fare code (possibly ending +/*), space(s), 3-6 digit amount, EOL.
     // Only try if nothing above matched — some PNRs use this format when CNY is stripped.
@@ -4763,6 +4766,9 @@ function parseSingleBooking(raw) {
       }
     } else if (pC) {
       const amt = parseFloat(pC[1]);
+      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+    } else if (pBagFare) {
+      const amt = parseFloat(pBagFare[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pTravelSkyFare) {
       const amt = parseFloat(pTravelSkyFare[1]);
