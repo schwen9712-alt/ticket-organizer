@@ -8636,7 +8636,7 @@ async function markAllTicketed() {
 
   // SAFETY: Rolling local backup + immediate cloud push after batch ticketing
   await saveRollingBackup(`批量出票 ${toSave.length} 单`);
-  if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
+  if (cloudSyncEnabled && cloudSyncKey) cloudPush(true, true);
   if (gistToken) gistPush(true);
 
   STATE.orders = [newOrder()];
@@ -9086,7 +9086,7 @@ async function submitManualTicket(btn) {
   settings.ticketed.unshift(entry);
   await storageSet('ticket-organizer-settings', settings);
   await saveRollingBackup(`手动补录 ${pnr || paxRaw.split('\n')[0]}`);
-  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true);
+  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true, true);
   if (typeof gistPush === 'function' && gistToken) gistPush(true);
 
   btn.closest('.verify-modal-overlay').remove();
@@ -11222,7 +11222,7 @@ async function doMarkTicketed(idx) {
     await saveRollingBackup(`出票 #${idx+1} ${entry.pnr || ''}`);
 
     // Push to cloud immediately (bypass debounce)
-    if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
+    if (cloudSyncEnabled && cloudSyncKey) cloudPush(true, true);
     if (gistToken) gistPush(true);
 
     toast(`✓ 订单 #${idx+1} 已出票`);
@@ -12134,14 +12134,34 @@ async function cloudPull(silent) {
   }
 }
 
-async function cloudPush(silent) {
+async function cloudPush(silent, mergeTicketed) {
   if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
   try {
+    // Only fetch+merge when explicitly requested (e.g. right after ticketing).
+    // Regular setting changes push directly to avoid doubling API calls.
+    if (mergeTicketed) {
+      let cloudTicketedArr = [];
+      try {
+        const fetchRes = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
+          headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
+        });
+        if (fetchRes.ok) {
+          const fetchData = await fetchRes.json();
+          cloudTicketedArr = ((fetchData.record && fetchData.record.settings && fetchData.record.settings.ticketed) || []);
+        }
+      } catch (e) { /* ignore, push local as-is */ }
+      const localTicketedArr = (settings.ticketed || []);
+      const mergedById = new Map();
+      localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
+      const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
+      settings.ticketed = mergedTicketed;
+    }
+
     const now = Date.now();
     settings.updatedAt = now;
     await storageSet('ticket-organizer-settings', settings);
     // Strip screenshots from cloud payload — base64 images are too large for jsonbin
-    // and don't need to sync. They're stored locally only.
     const ordersForCloud = STATE.orders.map(o => {
       if (!o.screenshots || o.screenshots.length === 0) return o;
       const { screenshots, ...rest } = o;
