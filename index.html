@@ -833,9 +833,15 @@ textarea.raw-input {
 }
 
 /* Print-friendly / screenshot-ready card */
-.ticket-card[data-airline="AA"] .ticket-card-header { background: linear-gradient(135deg, #B8002E 0%, #7A001E 100%); }
-.ticket-card[data-airline="UA"] .ticket-card-header { background: linear-gradient(135deg, #002244 0%, #001a33 100%); }
-.ticket-card[data-airline="DL"] .ticket-card-header { background: linear-gradient(135deg, #9B1B30 0%, #003366 100%); }
+/* Official airline brand colors */
+.ticket-card[data-airline="AA"] .ticket-card-header { background: linear-gradient(135deg, #1B3A5C 0%, #0D2035 60%, #C8102E 100%); }
+.ticket-card[data-airline="UA"] .ticket-card-header { background: linear-gradient(135deg, #003087 0%, #001A4E 100%); }
+.ticket-card[data-airline="DL"] .ticket-card-header { background: linear-gradient(135deg, #E01933 0%, #8B0012 50%, #003057 100%); }
+.ticket-card[data-airline="AS"] .ticket-card-header { background: linear-gradient(135deg, #00637B 0%, #003F4E 100%); }
+.ticket-card[data-airline="WN"] .ticket-card-header { background: linear-gradient(135deg, #304CB2 0%, #FFBF27 100%); }
+.ticket-card[data-airline="CA"] .ticket-card-header { background: linear-gradient(135deg, #CC0000 0%, #880000 100%); }
+.ticket-card[data-airline="CZ"] .ticket-card-header { background: linear-gradient(135deg, #1D3E8F 0%, #0A1F4A 100%); }
+.ticket-card[data-airline="MU"] .ticket-card-header { background: linear-gradient(135deg, #E21837 0%, #8B0012 100%); }
 .ticket-card[data-airline="AS"] .ticket-card-header { background: linear-gradient(135deg, #01426A 0%, #012a44 100%); }
 .ticket-card[data-airline="B6"] .ticket-card-header { background: linear-gradient(135deg, #003876 0%, #002655 100%); }
 .ticket-card[data-airline="WN"] .ticket-card-header { background: linear-gradient(135deg, #304CB2 0%, #F9B612 100%); }
@@ -2894,6 +2900,48 @@ const STATE = {
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
       'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
+    },
+    'NH': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business', 'O': 'Business',
+      'W': 'Premium', 'X': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'G': 'Economy', 'T': 'Economy', 'R': 'Economy', 'U': 'Economy'
+    },
+    'JL': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'S': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'G': 'Economy', 'N': 'Economy', 'T': 'Economy', 'R': 'Economy', 'O': 'Economy', 'X': 'Economy'
+    },
+    'CX': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'R': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'G': 'Economy', 'E': 'Economy', 'T': 'Economy', 'X': 'Economy', 'U': 'Economy'
+    },
+    'KE': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'S': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'T': 'Economy', 'E': 'Economy', 'N': 'Economy', 'R': 'Economy', 'G': 'Economy', 'U': 'Economy'
+    },
+    'OZ': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business',
+      'W': 'Premium', 'S': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'T': 'Economy', 'G': 'Economy', 'N': 'Economy', 'R': 'Economy', 'U': 'Economy'
+    },
+    'CA': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business', 'O': 'Business', 'R': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'T': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'G': 'Economy', 'U': 'Economy', 'X': 'Economy'
+    },
+    'CZ': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business',
+      'W': 'Premium', 'P': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'T': 'Economy', 'G': 'Economy', 'X': 'Economy', 'U': 'Economy'
     }
   },
   collapsedOrders: new Set()  // in-memory collapse state; restored from sessionStorage on load
@@ -2939,9 +2987,50 @@ const DEFAULT_SETTINGS = {
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
       'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
+    },
+    'NH': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business', 'O': 'Business',
+      'W': 'Premium', 'X': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'G': 'Economy', 'T': 'Economy', 'R': 'Economy', 'U': 'Economy'
+    },
+    'JL': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'S': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'G': 'Economy', 'N': 'Economy', 'T': 'Economy', 'R': 'Economy', 'O': 'Economy', 'X': 'Economy'
+    },
+    'CX': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'R': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'G': 'Economy', 'E': 'Economy', 'T': 'Economy', 'X': 'Economy', 'U': 'Economy'
+    },
+    'KE': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'S': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'T': 'Economy', 'E': 'Economy', 'N': 'Economy', 'R': 'Economy', 'G': 'Economy', 'U': 'Economy'
+    },
+    'OZ': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'P': 'Business',
+      'W': 'Premium', 'S': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'T': 'Economy', 'G': 'Economy', 'N': 'Economy', 'R': 'Economy', 'U': 'Economy'
+    },
+    'CA': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business', 'O': 'Business', 'R': 'Business',
+      'W': 'Premium', 'P': 'Premium', 'T': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'G': 'Economy', 'U': 'Economy', 'X': 'Economy'
+    },
+    'CZ': {
+      'F': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business',
+      'W': 'Premium', 'P': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'T': 'Economy', 'G': 'Economy', 'X': 'Economy', 'U': 'Economy'
     }
   },
-  cardholders: [],
   knownPax: [
     { last: 'QIU', first: 'XIAOGANG', dob: '05JAN70', gender: 'MALE' }
   ],
@@ -4103,7 +4192,29 @@ function splitIntoBookings(raw) {
   // a booking boundary — that's a user annotation, not a separator.
   const hasSeparator = /^\s*[=\-_*]{3,}\s*$/m.test(raw);
   if (hasSeparator) {
-    return raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
+    const chunks = raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
+    // Merge chunks: if a chunk has no confirmed segment (DK/HK) but has fare/pax,
+    // merge it with the next chunk that does have segments
+    // Only count DK/HK as confirmed segment if NOT in an SSR/OSI line
+    const hasConfirmedSeg = (c) => c.split(/\r?\n/).some(line => {
+      const t = line.trim();
+      if (/^(?:SSR|OSI|OSS|RMK|OPT)\b/i.test(t)) return false;
+      return /\bDK\d|\bHK\d/i.test(t);
+    });
+    const merged = [];
+    let carry = '';
+    for (const chunk of chunks) {
+      if (carry) {
+        merged.push(carry + '\n' + chunk);
+        carry = '';
+      } else if (!hasConfirmedSeg(chunk)) {
+        carry = chunk;  // hold over to merge with next chunk
+      } else {
+        merged.push(chunk);
+      }
+    }
+    if (carry) merged.push(carry); // leftover with no following chunk
+    return merged.filter(x => x.trim());
   }
 
   // Strong split: "第X单" markers (Chinese order numbers like 第1单, 第十五单, 第15单).
@@ -4140,8 +4251,11 @@ function splitIntoBookings(raw) {
   const isNameLike = (s) => {
     const t = s.trim();
     if (!t.includes('/')) return false;
-    // Ignore labeled field lines like "名字：CHEN/GONGHAI" — these are NOT split boundaries
+    // Ignore labeled field lines like "名字：CHEN/GONGHAI"
     if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
+    // Ignore Chinese inline pax lines like "ZHANG/JIAHAO  男  1991年8月28"
+    // These contain name + gender + Chinese date on same line
+    if (/[男女]/.test(t) && /\d{4}年/.test(t)) return false;
     return /^(?:\d+[\.\s]+)?[A-Z]{2,}\/\s?[A-Z]+/.test(t);
   };
   const isSegLike = (s) => {
@@ -4254,6 +4368,13 @@ function parseSingleBooking(raw) {
   const segs = [];
   let airline = '';
   let rmb = null, usd = null, parsedDiscount = null;
+  // Declare shared parse-result variables upfront to avoid var-hoisting bugs
+  let parsedCabin = undefined;
+  let parsedPaxPrices = undefined;
+  let parsedFareByType = undefined;
+  let _lastFareType = undefined;
+  let _equivFareAmt = undefined;
+  let _equivFareType = undefined;
 
   // Scan whole text for product discount markers (产1, 产2, etc.)
   // Highest priority — overrides all other discount sources.
@@ -4380,16 +4501,39 @@ function parseSingleBooking(raw) {
   ];
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    // Strip leading non-ASCII junk characters that some GDS systems prepend
+    const trimmed = line.replace(/^[^\x20-\x7E\u4e00-\u9fa5]+/, '').trim();
     if (!trimmed) continue;
 
-    // Chinese booking format: "乘机人：刘桂介" or "旅客：张三"
-    // Store the Chinese name directly (no LAST/FIRST slash format)
+    // ── FIRST PRIORITY: CO fare line "CO3709", "CO3709 经济0PC", "CO7779CNY/人"
+    const coFareMatch = trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位)?(?:\s+(?:普通经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务))?(?:\s*\d*PC)?\s*$/i);
+    if (coFareMatch) {
+      const amt = parseFloat(coFareMatch[1]);
+      if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
+      const cabM = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
+      const _cMap = {'普通经济':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱','经济舱':'经济舱','经济':'经济舱','商务舱':'商务舱','商务':'商务舱','头等舱':'头等舱','头等':'头等舱'};
+      if (cabM && _cMap[cabM[1]] && parsedCabin === undefined) parsedCabin = _cMap[cabM[1]];
+      continue;
+    }
+    // Also handles plain Chinese name: "乘机人：刘桂介"
     const cnPaxMatch = trimmed.match(/^(?:乘机人|旅客|乘客)[：:]\s*(.+)/);
     if (cnPaxMatch) {
-      const cnName = cnPaxMatch[1].trim();
-      if (cnName && !pax.find(p => p.name === cnName)) {
-        pax.push({ name: cnName, gender: '', dob: '' });
+      const raw = cnPaxMatch[1].trim();
+      // Try to extract LAST/FIRST + DOB + gender from inline format
+      const inlineMatch = raw.match(/^([A-Z]{2,}\/[A-Z][A-Z\s]*?)\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4})\s*([男女MF]?)$/i);
+      if (inlineMatch) {
+        const name = inlineMatch[1].trim();
+        const dob = extractDOB(inlineMatch[2]) || '';
+        const g = inlineMatch[3];
+        const gender = g === '男' || g.toUpperCase() === 'M' ? 'MALE' : g === '女' || g.toUpperCase() === 'F' ? 'FEMALE' : '';
+        if (!pax.find(p => p.name === name)) {
+          pax.push({ name, dob, gender });
+        }
+      } else {
+        // Fallback: store as-is (Chinese name or no DOB)
+        if (raw && !pax.find(p => p.name === raw)) {
+          pax.push({ name: raw, gender: '', dob: '' });
+        }
       }
       continue;
     }
@@ -4506,13 +4650,14 @@ function parseSingleBooking(raw) {
 
     // Standalone cabin keyword line: a line that is ONLY a cabin word (e.g. "经济舱", "商务舱")
     // Common in Chinese booking system outputs where cabin is on its own line
-    if (typeof parsedCabin === 'undefined') {
-      const standaloneCabin = trimmed.match(/^(头等舱|头等|商务舱|商务|超级经济舱|超级经济|超经|经济舱|经济)\s*$/);
-      if (standaloneCabin) {
-        const cabMap = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱',
+    if (parsedCabin === undefined) {
+      const standaloneCabin = trimmed.match(/^(?:大人|儿童|婴儿)?[^\u4e00-\u9fa5]*(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)\s*(?:2PC|1PC|\d+PC|行李|$)/i);
+        if (standaloneCabin) {
+        const cabMap2 = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱',
+          '公务': '商务舱', '公务舱': '商务舱',
           '超经': '超级经济舱', '超级经济': '超级经济舱', '超级经济舱': '超级经济舱',
           '经济': '经济舱', '经济舱': '经济舱' };
-        var parsedCabin = cabMap[standaloneCabin[1]];
+        parsedCabin = cabMap2[standaloneCabin[1]];
         continue;
       }
     }
@@ -4522,18 +4667,20 @@ function parseSingleBooking(raw) {
     //   "第九单 87 商务"
     //   "第九单 经济舱 87折"
     //   "第九单 头等 8.7折"
-    const orderMarker = trimmed.match(/第\s*[一二三四五六七八九十\d]+\s*单/);
+    const orderMarker = trimmed.match(/第\s*[一二三四五六七八九十\d]+\s*单/)
+      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s*$/) // "19单    92" format
+      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s+/);  // "19单    92  商务" format
     if (orderMarker) {
       // Extract cabin anywhere in the line
-      const cabMatch = trimmed.match(/(头等舱|头等|商务舱|商务|超级经济|超经|经济舱|经济)/);
+      const cabMatch = trimmed.match(/(头等舱|头等|商务舱|商务|公务舱|公务|超级经济|超经|经济舱|经济)/);
       if (cabMatch) {
-        var parsedCabin = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱', '超经': '超级经济舱', '超级经济': '超级经济舱', '经济': '经济舱', '经济舱': '经济舱' }[cabMatch[1]];
+        parsedCabin = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱', '公务': '商务舱', '公务舱': '商务舱', '超经': '超级经济舱', '超级经济': '超级经济舱', '经济': '经济舱', '经济舱': '经济舱' }[cabMatch[1]];
       }
-      // Strip the "第N单" portion so its digits don't leak into discount detection.
-      // Also strip dates like "4/19" or "MM/DD" prefixes that aren't discount info.
+      // Strip the order number portion
       const cleaned = trimmed
         .replace(/第\s*[一二三四五六七八九十\d]+\s*单/g, ' ')
-        .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ');  // dates like 4/19, 12/31
+        .replace(/^\d{1,3}\s*单\s+/, ' ')  // "19单    " prefix
+        .replace(/\b\d{1,2}\s*\/\s*\d{1,2}\b/g, ' ');
       // PRIORITY 1: number explicitly followed by "折" (e.g. "87折", "8.7折", "0.87折")
       const explicitDiscount = cleaned.match(/(\d+\.\d+|\d+)\s*折/);
       if (explicitDiscount) {
@@ -4584,9 +4731,34 @@ function parseSingleBooking(raw) {
     ]);
     const isMetaName = (n) => {
       const surname = (n.split('/')[0] || '').trim().toUpperCase();
-      return PNR_META_TOKENS.has(surname);
+      // Exact match
+      if (PNR_META_TOKENS.has(surname)) return true;
+      // FSI variants: FSICH, FSIP1, FSIXXX etc.
+      if (surname.startsWith('FSI') && surname.length > 3) return true;
+      // Single letter after slash like "FSICH/CA" → surname=FSICH, first=CA (airline code)
+      if (/^[A-Z]{2,3}$/.test(n.split('/')[1] || '')) {
+        // If "first name" is a 2-3 letter airline code, likely a meta token
+        const first = (n.split('/')[1] || '').trim().toUpperCase();
+        const AIRLINE_CODES = new Set(['CA','UA','AA','DL','AS','WN','CX','MH','KE','OZ','JL','NH','SQ','TG','QR','EK','LH','AF','BA','KL']);
+        if (AIRLINE_CODES.has(first) && surname.length >= 3) return true;
+      }
+      return false;
     };
     const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
+    // ── Chinese inline pax: "ZHANG/JIAHAO  男  1991年8月28" ─────────────
+    const cnInlinePax = trimmed.match(/^([A-Z]{2,}\/[A-Z][A-Z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2})/);
+    if (cnInlinePax) {
+      const name = cnInlinePax[1].trim();
+      const g = cnInlinePax[2];
+      const gender = (g.startsWith('男')) ? 'MALE' : 'FEMALE';
+      const dob = extractDOB(cnInlinePax[3]) || '';
+      const isInfant = g === '男婴' || g === '女婴';
+      const isChild = g === '男童' || g === '女童';
+      if (!pax.find(p => p.name === name)) {
+        pax.push({ name, gender, dob, ...(isInfant ? { forcedType: 'INFANT' } : isChild ? { forcedType: 'CHILD' } : {}) });
+      }
+      continue;
+    }
     const nameMatches = [...trimmed.matchAll(nameRe)].filter(m => !isMetaName(m[1]));
     if (nameMatches.length > 0) {
       let foundAny = false;
@@ -4716,25 +4888,44 @@ function parseSingleBooking(raw) {
     // Only treat as explicit adult fare when we already have (or will have) a child/infant line
     const inlineAdultFare = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch
       && trimmed.match(/^\d{1,2}\s+[A-Z0-9]+[+*]?\s+(\d{3,6})\s*(?:CNY|RMB|人民币)\s*$/i);
+
+    // TOTAL CNY line: "TOTAL CNY 13555" — this is the authoritative fare (base + tax)
+    const totalCnyMatch = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch && !inlineAdultFare
+      && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
+    if (totalCnyMatch && _lastFareType) {
+      const amt = parseFloat(totalCnyMatch[1]);
+      if (amt >= 100 && amt <= 500000) {
+        if (!parsedFareByType) parsedFareByType = {};
+        if (_lastFareType === 'ADULT') { parsedFareByType.adult = amt; if (!rmb) rmb = amt; }
+        else if (_lastFareType === 'CHILD') parsedFareByType.child = amt;
+        else if (_lastFareType === 'INFANT') parsedFareByType.infant = amt;
+        _lastFareType = null;
+        continue;
+      }
+    }
+
     if (fareTypeMatch || inlineInfMatch || inlineCnnMatch || inlineAdultFare) {
       const fareKind = fareTypeMatch ? fareTypeMatch[1]
         : inlineInfMatch ? 'INFANT'
         : inlineCnnMatch ? 'CHILD'
         : 'ADULT';
-      // Extract the CNY/RMB amount from this line
-      const amtMatch = trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
-      if (amtMatch) {
-        const amt = parseFloat(amtMatch[1]);
+      // Normalize fareKind to ADULT/CHILD/INFANT for tracking
+      const normKind = (fareKind === '大人' || fareKind === '成人') ? 'ADULT'
+        : (fareKind === '儿童' || fareKind === '小儿') ? 'CHILD'
+        : fareKind === '婴儿' ? 'INFANT' : fareKind;
+      // Track type — TOTAL CNY line (coming later) takes priority over EQUIV CNY
+      _lastFareType = normKind;
+      // Extract EQUIV CNY as FALLBACK (in case no TOTAL line follows)
+      const equivMatch = trimmed.match(/(?:EQUIV\s+(?:CNY|RMB|人民币)|CNY|RMB|人民币)\s+(\d{3,6}(?:\.\d+)?)/i)
+        || trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
+      if (equivMatch) {
+        const amt = parseFloat(equivMatch[1]);
         if (amt >= 100 && amt <= 500000) {
-          if (!parsedFareByType) var parsedFareByType = {};
-          if (fareKind === '大人' || fareKind === '成人' || fareKind === 'ADULT') parsedFareByType.adult = amt;
-          else if (fareKind === '儿童' || fareKind === '小儿' || fareKind === 'CHILD') parsedFareByType.child = amt;
-          else if (fareKind === '婴儿' || fareKind === 'INFANT') parsedFareByType.infant = amt;
-          // Set rmb to adult fare as default if not set
-          if ((fareKind === '大人' || fareKind === '成人' || fareKind === 'ADULT') && !rmb) rmb = amt;
-          continue;
+          _equivFareAmt = amt;
+          _equivFareType = normKind;
         }
       }
+      continue;
     }
 
     // MULTI-PASSENGER PRICE EXPRESSION
@@ -4746,7 +4937,9 @@ function parseSingleBooking(raw) {
     // If only a single term, it's equivalent to the existing "9600×0.87" shorthand
     // but we still want to capture the discount explicitly.
     const priceExprMatches = [...trimmed.matchAll(/(\d{3,6})\s*[*xX×]\s*([01]?\.\d+)/g)];
-    if (priceExprMatches.length > 0 && !rmb) {
+    // Skip if expression has count multiplier (*N) — handled by pCabinMulti above
+    const hasCountMultiplier = /\d{3,6}\s*[*xX×]\s*[01]?\.\d+\s*[*xX×]\s*\d+/.test(trimmed);
+    if (priceExprMatches.length > 0 && !rmb && !hasCountMultiplier) {
       const amounts = priceExprMatches.map(m => parseFloat(m[1])).filter(a => a >= 500 && a <= 500000);
       const rates = priceExprMatches.map(m => parseFloat(m[2]));
       if (amounts.length > 0) {
@@ -4761,7 +4954,7 @@ function parseSingleBooking(raw) {
           } else {
             // Multiple DIFFERENT prices — store as paxPrices array and use first
             // as basePrice (usually adult price).
-            var parsedPaxPrices = amounts.slice();
+            parsedPaxPrices = amounts.slice();
             rmb = amounts[0];  // legacy fallback; real total computed from paxPrices downstream
           }
           // Set discount too (as percentage). Don't overwrite if explicit discount is already set.
@@ -4770,7 +4963,7 @@ function parseSingleBooking(raw) {
             if (pct >= 10 && pct <= 100) parsedDiscount = +pct.toFixed(0);
           }
           // Also sniff cabin from the same line (e.g. "普通经济 9600*0.87")
-          if (typeof parsedCabin === 'undefined') {
+          if (parsedCabin === undefined) {
             const cabMatch = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
             if (cabMatch) {
               const map = {
@@ -4779,7 +4972,7 @@ function parseSingleBooking(raw) {
                 '商务舱': '商务舱', '商务': '商务舱',
                 '头等舱': '头等舱', '头等': '头等舱'
               };
-              if (map[cabMatch[1]]) var parsedCabin = map[cabMatch[1]];
+              if (map[cabMatch[1]]) parsedCabin = map[cabMatch[1]];
             }
           }
           continue;  // consume this line so pA/pCabin below don't double-count
@@ -4820,7 +5013,7 @@ function parseSingleBooking(raw) {
     // 元 suffix: "3820元", "3820元/人"
     const pYuan = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^(\d{3,6}(?:\.\d+)?)元/);
     // CO prefix = 运价 in RMB: "CO7850", "CO 7850", "CO15689 每位 *2"
-    const pCO = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位|\s*\*\s*\d+)?\s*$/i);
+    const pCO = !pA && !pB && !pPrefix && !pYunjia && trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位|\s*\*\s*\d+)?(?:\s+(?:普通经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务))?(?:\s*\d*PC)?\s*$/i);
     // Decimal discount on a header line: "18单  0.87  AA经济" → discount = 87
     const pDecimalDiscountM = trimmed.match(/\b(0\.\d{2})\b/);
     if (pDecimalDiscountM && !parsedDiscount && trimmed.match(/单|AA|UA|DL|CA|MU|CZ|经济|商务/)) {
@@ -4829,10 +5022,53 @@ function parseSingleBooking(raw) {
     }
     // Chinese cabin word + price (possibly with text in between):
     //   "普通经济17793", "商务舱45638", "经济舱 17793", "经济舱一件行李 10300"
-    const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
+    // ── Multi-part cabin fare: "普通经济9120*0.88*3+9050*0.88" ────────────
+    // Format: cabinLabel + price*discount*count + price*discount*count ...
+    const pCabinMulti = !pA && !pB && !pPrefix && !pYunjia && !pCO &&
+      trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)(\d[\d\*\.\+]+)$/);
+    if (pCabinMulti) {
+      const expr = pCabinMulti[1];
+      const groups = expr.split('+');
+      let discountFromExpr = null;
+      // Build flat paxPrices array directly from counts in expression
+      // e.g. "9120*0.88*3+9050*0.88" → [{base:9120,count:3},{base:9050,count:1}]
+      const priceGroups = [];
+      for (const g of groups) {
+        const parts = g.split('*');
+        const base = parseFloat(parts[0]) || 0;
+        const disc = parts.length > 1 ? parseFloat(parts[1]) || 1 : 1;
+        const count = parts.length > 2 ? parseInt(parts[2]) || 1 : 1;
+        if (discountFromExpr === null && disc < 1) discountFromExpr = Math.round(disc * 100);
+        if (base >= 100) priceGroups.push({ base, count });
+      }
+      if (priceGroups.length > 0) {
+        // Build flat list: [9120, 9120, 9120, 9050]
+        const flatPrices = [];
+        for (const { base, count } of priceGroups) {
+          for (let i = 0; i < count; i++) flatPrices.push(base);
+        }
+        // Store directly as parsedPaxPrices (discount applied separately)
+        parsedPaxPrices = flatPrices;
+        if (discountFromExpr != null && typeof parsedDiscount === 'undefined') {
+          parsedDiscount = discountFromExpr;
+        }
+        rmb = priceGroups[0].base;
+        // Also set parsedFareByType for display grouping
+        if (!parsedFareByType) parsedFareByType = {};
+        parsedFareByType.adult = priceGroups[0].base;
+        if (priceGroups.length > 1) parsedFareByType.child = priceGroups[1].base;
+        const _cabinMap = {'普通经济':'经济舱','超级经济舱':'超级经济舱','超级经济':'超级经济舱','超经':'超级经济舱','经济舱':'经济舱','经济':'经济舱','商务舱':'商务舱','商务':'商务舱','头等舱':'头等舱','头等':'头等舱'};
+        const cabMatch = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
+        if (cabMatch && _cabinMap[cabMatch[1]] && parsedCabin === undefined) {
+          parsedCabin = _cabinMap[cabMatch[1]];
+        }
+        continue;
+      }
+    }
+    // Chinese cabin word + price: "普通经济17793", "商务舱45638"
+    const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabinMulti && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
     // Baggage + fare line — two orders:
-    //   "2pc  48596"  (baggage first)
-    //   "32392   2pc" (fare first)
+    //   "2pc  48596"  (baggage first) / "32392   2pc" (fare first)
     const pBagFare = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin
       && (trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i) || trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i));
     // Bare price line: "24568", "24568  *2"
@@ -4865,7 +5101,7 @@ function parseSingleBooking(raw) {
       if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pCO) {
       const amt = parseFloat(pCO[1]);
-      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+      if (amt >= 500 && amt <= 500000 && !rmb) { rmb = amt; }
     } else if (pCabin) {
       const amt = parseFloat(pCabin[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -4877,8 +5113,8 @@ function parseSingleBooking(raw) {
         '头等舱': '头等舱', '头等': '头等舱'
       };
       const matched = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
-      if (matched && cabinMap[matched[1]] && typeof parsedCabin === 'undefined') {
-        var parsedCabin = cabinMap[matched[1]];
+      if (matched && cabinMap[matched[1]] && parsedCabin === undefined) {
+        parsedCabin = cabinMap[matched[1]];
       }
     } else if (pC) {
       const amt = parseFloat(pC[1]);
@@ -4936,8 +5172,15 @@ function parseSingleBooking(raw) {
 
   // If type-based fares were parsed (大人/儿童/婴儿运价), build paxPrices
   // by assigning each passenger their fare based on type (DOB + first segment date).
-  if (typeof parsedFareByType !== 'undefined' && parsedFareByType &&
-      Object.keys(parsedFareByType).length > 0 && pax.length > 0) {
+  // If 大人：/儿童：lines set _lastFareType but no TOTAL CNY followed, use EQUIV CNY as fallback
+  if (_equivFareAmt && _lastFareType) {
+    if (!parsedFareByType) parsedFareByType = {};
+    if (_equivFareType === 'ADULT') { parsedFareByType.adult = _equivFareAmt; if (!rmb) rmb = _equivFareAmt; }
+    else if (_equivFareType === 'CHILD') parsedFareByType.child = _equivFareAmt;
+    else if (_equivFareType === 'INFANT') parsedFareByType.infant = _equivFareAmt;
+  }
+
+  if (parsedFareByType && Object.keys(parsedFareByType).length > 0 && pax.length > 0 && parsedPaxPrices === undefined) {
     const firstSegDate = segs.length > 0 ? segs[0].date : null;
     const MONTH_MAP2 = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
     const getAgeAtFlight = (dob) => {
@@ -4965,17 +5208,26 @@ function parseSingleBooking(raw) {
     // Only use as paxPrices if at least one price differs (otherwise single basePrice is cleaner)
     const hasDiff = fareList.some((f, i) => f !== fareList[0] && f != null);
     if (hasDiff) {
-      var parsedPaxPrices = fareList.map(f => f || rmb || 0);
+      parsedPaxPrices = fareList.map(f => f || rmb || 0);
       rmb = parsedPaxPrices[0];  // adult fare as legacy basePrice
     } else if (fareList[0]) {
       rmb = fareList[0];
     }
   }
 
-  return { pax, segs, airline, rmb, usd, trip,
+  // Dedup segments: remove exact duplicates (same flight + date)
+  const seenSegs = new Set();
+  const dedupedSegs = segs.filter(s => {
+    const key = `${s.flight}|${s.date}|${s.from}|${s.to}`;
+    if (seenSegs.has(key)) return false;
+    seenSegs.add(key);
+    return true;
+  });
+
+  return { pax, segs: dedupedSegs, airline, rmb, usd, trip,
     discount: parsedDiscount || null,
-    cabin: typeof parsedCabin !== 'undefined' ? parsedCabin : null,
-    paxPrices: typeof parsedPaxPrices !== 'undefined' ? parsedPaxPrices : null,
+    cabin: parsedCabin ?? null,
+    paxPrices: parsedPaxPrices ?? null,
     productDiscount, productMarker, productNote,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
@@ -5023,11 +5275,11 @@ function detectDuplicates(newOrders) {
         strongMatch = { existing, where, reason: `${nf.firstPax} 所有航班完全相同` };
         return;
       }
-      // For TICKETED orders: also treat same-pax + same-airline as a strong block.
-      // It's better to block a false positive than let a duplicate slip through.
+      // For TICKETED orders: same-pax + same-airline + same departure date = strong block.
       if (where === 'ticketed' && nf.firstPax && ef.firstPax && nf.firstPax === ef.firstPax &&
-          nf.airline && ef.airline && nf.airline === ef.airline) {
-        strongMatch = { existing, where, reason: `${nf.firstPax} · ${nf.airline} · 已出票记录匹配` };
+          nf.airline && ef.airline && nf.airline === ef.airline &&
+          nf.date && ef.date && nf.date === ef.date) {
+        strongMatch = { existing, where, reason: `${nf.firstPax} · ${nf.airline} · 同日已出票` };
         return;
       }
       // WEAK: same passenger + same departure date (possible related booking)
@@ -5050,8 +5302,12 @@ function detectDuplicates(newOrders) {
 }
 
 async function parsePNR() {
+  try {
   const raw = document.getElementById('rawInput').value;
   if (!raw.trim()) { toast('请先粘贴内容'); return; }
+
+  // Sync DOM fields (agent, tableLabel etc.) to STATE before reading curr()
+  try { syncDOMToOrder(); } catch(e) { console.warn('syncDOMToOrder error:', e); }
 
   // Required fields validation: 代理 + 表 Label must be filled before parsing.
   // This prevents downstream report formatting issues when these are missing.
@@ -5185,7 +5441,6 @@ async function parsePNR() {
       usd: usd || null,
       rmb: rmb || null,
       paxPrices: (paxPrices && paxPrices.length > 0) ? paxPrices.slice() : null,
-      isSpecialDiscount: isSpecial,
       specialDiscountNote: specialNote,
       proposals,
       selectedProposalIdx: 0,
@@ -5252,6 +5507,29 @@ async function parsePNR() {
     });
     // Tag order with who entered it (for team view filtering)
     if (typeof tagOrderWithUser === 'function') tagOrderWithUser(o);
+    // Re-sort paxPrices AFTER knownPax backfill so DOBs are available
+    if (o.paxPrices && o.paxPrices.length === o.passengers.length && new Set(o.paxPrices).size > 1) {
+      const firstDate = o.segments[0] ? o.segments[0].date : null;
+      const paxAgeRank = o.passengers.map((p, i) => {
+        if (!p.dob || !firstDate) return { i, rank: 0 };
+        const age = calculateAgeAtFlight(p.dob, firstDate);
+        if (age == null) return { i, rank: 0 };
+        if (age < 2) return { i, rank: 3 };
+        if (age < 12) return { i, rank: 2 };
+        return { i, rank: 0 };
+      });
+      const sortedPrices = [...o.paxPrices].sort((a, b) => b - a);
+      const paxByRank = [...paxAgeRank].sort((a, b) => a.rank - b.rank);
+      const assigned = new Array(o.passengers.length);
+      paxByRank.forEach(({ i }, pi) => { assigned[i] = sortedPrices[pi]; });
+      o.paxPrices = assigned;
+      // Recompute rmb with reordered prices
+      if (o.discount != null) {
+        const sum = o.paxPrices.reduce((a, b) => a + b, 0);
+        o.rmb = +(sum * (o.discount / 100)).toFixed(2);
+        if (settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
+      }
+    }
     newOrders.push(o);
   }
 
@@ -5424,6 +5702,10 @@ async function parsePNR() {
   if (STATE.orders.length > 1) {
     setTimeout(() => document.querySelector('[data-tab=pending]').click(), 500);
   }
+  } catch(err) {
+    console.error('parsePNR error:', err);
+    toast('解析出错：' + err.message);
+  }
 }
 
 function clearRaw() {
@@ -5562,7 +5844,18 @@ function renderAirlineUsdPanel(orders) {
     return fareRmb / rate;
   };
   Object.values(byAirlineMap).forEach(group => {
-    group.sort((a, b) => getOrderUsd(a) - getOrderUsd(b));
+    group.sort((a, b) => {
+      // Priority 1: already assigned cardholder → float to top
+      const aAssigned = a.o.cardholderId ? 1 : 0;
+      const bAssigned = b.o.cardholderId ? 1 : 0;
+      if (aAssigned !== bAssigned) return bAssigned - aAssigned;
+      // Priority 2: mixed cabin warning → sink to bottom
+      const aMixed = detectMixedCabin(a.o).isMixed ? 1 : 0;
+      const bMixed = detectMixedCabin(b.o).isMixed ? 1 : 0;
+      if (aMixed !== bMixed) return aMixed - bMixed;
+      // Default: smallest USD first
+      return getOrderUsd(a) - getOrderUsd(b);
+    });
   });
 
   // Sort airlines by total USD descending
@@ -5581,24 +5874,64 @@ function renderAirlineUsdPanel(orders) {
     const groupTotal = group.reduce((s, x) => s + getOrderUsd(x), 0);
     const headerLabel = al;
     const AL_COLORS_HDR = {
-      'UA':'#002244','AA':'#B8002E','DL':'#9B1B30','AS':'#00427F','WN':'#d4820a',
+      'UA':'#003087','AA':'#1B3A5C','DL':'#E01933','AS':'#00637B','WN':'#304CB2',
       'B6':'#003876','LH':'#05164D','BA':'#075AAA','AF':'#002157','KL':'#00A0E2',
       'EK':'#C8102E','QR':'#5C0632','SQ':'#c07a00','CX':'#006564','NH':'#0A3D83',
       'JL':'#E60012','OZ':'#00438E','KE':'#003087','CA':'#CC0000','MU':'#E21837',
       'CZ':'#1D3E8F','LX':'#C8102E','OS':'#CC0000'
     };
     const hdrColor = AL_COLORS_HDR[al] || 'var(--ink)';
-    const headerRow = document.createElement('div');
+    const isAA = al === 'AA';
+    const hdrStyle = isAA
+      ? `background:linear-gradient(135deg,#1B3A5C 0%,#0D2035 55%,#C8102E 100%);`
+      : `background:${hdrColor};`;
+
+    // Airline SVG logos (inline, simplified brand marks)
+    const AL_LOGOS = {
+      'UA': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="14" cy="14" r="13" fill="white" opacity="0.18"/>
+        <ellipse cx="14" cy="14" rx="5" ry="13" stroke="white" stroke-width="1.5" fill="none"/>
+        <line x1="1" y1="14" x2="27" y2="14" stroke="white" stroke-width="1.5"/>
+        <line x1="2.5" y1="8" x2="25.5" y2="8" stroke="white" stroke-width="1.2"/>
+        <line x1="2.5" y1="20" x2="25.5" y2="20" stroke="white" stroke-width="1.2"/>
+        <circle cx="14" cy="14" r="13" stroke="white" stroke-width="1.5" fill="none"/>
+      </svg>`,
+      'AA': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="3" y="21" font-family="Arial Black,sans-serif" font-weight="900" font-size="18" fill="white" letter-spacing="-1">AA</text>
+        <line x1="0" y1="24" x2="28" y2="4" stroke="#C8102E" stroke-width="2.5"/>
+      </svg>`,
+      'DL': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="14,2 27,26 1,26" fill="white" opacity="0.9"/>
+        <polygon points="14,8 23,24 5,24" fill="#E01933"/>
+      </svg>`,
+      'AS': `<svg width="28" height="14" viewBox="0 0 28 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="12" font-family="Arial,sans-serif" font-weight="700" font-size="11" fill="white" letter-spacing="0">ALASKA</text>
+      </svg>`,
+      'WN': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M14 3 C8 3 3 8 3 14 C3 20 8 25 14 25 C20 25 25 20 25 14 C25 8 20 3 14 3Z" fill="white" opacity="0.2"/>
+        <path d="M6 20 L14 6 L22 20" stroke="#FFBF27" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+        <path d="M4 22 L14 10 L24 22" stroke="white" stroke-width="1.5" fill="none" stroke-linejoin="round" opacity="0.5"/>
+      </svg>`,
+    };
+    const logoSvg = AL_LOGOS[al] || '';    const headerRow = document.createElement('div');
     headerRow.className = 'airline-usd-table-header';
     headerRow.style.cssText = `
       display:flex; align-items:center; justify-content:space-between;
-      padding:6px 14px; margin:${grid.children.length > 0 ? '12px' : '0'} 0 6px 0;
-      background:${hdrColor}; color:#fff; border-radius:3px; font-size:13px; font-weight:700;
-      letter-spacing:0.06em;
+      padding:7px 14px 7px 12px; margin:${grid.children.length > 0 ? '14px' : '0'} 0 6px 0;
+      ${hdrStyle} color:#fff; border-radius:4px; font-size:13px; font-weight:700;
+      letter-spacing:0.06em; border-left:4px solid rgba(255,255,255,0.35);
+      box-shadow:0 2px 8px rgba(0,0,0,0.18);
     `;
     headerRow.innerHTML = `
-      <span style="font-family:'JetBrains Mono',monospace;">${escapeHtml(al)} · ${group.length} 单 <span style="font-weight:400;font-size:11px;opacity:0.7;">小→大</span></span>
-      <span style="font-family:'JetBrains Mono',monospace; color:var(--accent); font-size:14px;">≈ $${Math.round(groupTotal).toLocaleString()}</span>
+      <span style="display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;">
+        ${logoSvg ? `<span style="display:flex;align-items:center;opacity:0.95;flex-shrink:0;">${logoSvg}</span>` : ''}
+        <span style="background:rgba(255,255,255,${isAA?'0.25':'0.18'});border-radius:3px;padding:1px 7px;font-size:14px;letter-spacing:0.1em;${isAA?'font-style:italic;':''}">
+          ${escapeHtml(al)}
+        </span>
+        <span style="font-weight:400;opacity:0.9;">${group.length} 单</span>
+        <span style="font-weight:300;font-size:10px;opacity:0.6;">小→大</span>
+      </span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:800;letter-spacing:0.02em;">≈ $${Math.round(groupTotal).toLocaleString()}</span>
     `;
     grid.appendChild(headerRow);
 
@@ -5726,7 +6059,7 @@ function renderAirlineSummaryBar(orders) {
 
   // Airline color palette
   const AL_COLORS = {
-    'UA': '#002244', 'AA': '#B8002E', 'DL': '#9B1B30',
+    'UA': '#003087', 'AA': '#1B3A5C', 'DL': '#E01933',
     'AS': '#00427F', 'WN': '#F5A623', 'B6': '#003876',
     'NK': '#FFCC00', 'F9': '#3B9D4A', 'G4': '#D44A00',
     'LX': '#C8102E', 'OS': '#CC0000', 'LH': '#05164D',
