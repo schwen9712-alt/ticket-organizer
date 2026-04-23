@@ -5855,6 +5855,63 @@ function renderPendingList() {
     ? allMeaningful.filter(({o}) => applyViewModeFilter([o]).length > 0 && o.tableLabel !== 'G')
     : allMeaningful.filter(({o}) => o.tableLabel !== 'G');
 
+  // ── Render filter bar ────────────────────────────────────────────────────
+  let filterBar = document.getElementById('pendingFilterBar');
+  if (!filterBar) {
+    filterBar = document.createElement('div');
+    filterBar.id = 'pendingFilterBar';
+    filterBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:6px;';
+    area.parentNode.insertBefore(filterBar, area);
+  }
+
+  // Collect unique values
+  const airlines = [...new Set(meaningful.map(({o}) => o.airline).filter(Boolean))].sort();
+  const agents = [...new Set(meaningful.map(({o}) => o.agent || '(未指定)').filter(Boolean))].sort();
+  const labels = [...new Set(meaningful.map(({o}) => o.tableLabel || '未分类').filter(Boolean))].sort();
+
+  const cur = window._pendingFilter || { airline: '', agent: '', label: '' };
+
+  const makeSelect = (id, placeholder, options, curVal, key) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
+    const lbl = document.createElement('span');
+    lbl.textContent = placeholder;
+    lbl.style.cssText = 'font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;';
+    const sel = document.createElement('select');
+    sel.style.cssText = 'font-family:"JetBrains Mono",monospace;font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:4px;background:#fff;cursor:pointer;';
+    sel.innerHTML = `<option value="">全部</option>` + options.map(v => `<option value="${escapeAttr(v)}" ${curVal === v ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
+    sel.onchange = () => {
+      window._pendingFilter = { ...cur, [key]: sel.value };
+      renderPendingList();
+    };
+    wrap.appendChild(lbl);
+    wrap.appendChild(sel);
+    return wrap;
+  };
+
+  filterBar.innerHTML = '';
+  filterBar.appendChild(makeSelect('f-airline', '航司', airlines, cur.airline, 'airline'));
+  filterBar.appendChild(makeSelect('f-agent', '代理', agents, cur.agent, 'agent'));
+  filterBar.appendChild(makeSelect('f-label', '分类', labels, cur.label, 'label'));
+
+  // Clear button
+  if (cur.airline || cur.agent || cur.label) {
+    const clearBtn = document.createElement('button');
+    clearBtn.textContent = '✕ 清除筛选';
+    clearBtn.className = 'btn ghost small';
+    clearBtn.onclick = () => { window._pendingFilter = { airline: '', agent: '', label: '' }; renderPendingList(); };
+    filterBar.appendChild(clearBtn);
+  }
+
+  // Apply filter to meaningful list
+  const filtered = meaningful.filter(({o}) => {
+    if (cur.airline && o.airline !== cur.airline) return false;
+    if (cur.agent && (o.agent || '(未指定)') !== cur.agent) return false;
+    if (cur.label && (o.tableLabel || '未分类') !== cur.label) return false;
+    return true;
+  });
+  // ────────────────────────────────────────────────────────────────────────
+
   // Show filter banner if in employee mode
   const filterBanner = document.getElementById('viewModeFilterBanner');
   if (!filterBanner && _teamConfig && _teamConfig.viewMode === 'mine' && _teamConfig.myName) {
@@ -5882,6 +5939,12 @@ function renderPendingList() {
   if (batchActions) batchActions.style.display = '';
   area.innerHTML = '';
 
+  // Show filtered-empty message if filter active but no results
+  if (filtered.length === 0) {
+    area.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>没有符合筛选条件的订单</div></div>`;
+    return;
+  }
+
   // Compute display index map: order.id → displayed #N (matching airline USD panel)
   // Same sort: by agent first-seen, then original order
   const agentFirstSeen2 = {};
@@ -5902,11 +5965,10 @@ function renderPendingList() {
     displayNumById.set(item.o.id, sortedIdx + 1);
   });
 
-  // Group by agent (merge all orders of the same agent into one section,
-  // even if added in separate batches — keeps the agent view clean).
+  // Group by agent using FILTERED list
   const groupsByAgent = {};
   const agentOrder = [];
-  meaningful.forEach(item => {
+  filtered.forEach(item => {
     const key = item.o.agent || '(未指定代理)';
     if (!groupsByAgent[key]) {
       groupsByAgent[key] = [];
@@ -6345,8 +6407,8 @@ function openCardholderDialog(idx) {
   const isTableG = o.tableLabel === 'G';
   const sortedCardholders = [...cardholders].sort((a, b) => {
     if (isTableG) {
-      const aChase = (a.channel || '').toUpperCase().includes('CHASE');
-      const bChase = (b.channel || '').toUpperCase().includes('CHASE');
+      const aChase = (a.channel || '').toUpperCase().includes('CHASE') || (a.name || '').toUpperCase().includes('CHASE');
+      const bChase = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
       if (aChase !== bChase) return aChase ? -1 : 1;
     }
     const an = (a.name || '').toLowerCase();
@@ -6369,7 +6431,7 @@ function openCardholderDialog(idx) {
               return `<span class="ch-load-pill">#${dNum} ${al} ${escapeHtml(paxText)}</span>`;
             }).join(' ')
           : '<span style="color:var(--muted); font-style:italic; font-size:11px;">当前无分配</span>';
-        const isChase = (c.channel || '').toUpperCase().includes('CHASE');
+        const isChase = (c.channel || '').toUpperCase().includes('CHASE') || (c.name || '').toUpperCase().includes('CHASE');
         const chaseBadge = isChase
           ? `<span style="background:#0070c9; color:#fff; padding:2px 7px; border-radius:3px; font-size:10px; font-weight:700; margin-left:6px; letter-spacing:0.04em;">💳 CHASE</span>`
           : '';
@@ -7193,7 +7255,7 @@ function updatePendingField(idx, field, value) {
   if (['miles', 'cpmRate', 'cpmExchange', 'directDiscount', 'orderUsdAmount', 'swipeUsd', 'swipeDiscount'].includes(field)) {
     const n = parseFloat(value);
     o[field] = isNaN(n) ? null : n;
-  } else if (['tkt', 'issuer', 'commChannel', 'pnr', 'tableLabel', 'branch', 'client', 'swipeCardLast4'].includes(field)) {
+  } else if (['tkt', 'issuer', 'commChannel', 'pnr', 'tableLabel', 'branch', 'client', 'swipeCardLast4', 'operator'].includes(field)) {
     o[field] = value;
   }
   const settlement = computeSettlement(o);
@@ -7518,8 +7580,8 @@ function _cpRender(query) {
   // Table G: CHASE to top
   if (o && o.tableLabel === 'G') {
     filtered = [...filtered].sort((a, b) => {
-      const aC = (a.channel || '').toUpperCase().includes('CHASE');
-      const bC = (b.channel || '').toUpperCase().includes('CHASE');
+      const aC = (a.channel || '').toUpperCase().includes('CHASE') || (a.name || '').toUpperCase().includes('CHASE');
+      const bC = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
       return aC === bC ? 0 : aC ? -1 : 1;
     });
   }
@@ -7527,7 +7589,7 @@ function _cpRender(query) {
   const html = filtered.map((c, i) => {
     const sel = o && c.id === o.cardholderId;
     const hi = i === _cp.highlight;
-    const chase = (c.channel || '').toUpperCase().includes('CHASE');
+    const chase = (c.channel || '').toUpperCase().includes('CHASE') || (c.name || '').toUpperCase().includes('CHASE');
     return `<div class="chp-item"
       data-ch-id="${escapeAttr(c.id)}"
       style="padding:8px 12px; cursor:pointer; background:${hi ? 'var(--cream)' : sel ? '#eef5ff' : '#fff'}; border-bottom:1px solid var(--line); font-size:13px;"
@@ -9598,7 +9660,70 @@ function renderChasePanel() {
     </div>`;
   container.appendChild(header);
 
-  // Full order cards — same as pending list
+  // ── USD 金额快速列表（按金额排序）────────────────────────────────────────
+  const usdList = document.createElement('div');
+  usdList.style.cssText = 'background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px 14px;margin-bottom:16px;';
+
+  // Sort by USD descending
+  const sortedByUsd = meaningful.slice().sort((a, b) => {
+    const usdA = (() => { const fp = computeFinalPrice(a.o); const r = effectiveRate(a.o); return fp && r ? fp / r : 0; })();
+    const usdB = (() => { const fp = computeFinalPrice(b.o); const r = effectiveRate(b.o); return fp && r ? fp / r : 0; })();
+    return usdB - usdA;
+  });
+
+  const totalUsdSorted = sortedByUsd.reduce((s, {o}) => {
+    const fp = computeFinalPrice(o); const r = effectiveRate(o);
+    return fp && r ? s + fp / r : s;
+  }, 0);
+
+  usdList.innerHTML = `<div style="font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">💵 各单刷卡金额 · 小→大排序</div>`;
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+
+  sortedByUsd.forEach(({o, i: idx}) => {
+    const fp = computeFinalPrice(o);
+    const r = effectiveRate(o);
+    const usd = fp && r ? fp / r : null;
+    const paxNames = o.passengers.map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
+    const ch = o.cardholderId ? (settings.cardholders||[]).find(c => c.id === o.cardholderId) : null;
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;transition:background 0.1s;' + (ch ? 'background:#eef4ff;' : 'background:#fafafa;');
+    row.onmouseenter = () => row.style.background = ch ? '#ddeaff' : '#f0f0f0';
+    row.onmouseleave = () => row.style.background = ch ? '#eef4ff' : '#fafafa';
+    row.onclick = () => {
+      const card = document.getElementById(`chase-order-card-${idx}`);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    const seg0 = o.segments && o.segments[0];
+    const segN = o.segments && o.segments[o.segments.length - 1];
+    const route = seg0 ? `${seg0.from}→${(segN||seg0).to}` : '';
+    const depDate = seg0 && seg0.date ? seg0.date : '';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;font-size:12px;flex-wrap:wrap;">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);width:24px;">#${idx+1}</span>
+        <span style="font-weight:700;color:var(--ink);">${escapeHtml(paxNames || '—')}</span>
+        <span style="font-size:11px;color:var(--muted);">${escapeHtml(o.airline || '')} · ${o.passengers.length}人</span>
+        ${route ? `<span style="font-size:11px;color:var(--muted);">${escapeHtml(route)}</span>` : ''}
+        ${depDate ? `<span style="font-size:11px;background:#f5f0e8;color:var(--accent-deep);padding:1px 6px;border-radius:3px;font-family:'JetBrains Mono',monospace;">${escapeHtml(depDate)}</span>` : ''}
+        ${o.agent ? `<span style="font-size:11px;color:var(--muted);">· 代理 ${escapeHtml(o.agent)}</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        ${ch ? `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:10px;color:#0050aa;background:#ddeaff;padding:2px 8px;border-radius:3px;cursor:pointer;" title="点击重新分配">${escapeHtml(ch.name)}</span>` : `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:10px;color:#c0392b;background:#fde8e8;padding:2px 8px;border-radius:3px;cursor:pointer;border:1px dashed #c0392b;" title="点击分配卡主">＋ 分配</span>`}
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${ch ? '#0050aa' : 'var(--ink)'};">${usd ? '$' + Math.round(usd).toLocaleString() : '—'}</span>
+      </div>`;
+    grid.appendChild(row);
+  });
+
+  usdList.appendChild(grid);
+
+  // Total row
+  const totalRow = document.createElement('div');
+  totalRow.style.cssText = 'display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:12px;';
+  totalRow.innerHTML = `<span style="color:var(--muted);font-weight:600;">合计 ${meaningful.length} 单</span><span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:15px;">$${Math.round(totalUsdSorted).toLocaleString()}</span>`;
+  usdList.appendChild(totalRow);
+  container.appendChild(usdList);
+  // ────────────────────────────────────────────────────────────────────────
   meaningful.forEach(({ o, i: idx }) => {
     const isCollapsed = STATE.collapsedOrders && STATE.collapsedOrders.has(o.id + '-chase');
 
@@ -9708,6 +9833,13 @@ function renderChasePanel() {
         })()}
       </div>`;
     cardBody.appendChild(chaseBar);
+
+    // Screenshots section (same as pending list)
+    const ssDiv = document.createElement('div');
+    ssDiv.id = `order-screenshots-${idx}`;
+    ssDiv.innerHTML = buildScreenshotsHTML(idx);
+    cardBody.appendChild(ssDiv);
+
     group.appendChild(cardBody);
 
     // Render finalize form + actions into cardBody
@@ -10546,8 +10678,8 @@ function renderCardholdersList() {
   list.innerHTML = '';
   // Sort alphabetically by name (case-insensitive), with CHASE TRAVEL channel floating to top
   let sortedCardholders = [...settings.cardholders].sort((a, b) => {
-    const aChase = (a.channel || '').toUpperCase().includes('CHASE');
-    const bChase = (b.channel || '').toUpperCase().includes('CHASE');
+    const aChase = (a.channel || '').toUpperCase().includes('CHASE') || (a.name || '').toUpperCase().includes('CHASE');
+    const bChase = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
     if (aChase !== bChase) return aChase ? -1 : 1;
     const an = (a.name || '').toLowerCase();
     const bn = (b.name || '').toLowerCase();
