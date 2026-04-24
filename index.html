@@ -1020,7 +1020,10 @@ SUN/KAILAI MS 女 28SEP08
     <div class="row" style="grid-template-columns: 1fr 1fr;">
       <div class="field">
         <label>客户 Client</label>
-        <input type="text" id="f-client" placeholder="途安 / …" oninput="syncDOMToOrder(); renderPreview();">
+        <input type="text" id="f-client" placeholder="途安 / …" list="clientDatalist"
+          oninput="syncDOMToOrder(); renderPreview(); renderClientDatalist();"
+          style="background:#fffdf7;">
+        <datalist id="clientDatalist"></datalist>
       </div>
       <div class="field">
         <label>舱位 Cabin</label>
@@ -3244,6 +3247,19 @@ async function saveSettings() {
 // TODAY
 // ============================================
 
+function renderClientDatalist() {
+  const dl = document.getElementById('clientDatalist');
+  if (!dl) return;
+  // Collect unique clients from all orders
+  const clients = [...new Set(
+    STATE.orders
+      .map(o => o.client || '')
+      .concat((settings.ticketed || []).map(o => o.client || ''))
+      .filter(c => c.trim())
+  )].sort();
+  dl.innerHTML = clients.map(c => `<option value="${escapeAttr(c)}">`).join('');
+}
+
 function setToday() {
   const now = new Date();
   const y = now.getFullYear();
@@ -3620,6 +3636,7 @@ function loadCurrToDOM() {
   if (!o) return;
   document.getElementById('f-tableLabel').value = o.tableLabel || '';
   document.getElementById('f-client').value = o.client || '';
+  renderClientDatalist();
   document.getElementById('f-cabin').value = o.cabin || '经济舱';
   document.getElementById('f-agent').value = o.agent || '';
   document.getElementById('f-airline').value = o.airline || '';
@@ -4544,7 +4561,9 @@ function parseSingleBooking(raw) {
     //   "性别：男" / "性别：女"
     const labeledName = trimmed.match(/^(?:名字|姓名)[：:\s]\s*([A-Z]{2,}\/[A-Z][A-Z\s]*)/i);
     if (labeledName) {
-      const name = labeledName[1].trim().replace(/\s+/g, ' ');
+      // Strip trailing title suffixes: MR, MRS, MS, MISS, DR, MSTR
+      const name = labeledName[1].trim().replace(/\s+/g, ' ')
+        .replace(/\s+(?:MR|MRS|MS|MISS|DR|MSTR|JR|SR)\s*$/i, '').trim();
       if (name && !pax.find(p => p.name === name)) {
         pax.push({ name, gender: '', dob: '' });
       }
@@ -4745,8 +4764,8 @@ function parseSingleBooking(raw) {
       return false;
     };
     const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
-    // ── Chinese inline pax: "ZHANG/JIAHAO  男  1991年8月28" ─────────────
-    const cnInlinePax = trimmed.match(/^([A-Z]{2,}\/[A-Z][A-Z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2})/);
+    // ── Chinese inline pax: "ZHANG/JIAHAO  男  1991年8月28" or "ZOU/KE  女 29MAY07" ──
+    const cnInlinePax = trimmed.match(/^([A-Z]{2,}\/[A-Z][A-Z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/);
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim();
       const g = cnInlinePax[2];
@@ -4892,6 +4911,16 @@ function parseSingleBooking(raw) {
     // TOTAL CNY line: "TOTAL CNY 13555" — this is the authoritative fare (base + tax)
     const totalCnyMatch = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch && !inlineAdultFare
       && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
+
+    // GDS FARE line: "FARE  USD 1370.00  EQUIV CNY 9350" — treat as adult fare, wait for TOTAL
+    const gdsfareLine = !fareTypeMatch && !totalCnyMatch
+      && trimmed.match(/^FARE\s+(?:USD|CNY|EUR|GBP|JPY|AUD)\s+[\d.]+/i);
+    if (gdsfareLine && !_lastFareType) {
+      _lastFareType = 'ADULT';
+      // Also pick up EQUIV CNY as fallback
+      const equivM = trimmed.match(/EQUIV\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
+      if (equivM) { _equivFareAmt = parseFloat(equivM[1]); _equivFareType = 'ADULT'; }
+    }
     if (totalCnyMatch && _lastFareType) {
       const amt = parseFloat(totalCnyMatch[1]);
       if (amt >= 100 && amt <= 500000) {
@@ -4917,12 +4946,18 @@ function parseSingleBooking(raw) {
       _lastFareType = normKind;
       // Extract EQUIV CNY as FALLBACK (in case no TOTAL line follows)
       const equivMatch = trimmed.match(/(?:EQUIV\s+(?:CNY|RMB|人民币)|CNY|RMB|人民币)\s+(\d{3,6}(?:\.\d+)?)/i)
-        || trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
+        || trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i)
+        // Also handle "成人运价：10785" / "儿童运价 ：8510" — bare number after colon
+        || trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]\s*(\d{4,6})\s*$/);
       if (equivMatch) {
         const amt = parseFloat(equivMatch[1]);
         if (amt >= 100 && amt <= 500000) {
-          _equivFareAmt = amt;
-          _equivFareType = normKind;
+          // Bare number on same line as fare type = direct assignment, no need to wait for TOTAL
+          if (!parsedFareByType) parsedFareByType = {};
+          if (normKind === 'ADULT') { parsedFareByType.adult = amt; if (!rmb) rmb = amt; }
+          else if (normKind === 'CHILD') parsedFareByType.child = amt;
+          else if (normKind === 'INFANT') parsedFareByType.infant = amt;
+          _lastFareType = null; // consumed, no need to wait for TOTAL
         }
       }
       continue;
@@ -6734,19 +6769,20 @@ function openCardholderDialog(idx) {
   const meaningfulList = STATE.orders.filter(o2 => isMeaningfulOrder(o2));
   const displayNum = meaningfulList.indexOf(o) + 1;
 
-  // Sort cardholders alphabetically by name (case-insensitive)
-  // Exception: if this is a 表G order, CHASE TRAVEL channel cardholders float to the top
-  // (since 表G orders should pair with CHASE TRAVEL cards).
+  // Sort: 1) currently assigned to any order → top, 2) CHASE for 表G, 3) alphabetical
   const isTableG = o.tableLabel === 'G';
+  // Build set of cardholder IDs that are currently assigned to any pending order
+  const assignedIds = new Set(STATE.orders.filter(x => x.cardholderId).map(x => x.cardholderId));
   const sortedCardholders = [...cardholders].sort((a, b) => {
+    const aAssigned = assignedIds.has(a.id) ? 1 : 0;
+    const bAssigned = assignedIds.has(b.id) ? 1 : 0;
+    if (aAssigned !== bAssigned) return bAssigned - aAssigned; // assigned first
     if (isTableG) {
       const aChase = (a.channel || '').toUpperCase().includes('CHASE') || (a.name || '').toUpperCase().includes('CHASE');
       const bChase = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
       if (aChase !== bChase) return aChase ? -1 : 1;
     }
-    const an = (a.name || '').toLowerCase();
-    const bn = (b.name || '').toLowerCase();
-    return an.localeCompare(bn);
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
   });
 
   const itemsHtml = sortedCardholders.length === 0
@@ -9018,10 +9054,14 @@ async function markOrderTicketed(idx) {
         : (o.basePrice || 0) * paxCount;
       const fareUsd = baseFareRmb > 0 && effectiveRate(o) > 0 ? baseFareRmb / effectiveRate(o) : null;
       if (fareUsd) {
-        const diff = Math.abs(Number(o.chaseChargeUsd) - fareUsd) / fareUsd * 100;
-        if (diff > 1.5) {
-          const sign = Number(o.chaseChargeUsd) > fareUsd ? '+' : '-';
-          missing.push(`🚫 刷卡金额与运价换算相差 ${sign}${diff.toFixed(1)}%（限1.5%）`);
+        const chargeUsd = Number(o.chaseChargeUsd);
+        const diff = (chargeUsd - fareUsd) / fareUsd * 100;
+        if (diff < -5) {
+          // Charge is significantly LOWER than fare conversion → likely cabin/baggage mismatch
+          missing.push(`⚠️ 刷卡 $${chargeUsd.toFixed(0)} 远低于运价换算 $${fareUsd.toFixed(0)}（差 ${Math.abs(diff).toFixed(1)}%），请确认仓位、行李是否一致`);
+        } else if (Math.abs(diff) > 1.5) {
+          const sign = diff > 0 ? '+' : '-';
+          missing.push(`🚫 刷卡金额与运价换算相差 ${sign}${Math.abs(diff).toFixed(1)}%（限1.5%）`);
         }
       }
     }
