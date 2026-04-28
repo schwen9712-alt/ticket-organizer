@@ -2948,6 +2948,12 @@ const STATE = {
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business',
       'W': 'Premium', 'P': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'T': 'Economy', 'G': 'Economy', 'X': 'Economy', 'U': 'Economy'
+    },
+    'BR': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'X': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'G': 'Economy', 'T': 'Economy', 'R': 'Economy', 'U': 'Economy'
     }
   },
   collapsedOrders: new Set()  // in-memory collapse state; restored from sessionStorage on load
@@ -2966,6 +2972,8 @@ const DEFAULT_SETTINGS = {
     { agent: '季凯', airline: 'UA', cabin: '经济舱', discount: 87, note: '季凯 · UA 普通经济舱 · 87%' },
     { tableLabel: 'B', airline: 'OZ', fareClass: 'Z', originRegion: 'US', discount: 81, note: '表B · 韩亚美国始发Z舱 · 19%优惠' },
     { tableLabel: 'B', airline: 'CA', fareClass: 'R,Z,D,C,J', originRegion: 'US', discount: 90, note: '表B · 国航美国始发商务舱 · 10%优惠' },
+    { tableLabel: 'B', airline: 'BR', fareClass: 'D', originRegion: 'US', discount: 92, note: '表B · 长荣美国始发D舱商务 · 8%优惠' },
+    { tableLabel: 'B', airline: 'BR', fareClass: 'J', originRegion: 'US', discount: 90, note: '表B · 长荣美国始发J舱商务 · 10%优惠' },
     { tableLabel: 'G', discount: 92, priority: 10, note: '表G · CHASE TRAVEL · 92%' }
   ],
   // Product discount markers: when PNR text contains "产N" (product marker), force this discount.
@@ -3036,6 +3044,12 @@ const DEFAULT_SETTINGS = {
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'Z': 'Business', 'I': 'Business',
       'W': 'Premium', 'P': 'Premium',
       'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'E': 'Economy', 'T': 'Economy', 'G': 'Economy', 'X': 'Economy', 'U': 'Economy'
+    },
+    'BR': {
+      'F': 'First', 'A': 'First',
+      'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
+      'W': 'Premium', 'X': 'Premium', 'E': 'Premium',
+      'Y': 'Economy', 'B': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'Q': 'Economy', 'S': 'Economy', 'N': 'Economy', 'G': 'Economy', 'T': 'Economy', 'R': 'Economy', 'U': 'Economy'
     }
   },
   knownPax: [
@@ -3241,6 +3255,14 @@ function runSettingsMigrations() {
   } else if (!settings.discountRules[gRuleIdx].priority) {
     // Existing rule from earlier seed — backfill priority so it overrides
     settings.discountRules[gRuleIdx].priority = 10;
+  }
+  // Add BR US-origin business class rules (D=8%, J=10% commission)
+  const hasBrRule = settings.discountRules.some(r => r.tableLabel === 'B' && r.airline === 'BR');
+  if (!hasBrRule) {
+    settings.discountRules.push(
+      { tableLabel: 'B', airline: 'BR', fareClass: 'D', originRegion: 'US', discount: 92, note: '表B · 长荣美国始发D舱商务 · 8%优惠' },
+      { tableLabel: 'B', airline: 'BR', fareClass: 'J', originRegion: 'US', discount: 90, note: '表B · 长荣美国始发J舱商务 · 10%优惠' }
+    );
   }
   // Add CA US-origin business class rule (10% commission)
   const hasCaBizRule = settings.discountRules.some(r =>
@@ -4565,18 +4587,20 @@ function parseSingleBooking(raw) {
     // Loose "AA 100 Y 15MAY JFK-LAX"
     /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*[-\s>→]\s*([A-Z]{3})/,
     // E-ticket "AA 100 26MAY PVG LAX"
-    /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s+([A-Z]{3})/
+    /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s+([A-Z]{3})/,
+    // Informal chat format: "MAY.06 SFO-CIN, UA 805 23:40-04:20" or "JUN.15 PVG-LAX UA888 13:30-09:20"
+    /(\w+\.\d{2}|\d{1,2}[A-Z]{3})\s+([A-Z]{3})-([A-Z]{3})[,\s]+([A-Z]{2})\s*(\d{1,4})\s+(\d{2}:\d{2})-(\d{2}:\d{2})/i
   ];
 
   for (const line of lines) {
-    // Strip leading non-ASCII junk characters that some GDS systems prepend
-    const trimmed = line.replace(/^[^\x20-\x7E\u4e00-\u9fa5]+/, '').trim();
+    // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
+    const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
     if (!trimmed) continue;
 
     // ── FIRST PRIORITY: CO fare line "CO3709", "CO3709 经济0PC", "CO7779CNY/人"
     // Also handles mid-line: "经济1PC结算价  CO16481CNY/人"
     const coFareMatch = trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位)?(?:\s+(?:普通经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务))?(?:\s*\d*PC)?\s*$/i)
-      || trimmed.match(/\bCO\s*(\d{4,6})(?:CNY|RMB)?(?:\/人|每位)/i);
+      || trimmed.match(/\bCO\s*(\d{4,6})(?:CNY|RMB|USD)?(?:\/人|每位)?(?:\s|$)/i);
     if (coFareMatch) {
       const amt = parseFloat(coFareMatch[1]);
       if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
@@ -4590,6 +4614,15 @@ function parseSingleBooking(raw) {
     const cnPaxMatch = trimmed.match(/^(?:乘机人|旅客|乘客)[：:]\s*(.+)/);
     if (cnPaxMatch) {
       const raw = cnPaxMatch[1].trim();
+      // SSR DOCS style: "P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
+      const ssrM = raw.match(/^P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
+      if (ssrM) {
+        const dob = extractDOB(ssrM[1]) || '';
+        const gender = ssrM[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
+        const name = ssrM[3].toUpperCase() + '/' + ssrM[4].toUpperCase();
+        if (!pax.find(p => p.name === name)) pax.push({ name, dob, gender, paxType: 'ADULT' });
+        continue;
+      }
       // Try to extract LAST/FIRST + DOB + gender from inline format
       const inlineMatch = raw.match(/^([A-Z]{2,}\/[A-Z][A-Z\s]*?)\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4})\s*([男女MF]?)$/i);
       if (inlineMatch) {
@@ -4838,7 +4871,15 @@ function parseSingleBooking(raw) {
       return false;
     };
     const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
-    // ── Chinese inline pax: "ZHANG/JIAHAO  男  1991年8月28" or "ZOU/KE  女 29MAY07" ──
+    // ── 乘机人：P/CN/... SSR-style inline: "乘机人：P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
+    const paxInlineSSR = trimmed.match(/^(?:乘机人|旅客)[：:\s]+P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
+    if (paxInlineSSR) {
+      const dob = extractDOB(paxInlineSSR[1]);
+      const gender = paxInlineSSR[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
+      const name = paxInlineSSR[3].toUpperCase() + '/' + paxInlineSSR[4].toUpperCase();
+      pax.push({ name, dob: dob || '', gender, paxType: 'ADULT' });
+      continue;
+    }
     const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/[A-Za-z][A-Za-z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim().toUpperCase();
@@ -4949,6 +4990,16 @@ function parseSingleBooking(raw) {
         // Other patterns follow (carrier, flight, cls, date, from, to, depTime, arrTime) order
         if (patIdx === 1 && m.length === 9) {
           [, carrier, flight, cls, date, from, depTime, arrTime, to] = m;
+        }
+        // Informal chat format: "MAY.06 SFO-CIN, UA 805 23:40-04:20"
+        // Groups: (date, from, to, carrier, flight, depTime, arrTime)
+        else if (patIdx === segPatterns.length - 1 && m.length === 8) {
+          const rawDate = m[1]; // e.g. "MAY.06" or "06MAY"
+          const mth = rawDate.replace(/\./g, '').replace(/(\d+)([A-Z]+)/i, '$2$1').replace(/([A-Z]+)(\d+)/i, '$2$1');
+          date = mth.replace(/(\d{1,2})([A-Z]{3})/i, (_, d, mo) => d.padStart(2,'0') + mo.toUpperCase());
+          from = m[2].toUpperCase(); to = m[3].toUpperCase();
+          carrier = m[4].toUpperCase(); flight = m[5];
+          depTime = m[6]; arrTime = m[7]; cls = '';
         }
         else if (m.length === 9) [, carrier, flight, cls, date, from, to, depTime, arrTime] = m;
         else if (m.length === 7) [, carrier, flight, cls, date, from, to] = m;
@@ -5119,7 +5170,8 @@ function parseSingleBooking(raw) {
     if (/^\s*TAX\s+/i.test(trimmed)) continue;
 
     const pA = trimmed.match(/(\d+(?:\.\d+)?)\s*(CNY|RMB|人民币|USD|美金|美元)/i);
-    const pB = trimmed.match(/(¥|\$|￥)\s*(\d+(?:\.\d+)?)/);
+    const pB = trimmed.match(/(¥|\$|￥)\s*([\d,]+(?:\.\d+)?)/);
+    const pBamt = pB ? parseFloat(pB[2].replace(/,/g, '')) : null;
     // Currency-prefix: "TOTALCNY18881", "USD500", "TOTAL CNY 18881"
     const pPrefix = !pA && !pB && trimmed.match(/(CNY|RMB|人民币|USD|美金|美元)\s*(\d+(?:\.\d+)?)/i);
     // Chinese 运价/票价 prefix: "运价18512", "运价 18512", "票价 18512"
@@ -5181,7 +5233,7 @@ function parseSingleBooking(raw) {
     }
     // ── GDS fare code line: "02 XHE00AI0  12920 CNY", "01 PFE05MYP+*  37686 CNY  5516.83 USD"
     // Pattern: line-number + fare-code + CNY/RMB amount (possibly followed by USD equivalent)
-    const gdsFareLine = trimmed.match(/^\d{1,2}\s+[A-Z0-9]{4,}[+*]{0,2}\s+(\d{4,6})\s*(CNY|RMB)/i);
+    const gdsFareLine = trimmed.match(/^\d{1,2}\s+[A-Z0-9]{4,}[+*]{0,2}\s+(?:ADT|CNN|INF|CHD)?\s*(\d{4,6})\s*(CNY|RMB)/i);
     if (gdsFareLine) {
       const amt = parseFloat(gdsFareLine[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -5190,6 +5242,21 @@ function parseSingleBooking(raw) {
       if (usdM && !usd) usd = parseFloat(usdM[1]);
       continue;
     }
+    // Single fare class letter on own line: "W", "P", "J" — use with airline context
+    const singleClassLine = trimmed.match(/^([A-Z])\s*$/);
+    if (singleClassLine && parsedCabin === undefined) {
+      const cls = singleClassLine[1];
+      // Use already-parsed airline from segs, or the current `airline` variable
+      const ctx = airline || (segs.length > 0 ? segs[segs.length-1].flight.slice(0,2) : null);
+      const clsMap = ctx ? ((settings.fareClassByAirline || {})[ctx] || {}) : {};
+      const cabinName = clsMap[cls];
+      if (cabinName) {
+        const cabinNames = { 'Economy': '经济舱', 'Premium': '超级经济舱', 'Business': '商务舱', 'First': '头等舱' };
+        parsedCabin = cabinNames[cabinName] || cabinName;
+      }
+      continue;
+    }
+
     const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?)\s*(?:\d+PC)?\s*$/i);
     if (pNumCabin) {
       const amt = parseFloat(pNumCabin[1]);
@@ -5216,11 +5283,10 @@ function parseSingleBooking(raw) {
       const curr = pA[2].toUpperCase();
       if (/CNY|RMB|人民币/i.test(curr) && amt > 100 && !rmb) rmb = amt;
       else if (/USD|美金|美元/i.test(curr) && amt > 10 && !usd) usd = amt;
-    } else if (pB) {
+    } else if (pB && pBamt !== null) {
       const sym = pB[1];
-      const amt = parseFloat(pB[2]);
-      if ((sym === '¥' || sym === '￥') && amt > 100 && !rmb) rmb = amt;
-      else if (sym === '$' && amt > 10 && !usd) usd = amt;
+      if ((sym === '¥' || sym === '￥') && pBamt > 100 && !rmb) rmb = pBamt;
+      else if (sym === '$' && pBamt > 10 && !usd) usd = pBamt;
     } else if (pPrefix) {
       const curr = pPrefix[1].toUpperCase();
       const amt = parseFloat(pPrefix[2]);
