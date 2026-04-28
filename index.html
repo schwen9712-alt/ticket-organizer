@@ -2819,6 +2819,8 @@ function newOrder(init = {}) {
     screenshots: Array.isArray(init.screenshots) ? init.screenshots : [],
     waitingForRelease: init.waitingForRelease || false,
     noAvailability: init.noAvailability || false,
+    linkedOrderIds: init.linkedOrderIds || [],   // IDs of related orders
+    ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
     enteredBy: init.enteredBy || '',
     operator: init.operator || '',
     chaseChargeUsd: init.chaseChargeUsd != null ? init.chaseChargeUsd : null,
@@ -2831,6 +2833,7 @@ function newOrder(init = {}) {
     costUsd: init.costUsd != null ? init.costUsd : null,
     costRmb: init.costRmb != null ? init.costRmb : null,
     rate: init.rate != null ? init.rate : null,
+    customRate: init.customRate != null ? init.customRate : null,  // custom exchange rate from "N单 USD*rate*disc" format
     // Settlement / cost model
     commChannel: init.commChannel || '',   // WhatsApp/Discord/Slack/TG/微信
     issuer: init.issuer || '',              // legacy free-text
@@ -2962,6 +2965,7 @@ const DEFAULT_SETTINGS = {
     { agent: '季凯', airline: 'AA', cabin: '经济舱', discount: 92 },
     { agent: '季凯', airline: 'UA', cabin: '经济舱', discount: 87, note: '季凯 · UA 普通经济舱 · 87%' },
     { tableLabel: 'B', airline: 'OZ', fareClass: 'Z', originRegion: 'US', discount: 81, note: '表B · 韩亚美国始发Z舱 · 19%优惠' },
+    { tableLabel: 'B', airline: 'CA', fareClass: 'R,Z,D,C,J', originRegion: 'US', discount: 90, note: '表B · 国航美国始发商务舱 · 10%优惠' },
     { tableLabel: 'G', discount: 92, priority: 10, note: '表G · CHASE TRAVEL · 92%' }
   ],
   // Product discount markers: when PNR text contains "产N" (product marker), force this discount.
@@ -3058,7 +3062,8 @@ const POINTS_TYPES = {
   'AMEX-BP':    { label: 'AMEX BP',     mult: 0.65, usesPoints: true },
   'CSR-UR':     { label: 'CSR UR',      mult: 1.0,  usesPoints: true },
   'BOA-POINT':  { label: 'BOA Point',   mult: 1.0,  usesPoints: true },
-  '直接折扣':   { label: '直接折扣',    mult: null, usesPoints: false }
+  '直接折扣':   { label: '直接折扣',    mult: null, usesPoints: false },
+  '直接结算':   { label: '直接结算 $',  mult: null, usesPoints: false, directAmount: true }
 };
 
 // Storage helpers
@@ -3067,15 +3072,34 @@ const memoryStore = {};
 
 async function storageSet(key, value) {
   if (hasArtifactStorage) {
-    try { await window.storage.set(key, JSON.stringify(value)); } catch(e) { memoryStore[key] = value; }
+    try {
+      await window.storage.set(key, JSON.stringify(value));
+    } catch(e) {
+      memoryStore[key] = value;
+      console.warn('storageSet failed, using memory:', key, e);
+      toast('⚠️ 数据保存异常，已暂存内存（刷新前请勿关闭页面）');
+    }
   } else {
     memoryStore[key] = value;
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch(e) {
+      console.warn('localStorage full or blocked:', e);
+      toast('⚠️ 本地存储已满，数据仅保存在内存中');
+    }
   }
-  // Trigger cloud sync for data-bearing keys
   if (key === 'ticket-organizer-settings' || key === 'ticket-organizer-pending') {
     if (typeof autoCloudPush === 'function') autoCloudPush();
   }
+}
+
+// persistOrders() — debounced write (defined near the storage helpers for direct saves)
+// persistOrdersNow() — immediate write for critical paths (assignment, deletion, etc.)
+async function persistOrdersNow() {
+  await storageSet('ticket-organizer-pending', {
+    orders: STATE.orders,
+    currentIdx: STATE.currentIdx
+  });
 }
 async function storageGet(key) {
   if (hasArtifactStorage) {
@@ -3149,7 +3173,7 @@ async function loadSettings() {
       }
     }
     settings.fareClassMigrationVersion = FARE_CLASS_MIGRATION_VERSION;
-    storageSet('ticket-organizer-settings', settings);
+    await storageSet('ticket-organizer-settings', settings);
   }
   // Cardholder fee migration: previously stored as RMB (settlement * rate), now stored as USD (settlement).
   // Convert old RMB values back to USD by dividing by the order's rate (or current rate if missing).
@@ -3166,7 +3190,7 @@ async function loadSettings() {
       }
     });
     settings.cardholderFeeMigrationVersion = CARDHOLDER_FEE_MIGRATION_VERSION;
-    storageSet('ticket-organizer-settings', settings);
+    await storageSet('ticket-organizer-settings', settings);
   }
   // Discount rules + 公务舱 cleanup. Idempotent, so we just always run it here
   // (and from cloud pull / import paths too, via the same function).
@@ -3218,7 +3242,17 @@ function runSettingsMigrations() {
     // Existing rule from earlier seed — backfill priority so it overrides
     settings.discountRules[gRuleIdx].priority = 10;
   }
-  // Fix legacy rules that have cabin='公务舱' — the code elsewhere uses '商务舱'
+  // Add CA US-origin business class rule (10% commission)
+  const hasCaBizRule = settings.discountRules.some(r =>
+    r.tableLabel === 'B' && r.airline === 'CA' && r.originRegion === 'US'
+  );
+  if (!hasCaBizRule) {
+    settings.discountRules.push({
+      tableLabel: 'B', airline: 'CA', fareClass: 'R,Z,D,C,J', originRegion: 'US',
+      discount: 90, note: '表B · 国航美国始发商务舱 · 10%优惠'
+    });
+  }
+  // Fix legacy rules that have cabin='公务舱'
   // so these never match. For fareClass-scoped rules, just drop cabin entirely.
   settings.discountRules.forEach(r => {
     if (r.cabin === '公务舱') {
@@ -3417,10 +3451,18 @@ function matchDiscountRule(agentOrOrder, airline, cabin) {
     // Empty rule field = wildcard
     if (rAgent && rAgent !== ctx.agent) continue;
     if (rAirline && rAirline !== ctx.airline) continue;
-    if (rCabin && rCabin !== ctx.cabin) continue;
     if (rTableLabel && rTableLabel !== ctx.tableLabel) continue;
     if (rOriginRegion && rOriginRegion !== ctx.originRegion) continue;
-    if (rFareClass && rFareClass !== ctx.fareClass) continue;
+    // fareClass supports comma-separated list: "R,Z,D,C,J" matches any of those
+    if (rFareClass) {
+      const fareClasses = rFareClass.split(',').map(s => s.trim()).filter(Boolean);
+      if (!fareClasses.includes(ctx.fareClass)) continue;
+    }
+    // cabin supports comma-separated list too: "商务舱,头等舱"
+    if (rCabin) {
+      const cabins = rCabin.split(',').map(s => s.trim()).filter(Boolean);
+      if (!cabins.includes(ctx.cabin)) continue;
+    }
     // priority (defaults to 0); higher priority always wins. Within same priority,
     // more-specific (more fields specified) wins.
     const priority = r.priority || 0;
@@ -3532,7 +3574,7 @@ function addNewOrder() {
   toast(`新建订单 #${STATE.orders.length}`);
 }
 
-function removeOrder(idx) {
+async function removeOrder(idx) {
   if (STATE.orders.length === 1) {
     STATE.orders[0] = newOrder();
     STATE.currentIdx = 0;
@@ -3547,6 +3589,12 @@ function removeOrder(idx) {
   loadCurrToDOM();
   renderOrderTabs();
   renderPreview();
+  // Also refresh the pending list and chase panel
+  await persistOrdersNow();
+  renderPendingList();
+  renderChasePanel();
+  renderPendingBanner();
+  toast('已删除订单');
 }
 
 function orderSummary(o) {
@@ -3717,7 +3765,6 @@ function computeSettlement(o) {
   }
   if (o.pointsType === '直接折扣') {
     if (o.directDiscount == null) return null;
-    // Priority: user-entered orderUsdAmount; fallback: derived from finalPrice RMB
     let baseUsd;
     if (o.orderUsdAmount != null && o.orderUsdAmount > 0) {
       baseUsd = o.orderUsdAmount;
@@ -3727,6 +3774,11 @@ function computeSettlement(o) {
       baseUsd = fpRmb / effectiveRate(o);
     }
     return baseUsd * (o.directDiscount / 100);
+  }
+  if (o.pointsType === '直接结算') {
+    // directAmount is stored in orderUsdAmount — that IS the cost
+    if (o.orderUsdAmount != null && o.orderUsdAmount > 0) return Number(o.orderUsdAmount);
+    return null;
   }
   const typeConf = POINTS_TYPES[o.pointsType];
   if (typeConf && typeConf.usesPoints) {
@@ -3807,7 +3859,7 @@ function addPassenger(name = '', gender = '', dob = '') {
 
 // Parse MRZ (Machine Readable Zone) from passport - ICAO 9303 standard
 // Supports TD3 (passports, 2 lines × 44 chars)
-function parseMRZ() {
+async function parseMRZ() {
   const raw = document.getElementById('mrzInput').value;
   if (!raw.trim()) { toast('请粘贴护照机读码'); return; }
   // Clean: keep alphanumerics and < and newlines
@@ -3871,7 +3923,7 @@ function parseMRZ() {
     settings.knownPax = settings.knownPax || [];
     if (!settings.knownPax.find(k => k.last === surname && k.first === given)) {
       settings.knownPax.push({ last: surname, first: given, dob: dobFormatted, gender });
-      storageSet('ticket-organizer-settings', settings);
+      await storageSet('ticket-organizer-settings', settings);
       renderKnownPax();
     }
 
@@ -4212,11 +4264,11 @@ function splitIntoBookings(raw) {
     const chunks = raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
     // Merge chunks: if a chunk has no confirmed segment (DK/HK) but has fare/pax,
     // merge it with the next chunk that does have segments
-    // Only count DK/HK as confirmed segment if NOT in an SSR/OSI line
+    // Only count DK/HK/GK as confirmed segment if NOT in an SSR/OSI line
     const hasConfirmedSeg = (c) => c.split(/\r?\n/).some(line => {
       const t = line.trim();
       if (/^(?:SSR|OSI|OSS|RMK|OPT)\b/i.test(t)) return false;
-      return /\bDK\d|\bHK\d/i.test(t);
+      return /\bDK\d|\bHK\d|\bGK\d/i.test(t);
     });
     const merged = [];
     let carry = '';
@@ -4268,11 +4320,9 @@ function splitIntoBookings(raw) {
   const isNameLike = (s) => {
     const t = s.trim();
     if (!t.includes('/')) return false;
-    // Ignore labeled field lines like "名字：CHEN/GONGHAI"
     if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
-    // Ignore Chinese inline pax lines like "ZHANG/JIAHAO  男  1991年8月28"
-    // These contain name + gender + Chinese date on same line
-    if (/[男女]/.test(t) && /\d{4}年/.test(t)) return false;
+    // Ignore Chinese inline pax lines with gender + any date format
+    if (/[男女]/.test(t) && (/\d{4}年/.test(t) || /\d{1,2}[A-Z]{3}\d{2,4}/.test(t))) return false;
     return /^(?:\d+[\.\s]+)?[A-Z]{2,}\/\s?[A-Z]+/.test(t);
   };
   const isSegLike = (s) => {
@@ -4392,6 +4442,7 @@ function parseSingleBooking(raw) {
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
+  let parsedCustomRate = undefined;
 
   // Scan whole text for product discount markers (产1, 产2, etc.)
   // Highest priority — overrides all other discount sources.
@@ -4523,13 +4574,16 @@ function parseSingleBooking(raw) {
     if (!trimmed) continue;
 
     // ── FIRST PRIORITY: CO fare line "CO3709", "CO3709 经济0PC", "CO7779CNY/人"
-    const coFareMatch = trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位)?(?:\s+(?:普通经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务))?(?:\s*\d*PC)?\s*$/i);
+    // Also handles mid-line: "经济1PC结算价  CO16481CNY/人"
+    const coFareMatch = trimmed.match(/^CO\s*(\d{3,6})(?:CNY|RMB|USD|元)?(?:\/人|每位)?(?:\s+(?:普通经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务))?(?:\s*\d*PC)?\s*$/i)
+      || trimmed.match(/\bCO\s*(\d{4,6})(?:CNY|RMB)?(?:\/人|每位)/i);
     if (coFareMatch) {
       const amt = parseFloat(coFareMatch[1]);
       if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
-      const cabM = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
-      const _cMap = {'普通经济':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱','经济舱':'经济舱','经济':'经济舱','商务舱':'商务舱','商务':'商务舱','头等舱':'头等舱','头等':'头等舱'};
-      if (cabM && _cMap[cabM[1]] && parsedCabin === undefined) parsedCabin = _cMap[cabM[1]];
+      // Extract cabin from same line if present
+      const cabM = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等|公务)/);
+      const _cMap2 = {'普通经济':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱','经济舱':'经济舱','经济':'经济舱','商务舱':'商务舱','商务':'商务舱','公务':'商务舱','头等舱':'头等舱','头等':'头等舱'};
+      if (cabM && _cMap2[cabM[1]] && parsedCabin === undefined) parsedCabin = _cMap2[cabM[1]];
       continue;
     }
     // Also handles plain Chinese name: "乘机人：刘桂介"
@@ -4687,9 +4741,29 @@ function parseSingleBooking(raw) {
     //   "第九单 经济舱 87折"
     //   "第九单 头等 8.7折"
     const orderMarker = trimmed.match(/第\s*[一二三四五六七八九十\d]+\s*单/)
-      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s*$/) // "19单    92" format
-      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s+/);  // "19单    92  商务" format
+      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s*$/) // "19单    92"
+      || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s+/)  // "19单    92  商务"
+      || trimmed.match(/^\d{1,3}\s*单\s+(?:商务舱?|公务舱?|经济舱?|超经|头等舱?|头等)?\s*[\d]+\.[\d]+\s*\*/); // "11单 商务7055.53*6.9*0.87"
     if (orderMarker) {
+      // ── USD*rate*discount format: "11单 商务7055.53*6.9*0.87出"
+      // Means: USD fare × exchange rate × discount = CNY revenue
+      const usdFareM = trimmed.match(/(?:商务舱?|公务舱?|经济舱?|超经|头等舱?|头等)?\s*([\d]{3,6}(?:\.\d+)?)\s*\*\s*([\d.]+)\s*\*\s*(0\.\d+)/);
+      if (usdFareM) {
+        const usdFare = parseFloat(usdFareM[1]);
+        const exchRate = parseFloat(usdFareM[2]);
+        const disc = parseFloat(usdFareM[3]);
+        if (usdFare > 100 && exchRate > 1 && disc > 0 && disc < 1) {
+          usd = usdFare;
+          rmb = +(usdFare * exchRate * disc).toFixed(2);
+          parsedDiscount = Math.round(disc * 100);
+          // Store the custom exchange rate so revenue is calculated correctly
+          parsedCustomRate = exchRate;
+          // Also detect cabin
+          const cabM2 = trimmed.match(/(公务|商务舱?|头等舱?|超经|超级经济|经济舱?|经济)/);
+          const _cm2 = {'公务':'商务舱','商务':'商务舱','商务舱':'商务舱','头等':'头等舱','头等舱':'头等舱','超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱'};
+          if (cabM2 && _cm2[cabM2[1]] && parsedCabin === undefined) parsedCabin = _cm2[cabM2[1]];
+        }
+      }
       // Extract cabin anywhere in the line
       const cabMatch = trimmed.match(/(头等舱|头等|商务舱|商务|公务舱|公务|超级经济|超经|经济舱|经济)/);
       if (cabMatch) {
@@ -4765,9 +4839,9 @@ function parseSingleBooking(raw) {
     };
     const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
     // ── Chinese inline pax: "ZHANG/JIAHAO  男  1991年8月28" or "ZOU/KE  女 29MAY07" ──
-    const cnInlinePax = trimmed.match(/^([A-Z]{2,}\/[A-Z][A-Z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/);
+    const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/[A-Za-z][A-Za-z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
     if (cnInlinePax) {
-      const name = cnInlinePax[1].trim();
+      const name = cnInlinePax[1].trim().toUpperCase();
       const g = cnInlinePax[2];
       const gender = (g.startsWith('男')) ? 'MALE' : 'FEMALE';
       const dob = extractDOB(cnInlinePax[3]) || '';
@@ -4916,10 +4990,15 @@ function parseSingleBooking(raw) {
     const gdsfareLine = !fareTypeMatch && !totalCnyMatch
       && trimmed.match(/^FARE\s+(?:USD|CNY|EUR|GBP|JPY|AUD)\s+[\d.]+/i);
     if (gdsfareLine && !_lastFareType) {
-      _lastFareType = 'ADULT';
+      // If adult fare already captured, second FARE block is likely infant/child
+      if (parsedFareByType && parsedFareByType.adult) {
+        _lastFareType = 'INFANT';
+      } else {
+        _lastFareType = 'ADULT';
+      }
       // Also pick up EQUIV CNY as fallback
       const equivM = trimmed.match(/EQUIV\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
-      if (equivM) { _equivFareAmt = parseFloat(equivM[1]); _equivFareType = 'ADULT'; }
+      if (equivM) { _equivFareAmt = parseFloat(equivM[1]); _equivFareType = _lastFareType; }
     }
     if (totalCnyMatch && _lastFareType) {
       const amt = parseFloat(totalCnyMatch[1]);
@@ -5084,7 +5163,7 @@ function parseSingleBooking(raw) {
         }
         // Store directly as parsedPaxPrices (discount applied separately)
         parsedPaxPrices = flatPrices;
-        if (discountFromExpr != null && typeof parsedDiscount === 'undefined') {
+        if (discountFromExpr != null && parsedDiscount === undefined) {
           parsedDiscount = discountFromExpr;
         }
         rmb = priceGroups[0].base;
@@ -5100,10 +5179,29 @@ function parseSingleBooking(raw) {
         continue;
       }
     }
-    // Chinese cabin word + price: "普通经济17793", "商务舱45638"
-    const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabinMulti && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
+    // ── GDS fare code line: "02 XHE00AI0  12920 CNY", "01 PFE05MYP+*  37686 CNY  5516.83 USD"
+    // Pattern: line-number + fare-code + CNY/RMB amount (possibly followed by USD equivalent)
+    const gdsFareLine = trimmed.match(/^\d{1,2}\s+[A-Z0-9]{4,}[+*]{0,2}\s+(\d{4,6})\s*(CNY|RMB)/i);
+    if (gdsFareLine) {
+      const amt = parseFloat(gdsFareLine[1]);
+      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+      // Also extract USD if present
+      const usdM = trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*USD\s*$/i);
+      if (usdM && !usd) usd = parseFloat(usdM[1]);
+      continue;
+    }
+    const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?)\s*(?:\d+PC)?\s*$/i);
+    if (pNumCabin) {
+      const amt = parseFloat(pNumCabin[1]);
+      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+      const cabM = trimmed.match(/(公务|商务舱?|头等舱?|超级经济|超经|经济舱?)/);
+      const _nc = {'公务':'商务舱','商务':'商务舱','商务舱':'商务舱','头等':'头等舱','头等舱':'头等舱','超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱'};
+      if (cabM && _nc[cabM[1]] && parsedCabin === undefined) parsedCabin = _nc[cabM[1]];
+      continue;
+    }
     // Baggage + fare line — two orders:
     //   "2pc  48596"  (baggage first) / "32392   2pc" (fare first)
+    const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabinMulti && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
     const pBagFare = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin
       && (trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i) || trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i));
     // Bare price line: "24568", "24568  *2"
@@ -5250,6 +5348,12 @@ function parseSingleBooking(raw) {
     }
   }
 
+  // If only USD fare was found (no CNY), derive rmb from usd × settings.rate
+  // This handles formats like "3297.73 USD" where USD is the authoritative fare
+  if (usd && usd > 0 && !rmb && settings.rate > 0) {
+    rmb = +(usd * settings.rate).toFixed(2);
+  }
+
   // Dedup segments: remove exact duplicates (same flight + date)
   const seenSegs = new Set();
   const dedupedSegs = segs.filter(s => {
@@ -5263,6 +5367,7 @@ function parseSingleBooking(raw) {
     discount: parsedDiscount || null,
     cabin: parsedCabin ?? null,
     paxPrices: parsedPaxPrices ?? null,
+    customRate: parsedCustomRate ?? null,
     productDiscount, productMarker, productNote,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
@@ -5482,21 +5587,20 @@ async function parsePNR() {
       waitingForRelease: primary.waitingForRelease || false
     });
     const bookingText = chunk;
+    // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
+    if (primary.customRate) o.customRate = primary.customRate;
+
     // If we have per-pax prices, compute rmb as sum-of-paxPrices × discount
-    // (overrides the single-basePrice × paxCount formula used otherwise).
-    if (o.paxPrices && o.paxPrices.length > 0 && o.discount != null) {
+    if (o.paxPrices && o.paxPrices.length > 0 && o.discount != null && !primary.customRate) {
       const sum = o.paxPrices.reduce((a, b) => a + b, 0);
       o.rmb = +(sum * (o.discount / 100)).toFixed(2);
       if (settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
     }
-    // Re-match discount rule with full order context (tableLabel + originRegion + fareClass)
-    // but only if user didn't set isSpecialDiscount or parse explicit discount.
-    // Priority: special/product > parsed PNR discount > full-context rule > basic rule > default
-    if (!isSpecial && discount == null) {
+    // Re-match discount rule with full order context
+    if (!isSpecial && discount == null && !primary.customRate) {
       const fullCtxRule = matchDiscountRule(o);
       if (fullCtxRule != null) {
         o.discount = fullCtxRule;
-        // Recompute rmb using new discount
         if (o.paxPrices && o.paxPrices.length > 0) {
           const sum = o.paxPrices.reduce((a, b) => a + b, 0);
           o.rmb = +(sum * (fullCtxRule / 100)).toFixed(2);
@@ -5562,14 +5666,15 @@ async function parsePNR() {
       if (o.discount != null) {
         const sum = o.paxPrices.reduce((a, b) => a + b, 0);
         o.rmb = +(sum * (o.discount / 100)).toFixed(2);
-        if (settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
+        // Only recompute usd if we don't have an original USD fare
+        if (!primary.usd && settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
       }
     }
     newOrders.push(o);
   }
 
   // Persist any newly-discovered known passengers
-  storageSet('ticket-organizer-settings', settings);
+  await storageSet('ticket-organizer-settings', settings);
 
   if (newOrders.length === 0) { toast('没解析到内容，请手动填写'); return; }
 
@@ -5767,7 +5872,9 @@ SUN/KAILAI MS 女 28SEP08
 // ============================================
 
 function effectiveRate(o) {
-  return o.rate != null ? o.rate : settings.rate;
+  if (o.customRate != null) return o.customRate;
+  if (o.rate != null) return o.rate;
+  return settings.rate;
 }
 
 function renderPreview() {
@@ -6037,6 +6144,16 @@ function renderAirlineUsdPanel(orders) {
       const noAvailBadge = o.noAvailability
         ? `<span style="background:#888; color:#fff; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:700; margin-left:4px;">⏸ 暂时无位</span>`
         : '';
+      const linkedBadge = (() => {
+        if (!o.ticketOrder && (!o.linkedOrderIds || o.linkedOrderIds.length === 0)) return '';
+        const seq = o.ticketOrder ? `第${o.ticketOrder}出` : '';
+        const linkedNames = (o.linkedOrderIds || []).map(lid => {
+          const lo = STATE.orders.find(x => x.id === lid);
+          return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
+        }).filter(Boolean);
+        const linkStr = linkedNames.length ? ` → ${linkedNames.join('+')}` : '';
+        return `<span style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="出票顺序关联 · 点击编辑">🔗 ${seq}${linkStr}</span>`;
+      })();
       // Dim the row if no availability
       if (o.noAvailability) {
         row.style.opacity = '0.45';
@@ -6047,7 +6164,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
         <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? '表'+escapeHtml(o.tableLabel) : ''}</span>
-        <span class="pax-names">${escapeHtml(paxText)}${mixedBadge}${releaseBadge}${noAvailBadge}</span>
+        <span class="pax-names">${escapeHtml(paxText)}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -6141,7 +6258,7 @@ async function quickDeleteOrder(originalIdx, paxName) {
     STATE.orders.push(newOrder());
   }
   if (STATE.currentIdx >= STATE.orders.length) STATE.currentIdx = STATE.orders.length - 1;
-  await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+  await persistOrdersNow();
   renderPendingList();
   renderPendingBanner();
   renderOrderTabs();
@@ -6250,6 +6367,7 @@ function renderPendingList() {
     sel.innerHTML = `<option value="">全部</option>` + options.map(v => `<option value="${escapeAttr(v)}" ${curVal === v ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
     sel.onchange = () => {
       window._pendingFilter = { ...cur, [key]: sel.value };
+      try { sessionStorage.setItem('pendingFilter', JSON.stringify(window._pendingFilter)); } catch(e) {}
       renderPendingList();
     };
     wrap.appendChild(lbl);
@@ -6267,7 +6385,11 @@ function renderPendingList() {
     const clearBtn = document.createElement('button');
     clearBtn.textContent = '✕ 清除筛选';
     clearBtn.className = 'btn ghost small';
-    clearBtn.onclick = () => { window._pendingFilter = { airline: '', agent: '', label: '' }; renderPendingList(); };
+    clearBtn.onclick = () => {
+      window._pendingFilter = { airline: '', agent: '', label: '' };
+      try { sessionStorage.removeItem('pendingFilter'); } catch(e) {}
+      renderPendingList();
+    };
     filterBar.appendChild(clearBtn);
   }
 
@@ -6617,6 +6739,18 @@ function renderPendingOrderGroupExtras(group, o, idx) {
           成本 = 订单美金 × 折扣%
         </div>
       `;
+    } else if (pointsType === '直接结算') {
+      html += `
+        <div class="finalize-field">
+          <label>结算金额 USD <span style="color:#27ae60;font-size:10px;font-weight:700;">= 成本</span></label>
+          <input type="number" step="0.01" value="${o.orderUsdAmount != null ? o.orderUsdAmount : ''}" placeholder="如 285.00"
+            style="border-color:#27ae60;"
+            oninput="updatePendingField(${idx}, 'orderUsdAmount', this.value)">
+        </div>
+        <div class="finalize-field" style="align-self:end; padding-bottom:6px; color:#27ae60; font-size:11px; font-family:'JetBrains Mono',monospace; font-weight:600;">
+          填写的金额 = 最终付款成本
+        </div>
+      `;
     }
 
     html += `</div><div class="finalize-calc">`;
@@ -6653,6 +6787,8 @@ function renderPendingOrderGroupExtras(group, o, idx) {
       if (baseUsd != null) {
         html += `<span style="opacity:0.6;">$${baseUsd.toFixed(2)} × ${o.directDiscount}%</span>`;
       }
+    } else if (pointsType === '直接结算' && o.orderUsdAmount != null) {
+      html += `<span style="opacity:0.6;color:#27ae60;">直接结算 $${Number(o.orderUsdAmount).toFixed(2)}</span>`;
     }
     html += `</div>`;
 
@@ -6716,6 +6852,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="openReparseDialog(${idx})" title="重新粘贴PNR并解析此单的所有字段">⟲ 重新解析</button>
       <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx})" title="标记/取消「等待放位」" style="${o.waitingForRelease ? 'background:#fff3cd; border-color:#f0a500; color:#7a5200;' : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx})" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? 'background:#e0e0e0; border-color:#888; color:#555;' : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
+      <button class="btn ghost small" onclick="openLinkOrderDialog(${idx})" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? 'background:#f3e5ff; border-color:#8e44ad; color:#6c2ea0;' : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx})" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
       <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green);" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
       <button class="btn ghost small" onclick="editOrderInNewTab(${idx})">✎ 完整编辑</button>
@@ -6724,12 +6861,12 @@ function renderPendingOrderActions(actions, o, idx) {
 }
 
 // Mark a manual action as done (so the button shows "completed" color)
-function markActionDone(idx, action) {
+async function markActionDone(idx, action) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.actionsDone = o.actionsDone || {};
   o.actionsDone[action] = true;
-  storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+  await persistOrdersNow();
   // Update just the actions bar in-place — no full list rebuild needed
   setTimeout(() => {
     const actionsEl = document.getElementById(`order-actions-${idx}`);
@@ -6813,7 +6950,7 @@ function openCardholderDialog(idx) {
           <div class="cardholder-pick-row ${isCurrent ? 'selected' : ''}" data-name="${escapeAttr(c.name || '')}" onclick="assignCardholder(${idx}, '${escapeAttr(c.id)}')" style="${rowStyle}">
             <div class="cardholder-pick-main">
               <div class="cardholder-pick-name">${isCurrent ? '✓ ' : ''}${escapeHtml(c.name || '卡主')}${chaseBadge}</div>
-              <div class="cardholder-pick-meta">${load.count} 单 · ${load.usd > 0 ? '$' + load.usd.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—'}</div>
+              <div class="cardholder-pick-meta">${load.count} 单 · ${load.usd > 0 ? '$' + load.usd.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—'}${c.notes ? ` · <span style="color:var(--muted);font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}</div>
             </div>
             <div class="cardholder-pick-orders">${otherOrdersText}</div>
           </div>
@@ -6928,12 +7065,171 @@ async function assignCardholder(idx, cardholderId) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.cardholderId = cardholderId || null;
-  await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+  await persistOrdersNow();
   closeCardholderDialog();
   renderPendingList();
+  renderChasePanel();
   renderPendingBanner();
   const ch = cardholderId ? (settings.cardholders || []).find(c => c.id === cardholderId) : null;
   toast(ch ? `✓ 已分配给 ${ch.name}` : '已取消卡主分配');
+  // After assigning a cardholder, prompt for miles/profit check
+  if (cardholderId) {
+    setTimeout(() => openProfitCheckDialog(idx), 300);
+  }
+}
+
+function openProfitCheckDialog(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const revenue = computeFinalPrice(o) || 0;
+  const revenueUsd = effectiveRate(o) > 0 ? (revenue / effectiveRate(o)) : 0;
+  const ch = o.cardholderId ? (settings.cardholders || []).find(c => c.id === o.cardholderId) : null;
+  // Safe defaults
+  const existingMiles = (o.miles > 0) ? o.miles : '';
+  const existingExch = (o.cpmExchange > 0 && o.cpmExchange < 1) ? o.cpmExchange
+    : (settings.defaultCpmExchange > 0 && settings.defaultCpmExchange < 1) ? settings.defaultCpmExchange
+    : 0.0130;
+  const existingType = o.pointsType || '';
+
+  // Build points type options
+  const typeOpts = Object.entries(POINTS_TYPES || {}).map(([k, v]) =>
+    `<option value="${escapeAttr(k)}" ${existingType===k?'selected':''}>${escapeHtml(v.label || k)} (×${v.mult})</option>`
+  ).join('');
+
+  const html = `
+  <div class="verify-modal-overlay" id="profitCheckOverlay" onclick="closeProfitCheckDialog(event)">
+    <div class="verify-modal" onclick="event.stopPropagation()" style="max-width:480px;">
+      <div class="verify-modal-header" style="background:var(--ink);color:#fff;padding:14px 18px;border-radius:4px 4px 0 0;">
+        <h3 style="margin:0;font-size:15px;">💰 出票前利润核算 — 订单 #${idx+1}</h3>
+        <button onclick="closeProfitCheckDialog()" class="close-btn" style="color:#fff;">×</button>
+      </div>
+      <div class="verify-modal-body" style="padding:18px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;padding:12px;background:#f9f6f0;border-radius:4px;font-size:13px;">
+          <div><span style="color:var(--muted);font-size:11px;">卡主</span><br><strong>${escapeHtml(ch?.name || '—')}</strong></div>
+          <div><span style="color:var(--muted);font-size:11px;">收入 Revenue</span><br><strong style="color:var(--accent);">¥${Math.round(revenue).toLocaleString()}</strong> ≈ <span style="color:var(--muted);">$${revenueUsd.toFixed(0)}</span></div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">✈ 所需积分 MILES *</label>
+            <input id="pc-miles" type="number" placeholder="如 131193" value="${existingMiles}"
+              style="width:100%;box-sizing:border-box;padding:8px;border:2px solid var(--accent);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;"
+              oninput="updateProfitPreview(${idx})" autofocus>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">积分类型</label>
+            <select id="pc-type" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:12px;"
+              onchange="updateProfitPreview(${idx})">
+              <option value="">— 选择 —</option>
+              ${typeOpts}
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">CPM 汇率 (积分兑换率 $/分)</label>
+          <input id="pc-exch" type="number" step="0.0001" min="0.001" max="0.5" placeholder="如 0.0130" value="${existingExch}"
+            style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:13px;"
+            oninput="updateProfitPreview(${idx})">
+        </div>
+
+        <!-- Profit preview -->
+        <div id="pc-profit-preview" style="padding:14px;border-radius:6px;border:2px solid var(--line);text-align:center;font-size:13px;margin-bottom:16px;background:#fff;">
+          <span style="color:var(--muted);">填写积分后自动计算利润</span>
+        </div>
+
+        <div style="display:flex;gap:8px;">
+          <button class="btn accent" onclick="saveProfitCheck(${idx})" style="flex:1;font-size:14px;padding:10px;">✓ 确认并继续出票</button>
+          <button class="btn ghost" onclick="closeProfitCheckDialog()" style="font-size:13px;padding:10px;">跳过</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">积分数据会保存到订单，随时可修改</div>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('pc-miles')?.focus();
+  updateProfitPreview(idx);
+
+  // Keyboard shortcuts: Enter = confirm, Esc = close
+  const keyHandler = (e) => {
+    if (e.key === 'Escape') { closeProfitCheckDialog(); document.removeEventListener('keydown', keyHandler); }
+    if (e.key === 'Enter' && e.target.id !== 'pc-type') { saveProfitCheck(idx); document.removeEventListener('keydown', keyHandler); }
+  };
+  document.addEventListener('keydown', keyHandler);
+}
+
+function updateProfitPreview(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const preview = document.getElementById('pc-profit-preview');
+  if (!preview) return;
+  const miles = parseFloat(document.getElementById('pc-miles')?.value);
+  const exch = parseFloat(document.getElementById('pc-exch')?.value);
+  const typeKey = document.getElementById('pc-type')?.value;
+  const typeConf = POINTS_TYPES && POINTS_TYPES[typeKey];
+  const mult = typeConf?.mult ?? 1.0;
+  if (!miles || miles <= 0 || !exch || exch <= 0 || exch > 0.5) {
+    preview.innerHTML = exch > 0.5 ? '<span style="color:#e74c3c;">⚠️ CPM 汇率异常（应在 0.001~0.5 之间），请检查</span>'
+      : '<span style="color:var(--muted);">填写积分后自动计算利润</span>';
+    preview.style.borderColor = exch > 0.5 ? '#e74c3c' : 'var(--line)';
+    preview.style.background = exch > 0.5 ? '#fef0f0' : '#fff';
+    return;
+  }
+  const cost = miles * mult * exch;  // USD cost
+  const revenue = computeFinalPrice(o) || 0;
+  const rate = effectiveRate(o) || settings.rate || 6.84;
+  const revenueUsd = revenue / rate;
+  const profitUsd = revenueUsd - cost;
+  const profitRmb = profitUsd * rate;
+  const margin = revenueUsd > 0 ? profitUsd / revenueUsd * 100 : 0;
+  const isLoss = profitUsd < 0;
+  const isWarn = margin < 5 && !isLoss;
+
+  preview.style.borderColor = isLoss ? '#e74c3c' : isWarn ? '#e67e22' : '#27ae60';
+  preview.style.background = isLoss ? '#fef0f0' : isWarn ? '#fef9f0' : '#f0fef4';
+  preview.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--muted);">积分成本</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${cost.toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--muted);">收入</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${revenueUsd.toFixed(2)}</span>
+    </div>
+    <div style="height:1px;background:var(--line);margin:6px 0;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:13px;font-weight:700;color:${isLoss?'#e74c3c':isWarn?'#e67e22':'#27ae60'};">
+        ${isLoss ? '⚠️ 亏损！' : isWarn ? '⚠️ 利润偏低' : '✓ 利润正常'}
+      </span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:${isLoss?'#e74c3c':isWarn?'#e67e22':'#27ae60'};">
+        ${profitUsd >= 0 ? '+' : ''}$${profitUsd.toFixed(2)} (¥${Math.round(profitRmb).toLocaleString()})
+      </span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px;">利润率 ${margin.toFixed(1)}%</div>
+    ${isLoss ? '<div style="font-size:12px;color:#e74c3c;margin-top:8px;font-weight:600;">⛔ 当前设置会亏损，请确认积分数量或汇率是否正确</div>' : ''}
+  `;
+}
+
+async function saveProfitCheck(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const miles = parseFloat(document.getElementById('pc-miles')?.value);
+  const exch = parseFloat(document.getElementById('pc-exch')?.value);
+  const typeKey = document.getElementById('pc-type')?.value;
+  if (!isNaN(miles)) o.miles = miles;
+  if (!isNaN(exch)) o.cpmExchange = exch;
+  if (typeKey) o.pointsType = typeKey;
+  await persistOrdersNow();
+  closeProfitCheckDialog();
+  renderPendingList();
+  toast('✓ 积分已保存');
+}
+
+function closeProfitCheckDialog(e) {
+  if (e && e.type === 'click' && e.target.id !== 'profitCheckOverlay') return;
+  const el = document.getElementById('profitCheckOverlay');
+  if (el) el.remove();
+  // keyHandler cleans itself up on next Esc/Enter
 }
 
 // Reparse dialog: paste a fresh PNR and re-extract all fields for this order in place
@@ -7259,7 +7555,7 @@ function closeMRZDialog(e) {
   if (c) c.innerHTML = '';
 }
 
-function doMRZForOrder(idx) {
+async function doMRZForOrder(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
   const raw = document.getElementById('mrzDialogInput').value;
@@ -7306,7 +7602,7 @@ function doMRZForOrder(idx) {
     settings.knownPax = settings.knownPax || [];
     if (!settings.knownPax.find(k => k.last === surname && k.first === given)) {
       settings.knownPax.push({ last: surname, first: given, dob: dobFormatted, gender });
-      storageSet('ticket-organizer-settings', settings);
+      await storageSet('ticket-organizer-settings', settings);
     }
     persistOrders();
     closeMRZDialog();
@@ -7663,7 +7959,13 @@ function updatePendingCPP(idx, value) {
   const o = STATE.orders[idx];
   if (!o) return;
   const n = parseFloat(value);
-  o.cpmExchange = isNaN(n) ? null : n / 100;
+  if (!isNaN(n) && n > 0) {
+    o.cpmExchange = n / 100;  // convert cents-per-mile to dollars-per-mile
+    o.cpmRate = n / 100;      // also set cpmRate so validation passes
+  } else {
+    o.cpmExchange = null;
+    o.cpmRate = null;
+  }
   const settlement = computeSettlement(o);
   o.cardholderFee = settlement;  // USD
   persistOrders();
@@ -7721,6 +8023,8 @@ function refreshPendingOrderPreview(idx) {
     if (baseUsd != null) {
       html += `<span style="opacity:0.6;">$${baseUsd.toFixed(2)} × ${o.directDiscount}%</span>`;
     }
+  } else if (pointsType === '直接结算' && o.orderUsdAmount != null) {
+    html += `<span style="opacity:0.6;color:#27ae60;">直接结算 $${Number(o.orderUsdAmount).toFixed(2)}</span>`;
   }
   calcEl.innerHTML = html;
 }
@@ -7737,6 +8041,11 @@ function updatePendingPointsType(idx, value) {
     o.cpmRate = null;
     o.miles = null;
     o.cpmExchange = null;
+  } else if (value === '直接结算') {
+    o.cpmRate = null;
+    o.miles = null;
+    o.cpmExchange = null;
+    o.directDiscount = null;
   } else {
     o.cpmRate = null;
   }
@@ -7812,6 +8121,99 @@ function toggleNoAvailability(idx) {
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
   toast(o.noAvailability ? '⏸ 已标记为暂时无位' : '✓ 已恢复');
+}
+
+function openLinkOrderDialog(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const existing = STATE.orders.filter((x, i) => isMeaningfulOrder(x) && i !== idx);
+  const currentLinked = o.linkedOrderIds || [];
+  const currentOrder = o.ticketOrder || '';
+  const paxName = o.passengers[0]?.name || '此订单';
+
+  const orderOpts = existing.map((x, _i) => {
+    const realIdx = STATE.orders.indexOf(x);
+    const name = x.passengers[0]?.name?.split('/')[0] || `订单${realIdx+1}`;
+    const checked = currentLinked.includes(x.id) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:4px;cursor:pointer;font-size:13px;${checked?'background:#f3e5ff;border-color:#8e44ad;':''}">
+      <input type="checkbox" value="${escapeAttr(x.id)}" ${checked} style="accent-color:#8e44ad;">
+      <span><strong>${escapeHtml(name)}</strong> · ${escapeHtml(x.airline||'?')} · ${x.segments[0]?.from||'?'}→${(x.segments[x.segments.length-1]||{}).to||'?'}
+      ${x.ticketOrder ? `<span style="background:#8e44ad;color:#fff;padding:0 4px;border-radius:2px;font-size:10px;margin-left:4px;">第${x.ticketOrder}出</span>` : ''}</span>
+    </label>`;
+  }).join('');
+
+  const html = `
+  <div class="verify-modal-overlay" id="linkOrderOverlay" onclick="if(event.target.id==='linkOrderOverlay')closeLinkOrderDialog()">
+    <div class="verify-modal" onclick="event.stopPropagation()" style="max-width:460px;">
+      <div class="verify-modal-header" style="background:#8e44ad;color:#fff;padding:14px 18px;border-radius:4px 4px 0 0;display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="margin:0;font-size:15px;">🔗 出票顺序关联 — ${escapeHtml(paxName.split('/')[0])}</h3>
+        <button onclick="closeLinkOrderDialog()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:18px;">
+        <div style="margin-bottom:14px;">
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">出票顺序（此单是第几出）</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${[1,2,3,4].map(n => `<label style="cursor:pointer;"><input type="radio" name="ticketOrder" value="${n}" ${currentOrder==n?'checked':''} style="accent-color:#8e44ad;margin-right:4px;">第 ${n} 出</label>`).join('')}
+            <label style="cursor:pointer;"><input type="radio" name="ticketOrder" value="" ${!currentOrder?'checked':''} style="accent-color:#8e44ad;margin-right:4px;">不设置</label>
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:8px;">关联的订单（可多选）</label>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;">
+            ${orderOpts || '<div style="color:var(--muted);font-size:13px;text-align:center;padding:16px;">暂无其他待出票订单</div>'}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn accent" onclick="saveLinkOrder(${idx})" style="flex:1;background:#8e44ad;border-color:#8e44ad;">✓ 保存关联</button>
+          <button class="btn ghost" onclick="clearLinkOrder(${idx})" style="color:#888;">✕ 清除关联</button>
+          <button class="btn ghost" onclick="closeLinkOrderDialog()">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  const kh = (e) => { if (e.key === 'Escape') { closeLinkOrderDialog(); document.removeEventListener('keydown', kh); } };
+  document.addEventListener('keydown', kh);
+}
+
+async function saveLinkOrder(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const orderVal = document.querySelector('input[name="ticketOrder"]:checked')?.value;
+  o.ticketOrder = orderVal ? parseInt(orderVal) : null;
+  const checked = [...document.querySelectorAll('#linkOrderOverlay input[type=checkbox]:checked')].map(c => c.value);
+  o.linkedOrderIds = checked;
+  // Also update linked orders to point back to this one
+  checked.forEach(lid => {
+    const lo = STATE.orders.find(x => x.id === lid);
+    if (lo && !lo.linkedOrderIds) lo.linkedOrderIds = [];
+    if (lo && !lo.linkedOrderIds.includes(o.id)) lo.linkedOrderIds.push(o.id);
+  });
+  await persistOrdersNow();
+  closeLinkOrderDialog();
+  renderPendingList();
+  toast(`✓ 已设置：第${o.ticketOrder || '?'}出，关联${checked.length}个订单`);
+}
+
+async function clearLinkOrder(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  // Remove this order from all linked orders
+  (o.linkedOrderIds || []).forEach(lid => {
+    const lo = STATE.orders.find(x => x.id === lid);
+    if (lo) lo.linkedOrderIds = (lo.linkedOrderIds || []).filter(id => id !== o.id);
+  });
+  o.ticketOrder = null;
+  o.linkedOrderIds = [];
+  await persistOrdersNow();
+  closeLinkOrderDialog();
+  renderPendingList();
+  toast('已清除出票顺序关联');
+}
+
+function closeLinkOrderDialog() {
+  document.getElementById('linkOrderOverlay')?.remove();
 }
 
 function toggleWaitingForRelease(idx) {
@@ -8425,14 +8827,27 @@ function buildCardHTML(o, idx) {
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (${totalSum} ÷ ${rate.toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalFareUsd.toFixed(2)}</span></div>`;
         }
       } else {
-        html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
-        html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
-        const basePriceUsd = o.basePrice != null ? o.basePrice / effectiveRate(o) : null;
-        if (basePriceUsd != null) {
-          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">≈ 人均运价 USD (${o.basePrice} ÷ ${effectiveRate(o).toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${basePriceUsd.toFixed(2)}</span></div>`;
-          if (pax > 1) {
-            const totalUsd = basePriceUsd * pax;
-            html += `<div class="price-row"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (× ${pax}人)</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalUsd.toFixed(2)}</span></div>`;
+        if (o.customRate && o.usd) {
+          // USD fare format: show USD as primary fare
+          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${o.customRate} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD × ${pax}人</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(o.usd * pax).toFixed(2)}</span></div>`;
+        } else if (o.usd && o.usd > 0 && !o.customRate && !o.basePrice) {
+          // Plain USD fare (e.g. "3297.73 USD") — show USD as primary, CNY as derived
+          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+          const usdAfterDisc = o.usd * (o.discount || 100) / 100;
+          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD (× ${pax}人)</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(usdAfterDisc * pax).toFixed(2)}</span></div>`;
+        } else {
+          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+          const basePriceUsd = o.basePrice != null ? o.basePrice / effectiveRate(o) : null;
+          if (basePriceUsd != null) {
+            html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">≈ 人均运价 USD (${o.basePrice} ÷ ${effectiveRate(o).toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${basePriceUsd.toFixed(2)}</span></div>`;
+            if (pax > 1) {
+              const totalUsd = basePriceUsd * pax;
+              html += `<div class="price-row"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (× ${pax}人)</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalUsd.toFixed(2)}</span></div>`;
+            }
           }
         }
       }
@@ -8650,6 +9065,8 @@ function buildInternalCopy(o) {
       ? o.orderUsdAmount
       : (() => { const fp = computeFinalPrice(o); return fp != null ? fp / effectiveRate(o) : null; })();
     if (baseUsd != null) extra.push(`结算: $${baseUsd.toFixed(2)} × ${o.directDiscount}% (直接折扣)`);
+  } else if (o.pointsType === '直接结算' && o.orderUsdAmount != null) {
+    extra.push(`结算: $${Number(o.orderUsdAmount).toFixed(2)} (直接结算)`);
   } else if (POINTS_TYPES[o.pointsType] && POINTS_TYPES[o.pointsType].usesPoints &&
              o.miles != null && o.cpmExchange != null) {
     const mult = POINTS_TYPES[o.pointsType].mult;
@@ -8923,7 +9340,7 @@ function rematchAllPaxInfo() {
 // Global one-click: re-run the latest parsing logic on every order that has saved raw PNR text.
 // For orders without rawPnr (created before this feature), only does knownPax backfill + cost recompute.
 // Preserves user-entered fields (cardholder, points settings, PNR/TKT codes, labels, etc.)
-function refreshAllOrders() {
+async function refreshAllOrders() {
   let reparsed = 0;
   let paxUpdated = 0;
   let skippedNoRaw = 0;
@@ -8965,6 +9382,23 @@ function refreshAllOrders() {
             }
             if (parsed.usd != null) o.usd = parsed.usd;
             if (parsed.discount != null && o.discount == null) o.discount = parsed.discount;
+            if (parsed.customRate != null) o.customRate = parsed.customRate;
+            // Re-sort paxPrices by passenger age after re-parse
+            if (parsed.paxPrices && parsed.paxPrices.length === o.passengers.length && new Set(parsed.paxPrices).size > 1) {
+              const firstDate = o.segments[0] ? o.segments[0].date : null;
+              const paxAgeRank = o.passengers.map((p, i) => {
+                if (!p.dob || !firstDate) return { i, rank: 0 };
+                const age = calculateAgeAtFlight(p.dob, firstDate);
+                if (age == null) return { i, rank: 0 };
+                return { i, rank: age < 2 ? 3 : age < 12 ? 2 : 0 };
+              });
+              const sortedPrices = [...parsed.paxPrices].sort((a, b) => b - a);
+              const assigned = new Array(o.passengers.length);
+              [...paxAgeRank].sort((a, b) => a.rank - b.rank).forEach(({ i }, pi) => { assigned[i] = sortedPrices[pi]; });
+              o.paxPrices = assigned;
+            } else if (parsed.paxPrices) {
+              o.paxPrices = parsed.paxPrices;
+            }
             reparsed++;
           }
         } catch (e) {
@@ -9005,7 +9439,7 @@ function refreshAllOrders() {
   });
 
   persistOrders();
-  storageSet('ticket-organizer-settings', settings);
+  await storageSet('ticket-organizer-settings', settings);
 
   loadCurrToDOM();
   renderOrderTabs();
@@ -9075,6 +9509,7 @@ async function markOrderTicketed(idx) {
     const typeConf = POINTS_TYPES[pt];
     const usesPoints = typeConf && typeConf.usesPoints;
     const isDirect = pt === '直接折扣';
+    const isDirectAmount = pt === '直接结算';
     if (!pt) {
       missing.push('🎫 积分方式');
     } else if (usesPoints) {
@@ -9082,6 +9517,8 @@ async function markOrderTicketed(idx) {
       if (!o.cpmRate || Number(o.cpmRate) <= 0) missing.push('💰 CPP（每英里成本）');
     } else if (isDirect) {
       if (!o.directDiscount || Number(o.directDiscount) <= 0) missing.push('💲 直接折扣金额');
+    } else if (isDirectAmount) {
+      if (!o.orderUsdAmount || Number(o.orderUsdAmount) <= 0) missing.push('💲 直接结算金额');
     }
   }
   if (missing.length > 0) {
@@ -9134,6 +9571,7 @@ async function markAllTicketed() {
       const typeConf = POINTS_TYPES[pt];
       const usesPoints = typeConf && typeConf.usesPoints;
       const isDirect = pt === '直接折扣';
+      const isDirectAmount = pt === '直接结算';
       if (!pt) {
         missing.push('积分方式');
       } else if (usesPoints) {
@@ -9141,6 +9579,8 @@ async function markAllTicketed() {
         if (!o.cpmRate || Number(o.cpmRate) <= 0) missing.push('CPP');
       } else if (isDirect) {
         if (!o.directDiscount || Number(o.directDiscount) <= 0) missing.push('直接折扣');
+      } else if (isDirectAmount) {
+        if (!o.orderUsdAmount || Number(o.orderUsdAmount) <= 0) missing.push('直接结算金额');
       }
     }
     if (missing.length > 0) {
@@ -9978,20 +10418,17 @@ function filterChaseOrders(query) {
   const cards = document.querySelectorAll('[id^="chase-order-card-"]');
   let visibleCount = 0;
   cards.forEach(card => {
-    const text = card.innerText.toLowerCase();
-    const show = !q || text.includes(q);
+    const show = !q || card.innerText.toLowerCase().includes(q);
     card.style.display = show ? '' : 'none';
     if (show) visibleCount++;
   });
-  // Show/hide no-results message
   let noRes = document.getElementById('chaseSearchNoResults');
   if (!noRes) {
     noRes = document.createElement('div');
     noRes.id = 'chaseSearchNoResults';
     noRes.style.cssText = 'text-align:center;padding:24px;color:var(--muted);font-size:13px;';
     noRes.textContent = '🔍 没有符合的订单';
-    const wrap = document.getElementById('chaseSearchWrap');
-    if (wrap) wrap.parentNode.insertBefore(noRes, wrap.nextSibling.nextSibling || null);
+    document.getElementById('chasePanelContent')?.appendChild(noRes);
   }
   noRes.style.display = (q && visibleCount === 0) ? '' : 'none';
 }
@@ -11131,6 +11568,7 @@ function renderCardholdersList() {
     div.innerHTML = `
       <div class="ch-info">
         <div class="ch-name"><span class="ch-channel-tag">${escapeHtml(ch.channel || '?')}</span>${escapeHtml(ch.name)}${paidBadge}</div>
+        ${ch.notes ? `<div style="font-size:11px;color:var(--muted);font-style:italic;margin:2px 0 0 4px;">📝 ${escapeHtml(ch.notes)}</div>` : ''}
         <div class="ch-stats">
           <span>订单 <strong>${orders.length}</strong></span>
           ${totalMiles > 0 ? `<span>里程 <strong>${totalMiles.toLocaleString()}</strong></span>` : ''}
@@ -11353,6 +11791,14 @@ async function removeCardholder(id) {
   toast('已删除卡主');
 }
 
+async function saveCardholderNotes(id, notes) {
+  const ch = (settings.cardholders || []).find(c => c.id === id);
+  if (!ch) return;
+  ch.notes = notes.trim();
+  await storageSet('ticket-organizer-settings', settings);
+  renderCardholdersList();
+}
+
 function showCardholderDetail(id) {
   const ch = settings.cardholders.find(c => c.id === id);
   if (!ch) return;
@@ -11375,6 +11821,13 @@ function showCardholderDetail(id) {
       <div>
         <div class="name">${escapeHtml(ch.channel)} · ${escapeHtml(ch.name)}</div>
         <div style="font-size:11px; opacity:0.7; margin-top:4px; font-family:'JetBrains Mono',monospace;">共 ${totalOrders} 张已出票</div>
+        <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+          <input id="ch-notes-${ch.id}" type="text" value="${escapeAttr(ch.notes || '')}" placeholder="备注（卡号、积分余额、特殊要求…）"
+            style="flex:1; padding:5px 10px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; background:rgba(255,255,255,0.15); color:#fff; font-size:12px; font-family:'JetBrains Mono',monospace;"
+            oninput="saveCardholderNotes('${ch.id}', this.value)"
+            placeholder="备注…">
+          <span style="font-size:11px; opacity:0.6;">📝 备注</span>
+        </div>
       </div>
       <div class="stats">
         <div class="stat"><span class="v">${totalMiles > 0 ? totalMiles.toLocaleString() : '—'}</span><span class="l">消耗里程</span></div>
@@ -11405,6 +11858,14 @@ function showCardholderDetail(id) {
           <span style="font-weight:600;">全选未付 (${unpaidCount})</span>
         </label>
         <span id="chPaySelectionSummary" style="flex:1; font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted);">未选中任何订单</span>
+        <select id="chPayMethod" style="padding:5px 8px; border:1px solid var(--line); border-radius:4px; font-size:12px; background:#fff;">
+          <option value="">— 收款方式 —</option>
+          <option value="CASH">💵 现金 CASH</option>
+          <option value="ZELLE">📱 转账 ZELLE</option>
+          <option value="BOA-BOA">🏦 转账 BOA-BOA</option>
+          <option value="ACH">🔄 转账 ACH</option>
+          <option value="TAEKUS">💳 转账 TAEKUS</option>
+        </select>
         <button class="btn small" id="chPayMarkBtn" onclick="markSelectedOrdersPaid('${ch.id}')" disabled
                 style="background:var(--green); border-color:var(--green); color:#fff;">
           💰 标记为已付款
@@ -11433,7 +11894,7 @@ function showCardholderDetail(id) {
           <div style="display:flex; align-items:center; gap:10px; flex:1;">
             <div style="width:20px;">${checkboxHtml}</div>
             <div class="ch-order-main" style="flex:1;">
-              <div class="ch-pax">◈ ${escapeHtml(names || '—')}${isPaid ? ` <span style="background:var(--green); color:#fff; padding:1px 5px; border-radius:2px; font-size:9px; font-weight:700; margin-left:6px;">已付 ${paidDateStr}</span>` : ''}</div>
+              <div class="ch-pax">◈ ${escapeHtml(names || '—')}${isPaid ? ` <span style="background:var(--green); color:#fff; padding:1px 5px; border-radius:2px; font-size:9px; font-weight:700; margin-left:6px;">已付 ${paidDateStr}${t.payMethod ? ' · ' + escapeHtml(t.payMethod) : ''}</span>` : ''}</div>
               <div class="ch-route">${escapeHtml(route || '')} ${escapeHtml(dates ? '· ' + dates : '')} ${t.airline ? '· ' + escapeHtml(t.airline) : ''}</div>
             </div>
           </div>
@@ -11498,11 +11959,14 @@ async function markSelectedOrdersPaid(chId) {
   if (boxes.length === 0) return;
   const ids = [...boxes].map(b => b.dataset.orderId);
   const total = [...boxes].reduce((s, b) => s + (parseFloat(b.dataset.fee) || 0), 0);
-  if (!confirm(`确定把 ${ids.length} 单标记为已付款? 合计 $${total.toLocaleString(undefined, {maximumFractionDigits: 2})}`)) return;
+  const payMethod = document.getElementById('chPayMethod')?.value || '';
+  const methodLabel = payMethod ? ` · ${payMethod}` : '';
+  if (!confirm(`确定把 ${ids.length} 单标记为已付款${methodLabel}?\n合计 $${total.toLocaleString(undefined, {maximumFractionDigits: 2})}`)) return;
   const now = Date.now();
   (settings.ticketed || []).forEach(t => {
     if (ids.includes(t.id)) {
       t.paidAt = now;
+      if (payMethod) t.payMethod = payMethod;
     }
   });
   await storageSet('ticket-organizer-settings', settings);
@@ -11817,7 +12281,7 @@ async function restoreFromRollingBackup(slotIdx) {
   settings = slot.settings;
   STATE.orders = slot.orders || [];
   await storageSet('ticket-organizer-settings', settings);
-  await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+  await persistOrdersNow();
   ensureDraft();
   loadCurrToDOM();
   renderOrderTabs();
@@ -12418,7 +12882,7 @@ function exportData() {
   toast('已导出');
 }
 
-function importData(e) {
+async function importData(e) {
   const file = e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -12631,7 +13095,7 @@ async function loadPersistedOrders() {
       STATE.currentIdx = Math.min(snap.currentIdx || 0, kept.length - 1);
       const changed = runPendingMigrations(STATE.orders);
       if (changed.discount || changed.cabin) {
-        await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+        await persistOrdersNow();
         toastMigrationChanges(changed);
       }
       return true;
@@ -13003,7 +13467,7 @@ async function applyGistPayload(payload, silent) {
   if (Array.isArray(payload.orders)) {
     STATE.orders = payload.orders;
     ensureDraft();
-    await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+    await persistOrdersNow();
   }
   loadCurrToDOM(); renderOrderTabs(); renderPreview();
   renderPendingList(); renderPendingBanner();
@@ -13265,7 +13729,7 @@ async function mergeImportData(event) {
     // Apply same migrations we run on local load — imported orders may be from
     // a device that hadn't got the fix yet.
     const migChanged = runPendingMigrations(STATE.orders);
-    await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+    await persistOrdersNow();
     if (migChanged.discount || migChanged.cabin) toastMigrationChanges(migChanged);
     loadCurrToDOM();
     renderOrderTabs();
@@ -13287,9 +13751,16 @@ async function mergeImportData(event) {
 // ============================================
 
 (async function init() {
+  // Restore pending filter state across refreshes
+  try {
+    const savedFilter = sessionStorage.getItem('pendingFilter');
+    if (savedFilter) window._pendingFilter = JSON.parse(savedFilter);
+  } catch(e) {}
+
   setToday();
   updateWorldClocks();
   setInterval(updateWorldClocks, 1000);
+  renderClientDatalist();
   await loadSettings();
 
   const restored = await loadPersistedOrders();
