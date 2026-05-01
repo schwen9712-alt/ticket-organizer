@@ -4343,9 +4343,9 @@ function splitIntoBookings(raw) {
     const t = s.trim();
     if (!t.includes('/')) return false;
     if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
-    // Ignore Chinese inline pax lines with gender + any date format
     if (/[男女]/.test(t) && (/\d{4}年/.test(t) || /\d{1,2}[A-Z]{3}\d{2,4}/.test(t))) return false;
-    return /^(?:\d+[\.\s]+)?[A-Z]{2,}\/\s?[A-Z]+/.test(t);
+    // Allow compound surnames like "ARIAS ECHANDI/MARIALAURA"
+    return /^(?:\d+[\.\s]+)?[A-Z][A-Z\s]*\/\s?[A-Z]+/.test(t);
   };
   const isSegLike = (s) => {
     const t = s.trim();
@@ -4880,7 +4880,7 @@ function parseSingleBooking(raw) {
       pax.push({ name, dob: dob || '', gender, paxType: 'ADULT' });
       continue;
     }
-    const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/[A-Za-z][A-Za-z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
+    const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z][A-Z\s]*\/[A-Za-z][A-Za-z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim().toUpperCase();
       const g = cnInlinePax[2];
@@ -5257,7 +5257,34 @@ function parseSingleBooking(raw) {
       continue;
     }
 
-    const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?)\s*(?:\d+PC)?\s*$/i);
+    // ── 含税价: "含税 5441", "含税5441CNY", "含税：5441" ──────────────────────
+    const pHanShui = trimmed.match(/^含税\s*[:：]?\s*(\d{4,6}(?:\.\d+)?)\s*(?:CNY|RMB|元|人民币)?\s*$/i);
+    if (pHanShui) {
+      const amt = parseFloat(pHanShui[1]);
+      if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
+      continue;
+    }
+    const cabinFareMulti = trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{3,6}(?:\.\d+)?)\s*\*\s*(0\.\d+|\d+\.\d+)\s*\*\s*(\d{1,2})/i);
+    if (cabinFareMulti) {
+      const baseFare = parseFloat(cabinFareMulti[1]);
+      const disc = parseFloat(cabinFareMulti[2]);
+      const paxN = parseInt(cabinFareMulti[3]);
+      const perPax = +(baseFare * disc).toFixed(2);
+      if (baseFare > 100 && disc > 0 && disc <= 1 && paxN > 0) {
+        if (!rmb) rmb = perPax;
+        if (!parsedDiscount) parsedDiscount = Math.round(disc * 100);
+        const cabM = trimmed.match(/(公务|商务舱?|头等舱?|超级经济|超经|经济舱?|经济)/);
+        const _cm = {'公务':'商务舱','商务':'商务舱','商务舱':'商务舱','头等':'头等舱','头等舱':'头等舱','超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱'};
+        if (cabM && _cm[cabM[1]] && parsedCabin === undefined) parsedCabin = _cm[cabM[1]];
+        if (paxN > 1 && parsedPaxPrices === undefined) parsedPaxPrices = Array(paxN).fill(perPax);
+      }
+      continue;
+    }
+
+    // ── Number-before-cabin: "47566 公务 2pc", "38500 经济 1PC", "15198 结算 公务 2pc"
+    //    Also: "公务结算2580", "经济结算9120" (cabin + 结算 + amount, no multipliers)
+    const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|混舱)\s*(?:\d+PC)?\s*$/i)
+      || trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{4,6}(?:\.\d+)?)\s*$/i);
     if (pNumCabin) {
       const amt = parseFloat(pNumCabin[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -6332,18 +6359,29 @@ async function quickDeleteOrder(originalIdx, paxName) {
 }
 
 function scrollToOrderCard(displayNum) {
-  const area = document.getElementById('pendingArea');
-  if (!area) return;
-  const groups = area.querySelectorAll('.preview-order-group');
-  const target = groups[displayNum - 1];
-  if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  // Flash effect
-  target.style.transition = 'box-shadow 0.3s ease';
-  const originalShadow = target.style.boxShadow;
-  target.style.boxShadow = '0 0 0 3px var(--accent)';
-  setTimeout(() => { target.style.boxShadow = originalShadow; }, 1200);
-  // showBackToTopButton handled by scroll listener now
+  // 1. Switch to pending tab if not already there
+  const pendingTab = document.querySelector('.tab[data-tab="pending"]');
+  const pendingPanel = document.getElementById('panel-pending');
+  if (pendingPanel && !pendingPanel.classList.contains('active')) {
+    pendingTab?.click();
+  }
+  // 2. Wait for tab switch then scroll
+  setTimeout(() => {
+    const area = document.getElementById('pendingArea');
+    if (!area) return;
+    const groups = area.querySelectorAll('.preview-order-group');
+    const target = groups[displayNum - 1];
+    if (!target) return;
+    // 3. Expand the card if collapsed
+    const collapseBtn = target.querySelector('.collapse-toggle');
+    if (collapseBtn && target.classList.contains('collapsed')) collapseBtn.click();
+    // 4. Scroll + flash
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target.style.transition = 'box-shadow 0.4s ease';
+    const orig = target.style.boxShadow;
+    target.style.boxShadow = '0 0 0 3px var(--accent)';
+    setTimeout(() => { target.style.boxShadow = orig; }, 1400);
+  }, 80);
 }
 
 // Ensure the back-to-top button exists in the DOM (created on first need)
@@ -10591,8 +10629,16 @@ function renderChasePanel() {
     row.onmouseenter = () => row.style.background = ch ? '#ddeaff' : '#f0f0f0';
     row.onmouseleave = () => row.style.background = ch ? '#eef4ff' : '#fafafa';
     row.onclick = () => {
-      const card = document.getElementById(`chase-order-card-${idx}`);
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Find display number of this order in pending list
+      const meaningful = STATE.orders.filter(isMeaningfulOrder);
+      const dispIdx = meaningful.indexOf(o);
+      if (dispIdx >= 0) {
+        scrollToOrderCard(dispIdx + 1);
+      } else {
+        // Fallback: scroll to card in Chase panel
+        const card = document.getElementById(`chase-order-card-${idx}`);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     };
     const seg0 = o.segments && o.segments[0];
     const segN = o.segments && o.segments[o.segments.length - 1];
