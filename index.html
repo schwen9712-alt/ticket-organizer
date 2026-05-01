@@ -4578,8 +4578,8 @@ function parseSingleBooking(raw) {
     // TravelSky Eterm with "S" prefix: "S OZ    203Z08JUN LAX2330+0500ICN0S    388"
     // Flight+class glued (203Z), date glued to class (Z08JUN), times around route (LAX2330+0500ICN or FROM0835 1025TO)
     /^\s*S\s+([A-Z]{2})\s+(\d{1,4})([A-Z])\s*(\d{1,2}[A-Z]{3})\s+([A-Z]{3})(\d{3,4})[+\s](\d{3,4})([A-Z]{3})/,
-    // TravelSky / ETAS "1.  *DL7841 J   FR24APR   ICNJFK GK1   1000 1110"  (class can be like "W1")
-    /^\s*\d*\.?\s*\*?\s*([A-Z]{2})\s*(\d{1,4})\s+([A-Z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    // TravelSky / ETAS "1.  *DL7841 J   FR24APR   ICNJFK GK1   1000 1110"  (class can be like "W1" or lowercase "s")
+    /^\s*\d*\.?\s*\*?\s*([A-Z]{2})\s*(\d{1,4})\s+([A-Za-z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
     // Sabre "1 AA 100Y 26MAY J PVGLAX HK1 930A 1030A"
     /^\s*\d+\s+\*?\s*([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\d?\s+(\d{1,2}[A-Z]{3})\s+[A-Z]?\s*([A-Z]{3})([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
     // Amadeus "AA 100 Y 26MAY 4 PVGLAX 0930 1030"
@@ -4776,7 +4776,8 @@ function parseSingleBooking(raw) {
     const orderMarker = trimmed.match(/第\s*[一二三四五六七八九十\d]+\s*单/)
       || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s*$/) // "19单    92"
       || trimmed.match(/^\d{1,3}\s*单\s+\d{2,3}\s+/)  // "19单    92  商务"
-      || trimmed.match(/^\d{1,3}\s*单\s+(?:商务舱?|公务舱?|经济舱?|超经|头等舱?|头等)?\s*[\d]+\.[\d]+\s*\*/); // "11单 商务7055.53*6.9*0.87"
+      || trimmed.match(/^\d{1,3}\s*单\s+(?:商务舱?|公务舱?|经济舱?|超经|头等舱?|头等)?\s*[\d]+\.[\d]+\s*\*/) // "11单 商务7055.53*6.9*0.87"
+      || trimmed.match(/^\d{1,3}\s*单\s+0\.\d{2}/); // "17单 0.87 超级经济"
     if (orderMarker) {
       // ── USD*rate*discount format: "11单 商务7055.53*6.9*0.87出"
       // Means: USD fare × exchange rate × discount = CNY revenue
@@ -5284,7 +5285,9 @@ function parseSingleBooking(raw) {
     // ── Number-before-cabin: "47566 公务 2pc", "38500 经济 1PC", "15198 结算 公务 2pc"
     //    Also: "公务结算2580", "经济结算9120" (cabin + 结算 + amount, no multipliers)
     const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|混舱)\s*(?:\d+PC)?\s*$/i)
-      || trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{4,6}(?:\.\d+)?)\s*$/i);
+      || trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{4,6}(?:\.\d+)?)\s*$/i)
+      || trimmed.match(/^(\d{4,6})\s+\d+PC\s+(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱|每位|每人)\s*$/i)
+      || trimmed.match(/^(\d{4,6})\s+\d+PC\s*(?:每位|每人|\/人)?\s*$/i);  // "11483 1PC 每位"
     if (pNumCabin) {
       const amt = parseFloat(pNumCabin[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -7041,7 +7044,7 @@ function openCardholderDialog(idx) {
               return `<span class="ch-load-pill">#${dNum} ${al} ${escapeHtml(paxText)}</span>`;
             }).join(' ')
           : '<span style="color:var(--muted); font-style:italic; font-size:11px;">当前无分配</span>';
-        const isChase = (c.channel || '').toUpperCase().includes('CHASE') || (c.name || '').toUpperCase().includes('CHASE');
+        const isChase = c.isChaseCard || (c.channel || '').toUpperCase().includes('CHASE') || (c.name || '').toUpperCase().includes('CHASE');
         const chaseBadge = isChase
           ? `<span style="background:#0070c9; color:#fff; padding:2px 7px; border-radius:3px; font-size:10px; font-weight:700; margin-left:6px; letter-spacing:0.04em;">💳 CHASE</span>`
           : '';
@@ -7054,7 +7057,7 @@ function openCardholderDialog(idx) {
           <div class="cardholder-pick-row ${isCurrent ? 'selected' : ''}" data-name="${escapeAttr(c.name || '')}" onclick="assignCardholder(${idx}, '${escapeAttr(c.id)}')" style="${rowStyle}">
             <div class="cardholder-pick-main">
               <div class="cardholder-pick-name">${isCurrent ? '✓ ' : ''}${escapeHtml(c.name || '卡主')}${chaseBadge}</div>
-              <div class="cardholder-pick-meta">${load.count} 单 · ${load.usd > 0 ? '$' + load.usd.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—'}${c.notes ? ` · <span style="color:var(--muted);font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}</div>
+              <div class="cardholder-pick-meta">${load.count} 单 · ${load.usd > 0 ? '$' + load.usd.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—'}${c.notes ? ` · <span style="color:var(--muted);font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}${c.preferredPayMethod ? ` · <span style="color:var(--accent-deep);font-weight:600;">💰${escapeHtml(c.preferredPayMethod)}</span>` : ''}</div>
             </div>
             <div class="cardholder-pick-orders">${otherOrdersText}</div>
           </div>
@@ -9627,6 +9630,27 @@ async function markOrderTicketed(idx) {
   }
   if (missing.length > 0) {
     alert(`⚠️ 此单缺少以下信息，无法标记为已出票：\n\n${missing.map(m => '  ' + m).join('\n')}\n\n请先在订单卡片下方的"完成出票"区填写后再点击。`);
+    // Scroll to the finalize section of this order card
+    setTimeout(() => {
+      const meaningful = STATE.orders.filter(isMeaningfulOrder);
+      const dispIdx = meaningful.indexOf(o);
+      if (dispIdx >= 0) {
+        const groups = document.querySelectorAll('#pendingArea .preview-order-group');
+        const card = groups[dispIdx];
+        if (card) {
+          // Expand if collapsed
+          if (card.classList.contains('collapsed')) card.querySelector('.collapse-toggle')?.click();
+          // Find the finalize section inside the card
+          const finalizeSection = card.querySelector('.finalize-section, .settlement-section, [class*="finalize"]');
+          const target = finalizeSection || card;
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Flash highlight
+          target.style.transition = 'box-shadow 0.3s';
+          target.style.boxShadow = '0 0 0 3px #e74c3c';
+          setTimeout(() => { target.style.boxShadow = ''; }, 1800);
+        }
+      }
+    }, 100);
     return;
   }
 
@@ -11679,8 +11703,16 @@ function renderCardholdersList() {
           : '');
     div.innerHTML = `
       <div class="ch-info">
-        <div class="ch-name"><span class="ch-channel-tag">${escapeHtml(ch.channel || '?')}</span>${escapeHtml(ch.name)}${paidBadge}</div>
+        <div class="ch-name"><span class="ch-channel-tag">${escapeHtml(ch.channel || '?')}</span>${escapeHtml(ch.name)}${paidBadge}${(ch.isChaseCard || (ch.channel||'').toUpperCase().includes('CHASE') || (ch.name||'').toUpperCase().includes('CHASE')) ? '<span style="background:#0070c9;color:#fff;padding:1px 5px;border-radius:2px;font-size:9px;font-weight:700;margin-left:4px;">💳 CHASE</span>' : ''}</div>
         ${ch.notes ? `<div style="font-size:11px;color:var(--muted);font-style:italic;margin:2px 0 0 4px;">📝 ${escapeHtml(ch.notes)}</div>` : ''}
+        ${ch.preferredPayMethod ? (() => {
+          const d = ch.payMethodDetails || {};
+          const detail = ch.preferredPayMethod === 'CASH' ? d.location
+            : ch.preferredPayMethod === 'WIRE' ? (d.accountNum ? `${d.bankName||''} ···${d.accountNum.slice(-4)}` : d.bankName)
+            : ch.preferredPayMethod === 'ACH' ? (d.accountNum ? `${d.bankName||''} ···${d.accountNum.slice(-4)}` : d.bankName)
+            : d.account;
+          return `<div style="font-size:10px;color:var(--muted);margin:2px 0 0 4px;">💰 ${escapeHtml(ch.preferredPayMethod)}${detail ? ' · ' + escapeHtml(detail) : ''}</div>`;
+        })() : ''}
         <div class="ch-stats">
           <span>订单 <strong>${orders.length}</strong></span>
           ${totalMiles > 0 ? `<span>里程 <strong>${totalMiles.toLocaleString()}</strong></span>` : ''}
@@ -11903,10 +11935,78 @@ async function removeCardholder(id) {
   toast('已删除卡主');
 }
 
+async function saveCardholderChaseFlag(id, isChase) {
+  const ch = (settings.cardholders || []).find(c => c.id === id);
+  if (!ch) return;
+  ch.isChaseCard = !!isChase;
+  await storageSet('ticket-organizer-settings', settings);
+  renderCardholdersList();
+}
+
 async function saveCardholderNotes(id, notes) {
   const ch = (settings.cardholders || []).find(c => c.id === id);
   if (!ch) return;
   ch.notes = notes.trim();
+  await storageSet('ticket-organizer-settings', settings);
+  renderCardholdersList();
+}
+
+function buildPayDetailHTML(ch) {
+  const method = ch.preferredPayMethod || '';
+  const details = ch.payMethodDetails || {};
+  const iStyle = 'width:100%;box-sizing:border-box;padding:5px 10px;border:1px solid rgba(255,255,255,0.4);border-radius:4px;background:#1a2a4a;color:#fff;font-size:12px;font-family:"JetBrains Mono",monospace;';
+  const wrap = (label, inputHTML) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-top:5px;">
+      ${inputHTML}
+      <span style="font-size:10px;opacity:0.6;white-space:nowrap;">${label}</span>
+    </div>`;
+
+  if (!method) return '';
+  if (method === 'CASH') {
+    return wrap('📍 地点', `<input type="text" placeholder="收款地点（如：洛杉矶 / 微信转账）" value="${escapeAttr(details.location||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','location',this.value)">`);
+  }
+  if (method === 'PAYPAL') {
+    return wrap('📧 PayPal 邮箱/账号', `<input type="text" placeholder="example@email.com" value="${escapeAttr(details.account||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','account',this.value)">`);
+  }
+  if (method === 'ZELLE') {
+    return wrap('📱 Zelle 手机/邮箱', `<input type="text" placeholder="(310) 555-0000 或 email" value="${escapeAttr(details.account||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','account',this.value)">`);
+  }
+  if (method === 'TAEKUPAY') {
+    return wrap('🆔 Taeku 账号', `<input type="text" placeholder="Taeku Pay 账号" value="${escapeAttr(details.account||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','account',this.value)">`);
+  }
+  if (method === 'ACH' || method === 'WIRE') {
+    return `
+      ${wrap('🏦 银行名称', `<input type="text" placeholder="Bank of America / Chase…" value="${escapeAttr(details.bankName||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','bankName',this.value)">`)}
+      ${wrap('👤 账户名', `<input type="text" placeholder="Account Holder Name" value="${escapeAttr(details.accountName||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','accountName',this.value)">`)}
+      ${wrap('🔢 账号 Account', `<input type="text" placeholder="Account Number" value="${escapeAttr(details.accountNum||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','accountNum',this.value)">`)}
+      ${wrap('📍 路由号 Routing', `<input type="text" placeholder="Routing Number" value="${escapeAttr(details.routing||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','routing',this.value)">`)}
+      ${method === 'WIRE' ? wrap('🌐 Swift/BIC', `<input type="text" placeholder="BOFAUS3N" value="${escapeAttr(details.swift||'')}" style="${iStyle}" oninput="savePayDetail('${ch.id}','swift',this.value)">`) : ''}
+    `;
+  }
+  return '';
+}
+
+async function savePayDetail(id, field, value) {
+  const ch = (settings.cardholders || []).find(c => c.id === id);
+  if (!ch) return;
+  if (!ch.payMethodDetails) ch.payMethodDetails = {};
+  ch.payMethodDetails[field] = value.trim();
+  await storageSet('ticket-organizer-settings', settings);
+}
+
+function renderPayMethodDetail(id, method) {
+  const wrap = document.getElementById(`ch-paydetail-wrap-${id}`);
+  if (!wrap) return;
+  const ch = (settings.cardholders || []).find(c => c.id === id);
+  if (!ch) return;
+  ch.preferredPayMethod = method || null;
+  wrap.innerHTML = buildPayDetailHTML(ch);
+}
+
+async function saveCardholderPayMethod(id, method) {
+  const ch = (settings.cardholders || []).find(c => c.id === id);
+  if (!ch) return;
+  ch.preferredPayMethod = method || null;
   await storageSet('ticket-organizer-settings', settings);
   renderCardholdersList();
 }
@@ -11933,12 +12033,36 @@ function showCardholderDetail(id) {
       <div>
         <div class="name">${escapeHtml(ch.channel)} · ${escapeHtml(ch.name)}</div>
         <div style="font-size:11px; opacity:0.7; margin-top:4px; font-family:'JetBrains Mono',monospace;">共 ${totalOrders} 张已出票</div>
+        <div style="margin-top:8px; display:flex; align-items:center; gap:10px;">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:#fff;">
+            <input type="checkbox" id="ch-ischase-${ch.id}" ${ch.isChaseCard ? 'checked' : ''}
+              style="accent-color:#0070c9;width:15px;height:15px;cursor:pointer;"
+              onchange="saveCardholderChaseFlag('${ch.id}', this.checked)">
+            <span>💳 CHASE TRAVEL 刷卡卡主</span>
+          </label>
+        </div>
         <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
           <input id="ch-notes-${ch.id}" type="text" value="${escapeAttr(ch.notes || '')}" placeholder="备注（卡号、积分余额、特殊要求…）"
-            style="flex:1; padding:5px 10px; border:1px solid rgba(255,255,255,0.3); border-radius:4px; background:rgba(255,255,255,0.15); color:#fff; font-size:12px; font-family:'JetBrains Mono',monospace;"
-            oninput="saveCardholderNotes('${ch.id}', this.value)"
-            placeholder="备注…">
+            style="flex:1; padding:5px 10px; border:1px solid rgba(255,255,255,0.4); border-radius:4px; background:#1a2a4a; color:#fff; font-size:12px; font-family:'JetBrains Mono',monospace;"
+            oninput="saveCardholderNotes('${ch.id}', this.value)">
           <span style="font-size:11px; opacity:0.6;">📝 备注</span>
+        </div>
+        <div style="margin-top:8px; display:flex; align-items:center; gap:8px;">
+          <select id="ch-paymethod-${ch.id}"
+            style="flex:1; padding:5px 10px; border:1px solid rgba(255,255,255,0.4); border-radius:4px; background:#1a2a4a; color:#fff; font-size:12px; cursor:pointer;"
+            onchange="saveCardholderPayMethod('${ch.id}', this.value); renderPayMethodDetail('${ch.id}', this.value)">
+            <option value=""       style="background:#1a2a4a;color:#fff;" ${!ch.preferredPayMethod ? 'selected' : ''}>— 收款方式 —</option>
+            <option value="PAYPAL"   style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='PAYPAL'   ? 'selected' : ''}>💳 PayPal</option>
+            <option value="ZELLE"    style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='ZELLE'    ? 'selected' : ''}>📱 Zelle</option>
+            <option value="ACH"      style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='ACH'      ? 'selected' : ''}>🏦 ACH 转账</option>
+            <option value="WIRE"     style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='WIRE'     ? 'selected' : ''}>🔄 Wire</option>
+            <option value="TAEKUPAY" style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='TAEKUPAY' ? 'selected' : ''}>💳 Taeku Pay</option>
+            <option value="CASH"     style="background:#1a2a4a;color:#fff;" ${ch.preferredPayMethod==='CASH'     ? 'selected' : ''}>💵 现金 Cash</option>
+          </select>
+          <span style="font-size:11px; opacity:0.6;">💰 收款</span>
+        </div>
+        <div id="ch-paydetail-wrap-${ch.id}" style="margin-top:6px;">
+          ${buildPayDetailHTML(ch)}
         </div>
       </div>
       <div class="stats">
