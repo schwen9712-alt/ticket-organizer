@@ -832,7 +832,124 @@ textarea.raw-input {
   .brand-sub { display: none; }
 }
 
-/* Print-friendly / screenshot-ready card */
+@media (max-width: 380px) {
+  .finalize-grid { grid-template-columns: 1fr !important; }
+  .section-title .zh { display: none; }
+  .brand-sub { display: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   iPhone / Mobile Optimized (375px - 430px)
+   Targets iPhone SE / Pro / Max
+═══════════════════════════════════════════════════════════ */
+@media (max-width: 480px) {
+
+  /* ── Header ── */
+  .header-top { gap: 4px; }
+  .world-clocks { display: none; } /* hide 3-clock bar on phone */
+  .header-meta { font-size: 10px; }
+  .refresh-btn { font-size: 11px; padding: 4px 8px; }
+
+  /* ── Tabs ── */
+  .tabs { padding: 0 6px; gap: 0; }
+  .tab { padding: 8px 10px; font-size: 12px; min-width: 0; }
+  .tab .count { font-size: 10px; padding: 0 4px; }
+
+  /* ── Pending banner ── */
+  .pending-banner { padding: 10px 12px; gap: 8px; }
+  .pb-stats { gap: 8px; }
+  .pb-stat-val { font-size: 15px; }
+  .pb-stat-label { font-size: 9px; }
+
+  /* ── USD airline row (fast list) ── */
+  .airline-usd-row {
+    grid-template-columns: 28px auto auto 1fr auto auto !important;
+    font-size: 12px;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .airline-usd-row .pax-names { font-size: 12px; }
+  .airline-usd-row .amount { font-size: 13px; font-weight: 700; }
+  .airline-usd-row .per-pax { display: none; } /* hide per-pax on phone */
+  .airline-usd-row .ch-badge { font-size: 10px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ── Pending order card ── */
+  .ticket-card-header { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
+  .tag-row { gap: 3px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 1px 5px; }
+
+  /* ── Segment display ── */
+  .segment { gap: 6px; padding: 6px 0; }
+  .segment-endpoint .code { font-size: 20px; }
+  .segment-endpoint .city { font-size: 9px; max-width: 60px; }
+  .segment-connector { min-width: 60px; }
+  .segment-connector .flight-pill { font-size: 10px; }
+
+  /* ── Bottom action buttons on card ── */
+  .action-row, [class*="action-bar"] {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .action-row .btn, [class*="action-bar"] .btn {
+    font-size: 11px;
+    padding: 5px 8px;
+    flex-shrink: 1;
+  }
+
+  /* ── Finalize box ── */
+  .finalize-box { padding: 10px; }
+  .finalize-grid { gap: 6px; }
+  .finalize-field label { font-size: 10px; }
+
+  /* ── Modals / Dialogs ── */
+  .verify-modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .verify-modal {
+    border-radius: 16px 16px 0 0 !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    max-height: 85vh !important;
+    overflow-y: auto;
+  }
+  .verify-modal-header { border-radius: 16px 16px 0 0 !important; }
+
+  /* ── Cardholder pick dialog ── */
+  .cardholder-pick-row { padding: 10px 12px; }
+  .cardholder-pick-name { font-size: 14px; }
+  .cardholder-pick-meta { font-size: 11px; }
+
+  /* ── Profit check dialog ── */
+  #profitCheckOverlay .verify-modal { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+  /* ── Price rows ── */
+  .price-row { font-size: 12px; flex-wrap: wrap; gap: 2px; }
+  .price-row.total { font-size: 14px; }
+  .price-row .label { flex: 1; min-width: 120px; }
+  .price-row .value { font-weight: 700; }
+
+  /* ── Paste PNR box ── */
+  .pnr-box textarea { font-size: 13px !important; min-height: 120px; }
+
+  /* ── Copy preview ── */
+  .copy-preview { font-size: 11px; word-break: break-all; }
+
+  /* ── Form field inputs ── larger touch targets ── */
+  .field input, .field select, .field textarea {
+    font-size: 16px !important; /* prevents iOS zoom on focus */
+    padding: 12px 10px;
+  }
+  .finalize-field input, .finalize-field select {
+    font-size: 16px !important;
+    padding: 10px;
+  }
+
+  /* ── Already-ticketed card ── */
+  .ch-order-meta { font-size: 11px; flex-wrap: wrap; }
+
+  /* ── Safe area for iPhone notch/home bar ── */
+  .app { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .tabs { padding-bottom: 2px; }
+}
+
 /* Official airline brand colors */
 .ticket-card[data-airline="AA"] .ticket-card-header { background: linear-gradient(135deg, #1B3A5C 0%, #0D2035 60%, #C8102E 100%); }
 .ticket-card[data-airline="UA"] .ticket-card-header { background: linear-gradient(135deg, #003087 0%, #001A4E 100%); }
@@ -4344,8 +4461,8 @@ function splitIntoBookings(raw) {
     if (!t.includes('/')) return false;
     if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
     if (/[男女]/.test(t) && (/\d{4}年/.test(t) || /\d{1,2}[A-Z]{3}\d{2,4}/.test(t))) return false;
-    // Allow compound surnames like "ARIAS ECHANDI/MARIALAURA"
-    return /^(?:\d+[\.\s]+)?[A-Z][A-Z\s]*\/\s?[A-Z]+/.test(t);
+    // Allow compound surnames and first names with spaces
+    return /^(?:\d+[\.\s]+)?[A-Z][A-Z\s]*\/\s?[A-Za-z]+/.test(t);
   };
   const isSegLike = (s) => {
     const t = s.trim();
@@ -4511,7 +4628,10 @@ function parseSingleBooking(raw) {
 
   // ── Chinese city name → IATA code lookup ────────────────────────────────
   const CN_CITY_IATA = {
-    '洛杉矶':'LAX','旧金山':'SFO','纽约':'JFK','肯尼迪':'JFK','纽瓦克':'EWR',
+    '洛杉矶':'LAX','旧金山':'SFO','纽约':'JFK','肯尼迪':'JFK','纽瓦克':'EWR','纽约纽瓦克':'EWR',
+    '米兰':'MXP','马尔彭萨':'MXP','米兰马尔彭萨':'MXP','米兰利纳特':'LIN',
+    '伦敦':'LHR','希思罗':'LHR','盖特威克':'LGW','斯坦斯特德':'STN',
+    '巴黎':'CDG','戴高乐':'CDG','奥利':'ORY','法兰克福':'FRA','阿姆斯特丹':'AMS',
     '芝加哥':'ORD','奥黑尔':'ORD','休斯顿':'IAH','达拉斯':'DFW','亚特兰大':'ATL',
     '迈阿密':'MIA','西雅图':'SEA','波士顿':'BOS','丹佛':'DEN','拉斯维加斯':'LAS',
     '波特兰':'PDX','圣地亚哥':'SAN','明尼阿波利斯':'MSP','底特律':'DTW',
@@ -4592,10 +4712,34 @@ function parseSingleBooking(raw) {
     /(\w+\.\d{2}|\d{1,2}[A-Z]{3})\s+([A-Z]{3})-([A-Z]{3})[,\s]+([A-Z]{2})\s*(\d{1,4})\s+(\d{2}:\d{2})-(\d{2}:\d{2})/i
   ];
 
+  let segCarry = null;  // carries partial segment (carrier+flight+cls+date) waiting for next line's route
+
   for (const line of lines) {
     // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
     const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
     if (!trimmed) continue;
+
+    // ── Two-line segment: route line "ORDLAX HK1 1859 2123" after a carry ──
+    if (segCarry) {
+      const routeM = trimmed.match(/^([A-Z]{3})([A-Z]{3})\s+(?:HK|DK|GK|WL)\d\s+(\d{3,4})\s+(\d{3,4})/);
+      if (routeM) {
+        const depTime = routeM[3].replace(/(\d{2})(\d{2})/, '$1:$2');
+        const arrTime = routeM[4].replace(/(\d{2})(\d{2})/, '$1:$2');
+        segs.push({ from: routeM[1], to: routeM[2], date: segCarry.date,
+          flight: segCarry.carrier + segCarry.flight, cls: segCarry.cls, depTime, arrTime });
+        if (!airline) airline = segCarry.carrier;
+        segCarry = null;
+        continue;
+      }
+      segCarry = null; // didn't match, abandon carry
+    }
+
+    // ── Detect partial segment line (no route): "AA2364 R  FR05JUN" ──
+    const partialSeg = trimmed.match(/^([A-Z]{2})\s*(\d{1,4})\s+([A-Za-z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s*$/i);
+    if (partialSeg) {
+      segCarry = { carrier: partialSeg[1].toUpperCase(), flight: partialSeg[2], cls: partialSeg[3].toUpperCase(), date: partialSeg[4].toUpperCase() };
+      continue;
+    }
 
     // ── FIRST PRIORITY: CO fare line "CO3709", "CO3709 经济0PC", "CO7779CNY/人"
     // Also handles mid-line: "经济1PC结算价  CO16481CNY/人"
@@ -4881,7 +5025,7 @@ function parseSingleBooking(raw) {
       pax.push({ name, dob: dob || '', gender, paxType: 'ADULT' });
       continue;
     }
-    const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z][A-Z\s]*\/[A-Za-z][A-Za-z]*)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
+    const cnInlinePax = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z][A-Z\s]*\/[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s+(\d{4}年\d{1,2}月\d{1,2}|\d{1,2}[A-Z]{3}\d{2,4})/i);
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim().toUpperCase();
       const g = cnInlinePax[2];
@@ -4977,10 +5121,22 @@ function parseSingleBooking(raw) {
       if (carrier && flight && from && to && date) {
         segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime: finalArr });
         if (!airline) airline = carrier;
+        // Extract inline price: "16156元运价" or "¥16156"
+        const inlinePrice = trimmed.match(/(\d{4,6})元(?:运价|票价)?/) || trimmed.match(/(¥|￥)\s*(\d{4,6})/);
+        if (inlinePrice && !rmb) rmb = parseFloat(inlinePrice[inlinePrice[1].match(/\d/) ? 1 : 2]);
         matched = true;
       }
     }
     if (matched) continue;
+
+    // ── 出X cabin: "出超经", "出商务", "出经济" ─────────────────────────────
+    const chuCabin = trimmed.match(/^出\s*(超级经济|超经|经济舱?|商务舱?|公务舱?|头等舱?)/);
+    if (chuCabin) {
+      const _chuMap = {'超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱','商务':'商务舱','商务舱':'商务舱','公务':'商务舱','公务舱':'商务舱','头等':'头等舱','头等舱':'头等舱'};
+      if (parsedCabin === undefined) parsedCabin = _chuMap[chuCabin[1]] || null;
+      if (!_lastFareType) _lastFareType = 'ADULT';
+      continue;
+    }
     for (let patIdx = 0; patIdx < segPatterns.length; patIdx++) {
       const pat = segPatterns[patIdx];
       const m = trimmed.match(pat);
@@ -5258,7 +5414,15 @@ function parseSingleBooking(raw) {
       continue;
     }
 
-    // ── 含税价: "含税 5441", "含税5441CNY", "含税：5441" ──────────────────────
+    // ── 核价超经 / 核价商务 — label line indicating cabin and that TOTAL CNY follows ──
+    const hexiaCabin = trimmed.match(/^核价\s*(超级经济|超经|经济舱?|商务舱?|公务舱?|头等舱?)/);
+    if (hexiaCabin) {
+      const cabM = hexiaCabin[1];
+      const _hcMap = {'超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱','商务':'商务舱','商务舱':'商务舱','公务':'商务舱','公务舱':'商务舱','头等':'头等舱','头等舱':'头等舱'};
+      if (parsedCabin === undefined) parsedCabin = _hcMap[cabM] || null;
+      if (!_lastFareType) _lastFareType = 'ADULT';
+      continue;
+    }
     const pHanShui = trimmed.match(/^含税\s*[:：]?\s*(\d{4,6}(?:\.\d+)?)\s*(?:CNY|RMB|元|人民币)?\s*$/i);
     if (pHanShui) {
       const amt = parseFloat(pHanShui[1]);
