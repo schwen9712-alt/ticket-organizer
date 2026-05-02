@@ -3227,10 +3227,14 @@ async function storageSet(key, value) {
 // persistOrders() — debounced write (defined near the storage helpers for direct saves)
 // persistOrdersNow() — immediate write for critical paths (assignment, deletion, etc.)
 async function persistOrdersNow() {
-  await storageSet('ticket-organizer-pending', {
-    orders: STATE.orders,
-    currentIdx: STATE.currentIdx
-  });
+  try {
+    await storageSet('ticket-organizer-pending', {
+      orders: STATE.orders,
+      currentIdx: STATE.currentIdx
+    });
+  } catch(e) {
+    toast('⚠️ 保存失败，请检查存储空间');
+  }
 }
 async function storageGet(key) {
   if (hasArtifactStorage) {
@@ -3737,10 +3741,10 @@ async function removeOrder(idx) {
 }
 
 function orderSummary(o) {
-  const names = o.passengers.map(p => p.name.split('/')[0] || '').filter(Boolean).join('/');
+  const names = (o.passengers||[]).map(p => p.name.split('/')[0] || '').filter(Boolean).join('/');
   const route = [];
   if (o.segments.length) {
-    route.push(o.segments[0].from);
+    route.push((o.segments[0]||{}).from);
     route.push(o.segments[o.segments.length-1].to);
   }
   const r = route.filter(Boolean).join('→');
@@ -5234,8 +5238,10 @@ function parseSingleBooking(raw) {
       // Extract EQUIV CNY as FALLBACK (in case no TOTAL line follows)
       const equivMatch = trimmed.match(/(?:EQUIV\s+(?:CNY|RMB|人民币)|CNY|RMB|人民币)\s+(\d{3,6}(?:\.\d+)?)/i)
         || trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i)
-        // Also handle "成人运价：10785" / "儿童运价 ：8510" — bare number after colon
-        || trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]\s*(\d{4,6})\s*$/);
+        // "成人运价：10785" / "儿童运价 ：8510" — bare number after colon
+        || trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]\s*(\d{4,6})\s*$/)
+        // "大人价格 39410 *1" / "儿童价格 39256 *2" — price + count multiplier (no CNY)
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)价格\s+(\d{4,6})\s*\*\s*\d/);
       if (equivMatch) {
         const amt = parseFloat(equivMatch[1]);
         if (amt >= 100 && amt <= 500000) {
@@ -5908,8 +5914,8 @@ async function parsePNR() {
     if (typeof tagOrderWithUser === 'function') tagOrderWithUser(o);
     // Re-sort paxPrices AFTER knownPax backfill so DOBs are available
     if (o.paxPrices && o.paxPrices.length === o.passengers.length && new Set(o.paxPrices).size > 1) {
-      const firstDate = o.segments[0] ? o.segments[0].date : null;
-      const paxAgeRank = o.passengers.map((p, i) => {
+      const firstDate = o.segments[0] ? (o.segments[0]||{}).date : null;
+      const paxAgeRank = (o.passengers||[]).map((p, i) => {
         if (!p.dob || !firstDate) return { i, rank: 0 };
         const age = calculateAgeAtFlight(p.dob, firstDate);
         if (age == null) return { i, rank: 0 };
@@ -6137,7 +6143,12 @@ function effectiveRate(o) {
   return settings.rate;
 }
 
+let _renderPreviewTimer = null;
 function renderPreview() {
+  if (_renderPreviewTimer) clearTimeout(_renderPreviewTimer);
+  _renderPreviewTimer = setTimeout(_renderPreviewNow, 120);
+}
+function _renderPreviewNow() {
   // Render CURRENT order only in the new-order tab's preview area
   const area = document.getElementById('previewArea');
   area.innerHTML = '';
@@ -6354,7 +6365,7 @@ function renderAirlineUsdPanel(orders) {
       // With paxPrices, per-pax differs so we skip the "$N/人" hint.
       const perPaxUsd = (!hasPaxPrices && hasPrice && rate && rate > 0) ? (o.basePrice / rate) : 0;
       const agent = o.agent || '—';
-      const lastNames = [...new Set(o.passengers.map(p => (p.name || '').split('/')[0].trim()).filter(Boolean))];
+      const lastNames = [...new Set((o.passengers||[]).map(p => (p.name || '').split('/')[0].trim()).filter(Boolean))];
       const paxText = lastNames.length > 0 ? lastNames.join('/') : '—';
       const ch = o.cardholderId ? (settings.cardholders || []).find(c => c.id === o.cardholderId) : null;
       const chName = ch ? (ch.name || '已分配') : '';
@@ -6804,7 +6815,7 @@ function renderPendingList() {
         }
 
         // Summary line (pax + route + price)
-        const paxNames = o.passengers.map(p => (p.name || '').split('/')[0]).filter(Boolean).join(' / ');
+        const paxNames = (o.passengers||[]).map(p => (p.name || '').split('/')[0]).filter(Boolean).join(' / ');
         const seg0 = o.segments[0], segN = o.segments[o.segments.length - 1];
         const routePart = seg0 ? `${seg0.from} → ${(segN || seg0).to}` : '';
         const datePart = seg0 && seg0.date ? seg0.date : '';
@@ -6915,7 +6926,7 @@ function renderPendingOrderGroupExtras(group, o, idx) {
           <label>票号 TKT <span style="color:#c0392b; font-size:10px;">*二选一</span></label>
           <input type="text" value="${escapeAttr((o.passengers[0] && o.passengers[0].tkt) || o.tkt || '')}" placeholder="暂未提供" style="${!o.pnr && !o.tkt ? 'border-color:#e67e22;' : ''}" oninput="updatePendingTkt(${idx}, 0, this.value)">
         </div>
-        ` : o.passengers.map((p, pi) => `
+        ` : (o.passengers||[]).map((p, pi) => `
         <div class="finalize-field">
           <label>TKT · P${pi+1} ${escapeHtml((p.name || '').split('/')[0] || '')} <span style="color:#c0392b; font-size:10px;">*二选一</span></label>
           <input type="text" value="${escapeAttr(p.tkt || '')}" placeholder="暂未提供" oninput="updatePendingTkt(${idx}, ${pi}, this.value)">
@@ -7552,7 +7563,7 @@ function openSplitOrderDialog(idx) {
   const o = STATE.orders[idx];
   if (!o || o.passengers.length < 2) return;
   const hasPaxPrices = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
-  const paxRows = o.passengers.map((p, i) => {
+  const paxRows = (o.passengers||[]).map((p, i) => {
     const priceTag = hasPaxPrices && o.paxPrices[i] != null
       ? `<span style="background:var(--cream); color:var(--ink); padding:1px 6px; border-radius:2px; font-size:10px; font-weight:700; margin-left:8px; font-family:'JetBrains Mono',monospace;">¥${o.paxPrices[i]}</span>`
       : '';
@@ -7649,7 +7660,7 @@ function updateSplitPreview(idx) {
     preview.innerHTML = `
       <div style="color:var(--ink); font-weight:700; margin-bottom:4px;">🎯 拆分预览</div>
       <div>原单将被删除,每位乘客生成独立订单 (共 <strong>${o.passengers.length}</strong> 单)</div>
-      <div style="margin-top:4px; color:var(--muted);">${o.passengers.map((p, i) => `P${i+1}: ${p.name || '—'}`).join(' · ')}</div>
+      <div style="margin-top:4px; color:var(--muted);">${(o.passengers||[]).map((p, i) => `P${i+1}: ${p.name || '—'}`).join(' · ')}</div>
     `;
     btn.disabled = false;
     btn.textContent = `✂ 拆为 ${o.passengers.length} 个单人订单`;
@@ -7733,7 +7744,7 @@ function doSplitOrder(idx) {
     // ALL resulting orders have cardholder cleared — user will assign each one.
     const confirmMsg = `确认把 Order #${idx+1} 拆分为 ${o.passengers.length} 个独立订单?\n\n每单一位乘客,航段/运价/折扣都复制过去。\n原单会被删除。\n\n⚠ 所有新单的卡主需要重新分配。`;
     if (!confirm(confirmMsg)) return;
-    const newOrders = o.passengers.map((p, i) => {
+    const newOrders = (o.passengers||[]).map((p, i) => {
       const priceSubset = extractPaxPrices(o, [i]);
       return makeSplitOrder(o, [p], /*keepCardholder=*/ false, priceSubset);
     });
@@ -7748,7 +7759,7 @@ function doSplitOrder(idx) {
 
   // Partial split: original keeps unselected passengers; new order gets selected.
   // BOTH orders' cardholder gets cleared — user wants one cardholder per order, all manual.
-  const stayIdxs = o.passengers.map((_, i) => i).filter(i => !checkedIdxs.includes(i));
+  const stayIdxs = (o.passengers||[]).map((_, i) => i).filter(i => !checkedIdxs.includes(i));
   const stayPax = stayIdxs.map(i => o.passengers[i]);
   const movePax = checkedIdxs.map(i => o.passengers[i]);
   const stayPrices = extractPaxPrices(o, stayIdxs);
@@ -7785,7 +7796,7 @@ function doSplitOrder(idx) {
 function openMRZDialog(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
-  const paxList = o.passengers.map((p, i) => `<li>P${i+1}: ${escapeHtml(p.name)}${p.dob ? ' · ' + p.dob : ''}${p.gender ? ' · ' + p.gender : ''}</li>`).join('') || '<li style="color:var(--muted);">（暂无乘客）</li>';
+  const paxList = (o.passengers||[]).map((p, i) => `<li>P${i+1}: ${escapeHtml(p.name)}${p.dob ? ' · ' + p.dob : ''}${p.gender ? ' · ' + p.gender : ''}</li>`).join('') || '<li style="color:var(--muted);">（暂无乘客）</li>';
   const modalHtml = `
     <div class="verify-modal-overlay" id="mrzModalOverlay" onclick="closeMRZDialog(event)">
       <div class="verify-modal" onclick="event.stopPropagation()" style="max-width:560px;">
@@ -8052,7 +8063,7 @@ function openVerifyDialog(idx) {
     </tr>`;
   }).join('');
 
-  const paxRows = o.passengers.map((p, i) => `<tr>
+  const paxRows = (o.passengers||[]).map((p, i) => `<tr>
     <td><strong>P${i+1}</strong></td>
     <td><strong>${escapeHtml(p.name || '—')}</strong></td>
     <td>${escapeHtml(p.gender || '—')}</td>
@@ -8219,7 +8230,7 @@ function updatePendingTkt(idx, paxIdx, value) {
     o.tkt = value;
   } else {
     // Multi-pax: set o.tkt to comma-separated summary for legacy code paths
-    o.tkt = o.passengers.map(p => p.tkt || '').filter(Boolean).join(', ');
+    o.tkt = (o.passengers||[]).map(p => p.tkt || '').filter(Boolean).join(', ');
   }
   persistOrders();
   refreshPendingOrderPreview(idx);
@@ -8970,7 +8981,7 @@ function buildCardHTML(o, idx) {
   const firstSegDate = displaySegments && displaySegments[0] ? displaySegments[0].date : null;
 
   // Build passenger list with type info, then sort: adults → children youngest→oldest
-  const paxWithType = o.passengers.map((p, origIdx) => {
+  const paxWithType = (o.passengers||[]).map((p, origIdx) => {
     let badge = '';
     let ageAtFlight = null;
     let paxType = 'ADULT';
@@ -9377,7 +9388,7 @@ function buildPlainText(o) {
 function matchKnownPassengers(o) {
   const matched = [];
   // Get first segment date to calculate age at time of flight
-  const firstSegDate = o.segments && o.segments[0] ? o.segments[0].date : null;
+  const firstSegDate = o.segments && o.segments[0] ? (o.segments[0]||{}).date : null;
 
   o.passengers.forEach(p => {
     if (!p.name || !p.name.includes('/')) return;
@@ -9656,8 +9667,8 @@ async function refreshAllOrders() {
             if (parsed.customRate != null) o.customRate = parsed.customRate;
             // Re-sort paxPrices by passenger age after re-parse
             if (parsed.paxPrices && parsed.paxPrices.length === o.passengers.length && new Set(parsed.paxPrices).size > 1) {
-              const firstDate = o.segments[0] ? o.segments[0].date : null;
-              const paxAgeRank = o.passengers.map((p, i) => {
+              const firstDate = o.segments[0] ? (o.segments[0]||{}).date : null;
+              const paxAgeRank = (o.passengers||[]).map((p, i) => {
                 if (!p.dob || !firstDate) return { i, rank: 0 };
                 const age = calculateAgeAtFlight(p.dob, firstDate);
                 if (age == null) return { i, rank: 0 };
@@ -10810,7 +10821,7 @@ function renderChasePanel() {
     const fp = computeFinalPrice(o);
     const r = effectiveRate(o);
     const usd = fp && r ? fp / r : null;
-    const paxNames = o.passengers.map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
+    const paxNames = (o.passengers||[]).map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
     const ch = o.cardholderId ? (settings.cardholders||[]).find(c => c.id === o.cardholderId) : null;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:4px;cursor:pointer;transition:background 0.1s;' + (ch ? 'background:#eef4ff;' : 'background:#fafafa;');
@@ -10888,7 +10899,7 @@ function renderChasePanel() {
     // Collapse header
     const colHeader = document.createElement('div');
     colHeader.className = 'order-collapse-header' + (isCollapsed ? '' : ' is-expanded');
-    const paxNames = o.passengers.map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
+    const paxNames = (o.passengers||[]).map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
     const seg0 = o.segments[0], segN = o.segments[o.segments.length-1];
     const route = seg0 ? seg0.from + '→' + (segN||seg0).to : '';
     const price = o.rmb ? '¥' + Math.round(o.rmb).toLocaleString() : '';
@@ -12428,7 +12439,7 @@ function openTicketingModal(idx) {
     infoEl.textContent = lines.join('  ·  ');
   }
 
-  const paxName = o.passengers.map(p => p.name).filter(Boolean).join(', ');
+  const paxName = (o.passengers||[]).map(p => p.name).filter(Boolean).join(', ');
   const route = o.segments.map(s => s.from).concat(o.segments.length ? [o.segments[o.segments.length-1].to] : []).join('→');
   document.getElementById('tmOrderRef').textContent = `· ${paxName || '—'} ${route ? '· ' + route : ''}`;
   document.getElementById('ticketingModal').style.display = '';
@@ -14072,7 +14083,7 @@ async function mergeImportData(event) {
     // Merge orders (append, dedup by pnr+first segment date+passenger name)
     const orderKey = o => {
       const pax = (o.passengers && o.passengers[0]) ? o.passengers[0].name : '';
-      const seg = (o.segments && o.segments[0]) ? o.segments[0].date + o.segments[0].from : '';
+      const seg = (o.segments && o.segments[0]) ? (o.segments[0]||{}).date + (o.segments[0]||{}).from : '';
       return (o.pnr || '') + '|' + pax + '|' + seg;
     };
     const existingKeys = new Set(STATE.orders.map(orderKey));
