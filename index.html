@@ -95,34 +95,39 @@ body {
 .brand {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  gap: 14px;
 }
 .brand h1 {
   font-family: 'Fraunces', serif;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   font-variation-settings: "opsz" 144;
   line-height: 1;
+  background: linear-gradient(135deg, var(--ink) 0%, #2a4060 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 .brand .zh {
   font-family: 'Noto Sans SC', sans-serif;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 400;
   color: var(--muted);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
 }
 .header-meta {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--muted);
   text-align: right;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
 }
 .header-meta .rate {
   color: var(--ink);
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 14px;
 }
 .rate-wrap {
   display: inline-flex;
@@ -132,11 +137,11 @@ body {
 }
 .rate-refresh {
   background: var(--ink);
-  color: var(--paper);
+  color: var(--accent);
   border: none;
   border-radius: 50%;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   font-size: 11px;
   cursor: pointer;
   display: inline-flex;
@@ -144,9 +149,10 @@ body {
   justify-content: center;
   padding: 0;
   line-height: 1;
-  transition: transform 0.3s;
+  transition: transform 0.3s, background var(--t-fast);
+  box-shadow: var(--shadow-xs);
 }
-.rate-refresh:hover { background: var(--accent-deep); }
+.rate-refresh:hover { background: var(--accent-deep); color: #fff; }
 .rate-refresh.spinning { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -228,24 +234,26 @@ body {
 .section-title .num {
   font-family: 'JetBrains Mono', monospace;
   background: var(--ink);
-  color: var(--paper);
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+  color: var(--accent);
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(12,27,42,0.2);
 }
 .section-title .zh {
   font-family: 'Noto Sans SC', sans-serif;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
   color: var(--muted);
-  margin-left: 4px;
+  margin-left: 2px;
 }
 
 /* Form controls */
@@ -295,18 +303,20 @@ textarea.raw-input {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 1.7;
-  padding: 14px;
+  padding: 14px 16px;
   border: 1.5px solid var(--line);
-  background: #fff;
+  background: #fefdf9;
   color: var(--ink);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   resize: vertical;
   transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  box-shadow: inset 0 2px 4px rgba(12,27,42,0.03);
 }
 textarea.raw-input:focus {
   outline: none;
   border-color: var(--accent-deep);
-  box-shadow: 0 0 0 3px rgba(139, 105, 20, 0.1);
+  box-shadow: 0 0 0 3px rgba(139,105,20,0.1), inset 0 2px 4px rgba(12,27,42,0.03);
+  background: #fff;
 }
 
 /* Buttons */
@@ -469,6 +479,22 @@ textarea.raw-input:focus {
   color: var(--accent);
   margin-right: 6px;
 }
+.copyable-name {
+  cursor: pointer;
+  border-bottom: 1.5px dashed var(--accent);
+  padding-bottom: 1px;
+  transition: background var(--t-fast), color var(--t-fast);
+  border-radius: 3px;
+}
+.copyable-name:hover {
+  background: var(--accent-light);
+  padding: 0 4px;
+}
+.copyable-name.copied {
+  background: var(--green-light);
+  border-bottom-color: var(--green);
+  color: var(--green);
+}
 
 .segment {
   display: grid;
@@ -583,38 +609,41 @@ textarea.raw-input:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  padding: 2px 0;
 }
 .price-row:last-child { margin-bottom: 0; }
 .price-row.total {
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  margin-top: 6px;
-  font-size: 13px;
+  padding: 10px 14px;
+  background: var(--ink);
+  border-radius: var(--r-sm);
+  margin-top: 10px;
 }
-.price-row.total .label { color: var(--ink); font-weight: 600; }
+.price-row.total .label { color: rgba(255,255,255,0.6); font-weight: 500; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .price-row .value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
   color: var(--ink);
 }
-.price-row.total .value { font-size: 16px; color: var(--accent-deep); }
+.price-row.total .value { font-size: 20px; color: var(--accent); font-weight: 700; }
 
 /* Plain text version for copy */
 .copy-preview {
-  background: var(--ink);
-  color: #E8E0D0;
-  padding: 16px;
-  border-radius: var(--r-sm);
+  background: #0d1825;
+  color: #bfb8a8;
+  padding: 16px 18px;
+  border-radius: var(--r-md);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  line-height: 1.8;
+  line-height: 1.85;
   white-space: pre-wrap;
   word-break: break-all;
   margin-top: 12px;
   position: relative;
+  border: 1px solid rgba(255,255,255,0.04);
+  box-shadow: inset 0 2px 8px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .pax-info-block {
@@ -650,14 +679,19 @@ textarea.raw-input:focus {
 .ticketed-item {
   background: var(--cream);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--green);
+  border-left: 4px solid var(--green);
   border-radius: var(--r-sm);
-  padding: 12px 14px;
+  padding: 12px 16px;
   margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+  transition: box-shadow var(--t-base), transform var(--t-base);
+}
+.ticketed-item:hover {
+  box-shadow: var(--shadow);
+  transform: translateX(2px);
 }
 .ticketed-info {
   flex: 1;
@@ -694,32 +728,36 @@ textarea.raw-input:focus {
 
 .empty-state {
   text-align: center;
-  padding: 48px 16px;
+  padding: 56px 16px;
   color: var(--muted);
 }
 .empty-state .icon {
-  font-size: 40px;
-  margin-bottom: 12px;
-  opacity: 0.3;
+  font-size: 44px;
+  margin-bottom: 14px;
+  opacity: 0.25;
+  filter: grayscale(0.3);
 }
 
 /* Toast */
 .toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 28px;
   left: 50%;
-  transform: translateX(-50%) translateY(20px);
+  transform: translateX(-50%) translateY(12px);
   background: var(--ink);
   color: var(--paper);
-  padding: 10px 20px;
-  border-radius: var(--r-sm);
+  padding: 10px 22px;
+  border-radius: var(--r-md);
   font-size: 13px;
   opacity: 0;
-  transition: all 0.25s;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
-  z-index: 1000;
+  z-index: 9999;
   font-weight: 500;
   box-shadow: var(--shadow-strong);
+  border: 1px solid rgba(255,255,255,0.06);
+  max-width: 80vw;
+  text-align: center;
 }
 .toast.show {
   opacity: 1;
@@ -748,21 +786,26 @@ textarea.raw-input:focus {
 .hint {
   font-size: 11px;
   color: var(--muted);
-  margin-top: 4px;
-  line-height: 1.5;
+  margin-top: 6px;
+  line-height: 1.6;
+  padding: 8px 10px;
+  background: rgba(12,27,42,0.03);
+  border-radius: var(--r-sm);
+  border-left: 2px solid var(--line);
 }
 .hint code {
-  background: rgba(12, 27, 42, 0.06);
-  padding: 1px 4px;
-  border-radius: var(--r-sm);
+  background: rgba(12, 27, 42, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
   font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .divider-dashed {
   height: 1px;
-  background-image: linear-gradient(to right, var(--line-strong) 50%, transparent 50%);
-  background-size: 8px 1px;
-  margin: 12px 0;
+  background-image: linear-gradient(to right, var(--line) 40%, transparent 40%);
+  background-size: 10px 1px;
+  margin: 14px 0;
 }
 
 /* Settings */
@@ -770,12 +813,13 @@ textarea.raw-input:focus {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--line);
 }
 .setting-row:last-child { border-bottom: none; }
 .setting-row .label {
-  font-weight: 500;
+  font-weight: 600;
+  font-size: 13px;
 }
 .setting-row .desc {
   font-size: 11px;
@@ -1199,18 +1243,18 @@ SUN/KAILAI MS 女 28SEP08
       <button class="btn ghost" onclick="loadSample()">加载示例</button>
 
       <!-- Special discount: applied when parsing, overrides default discount for this batch -->
-      <div style="display:flex; align-items:center; gap:6px; margin-left:auto; padding:4px 10px; background:var(--cream); border:1px dashed var(--accent); border-radius:4px;">
-        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; font-weight:600; margin:0;">
-          <input type="checkbox" id="f-specialDiscountToggle" onchange="toggleSpecialDiscount()">
-          <span>🎁 特殊折扣</span>
+      <div style="display:flex; align-items:center; gap:8px; margin-left:auto; padding:6px 12px; background:var(--cream); border:1.5px dashed var(--accent); border-radius:var(--r-md);">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; font-weight:600; margin:0; color:var(--accent-deep); white-space:nowrap;">
+          <input type="checkbox" id="f-specialDiscountToggle" onchange="toggleSpecialDiscount()" style="accent-color:var(--accent-deep);width:15px;height:15px;">
+          🎁 特殊折扣
         </label>
         <input type="number" id="f-specialDiscount" min="1" max="100" placeholder="84" disabled
                oninput="applySpecialDiscount()"
-               style="width:55px; padding:3px 6px; font-weight:700; color:var(--accent-deep); text-align:center; border:1px solid var(--line); border-radius:3px;">
-        <span style="font-size:11px; color:var(--muted);">%</span>
+               style="width:52px; padding:4px 6px; font-weight:700; font-family:'JetBrains Mono',monospace; font-size:14px; color:var(--accent-deep); text-align:center; border:1.5px solid var(--line); border-radius:var(--r-sm);">
+        <span style="font-size:12px; color:var(--muted); font-weight:600;">%</span>
         <input type="text" id="f-specialDiscountNote" placeholder="备注（可选）" disabled
                oninput="syncDOMToOrder()"
-               style="width:120px; padding:3px 6px; font-size:11px; border:1px solid var(--line); border-radius:3px;">
+               style="width:110px; padding:4px 8px; font-size:12px; border:1px solid var(--line); border-radius:var(--r-sm); color:var(--muted);">
       </div>
     </div>
     <div class="hint">支持 Sabre / Amadeus / Galileo / TravelSky 等格式。解析后每单独立编辑/复制/出票。<br>
@@ -2436,29 +2480,35 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .agent-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
+  gap: 5px;
+  margin-bottom: 8px;
 }
 .agent-chip {
-  padding: 3px 10px;
-  border: 1px solid var(--line-strong);
+  padding: 4px 12px;
+  border: 1.5px solid var(--line);
   background: #fff;
-  border-radius: 12px;
+  border-radius: 20px;
   cursor: pointer;
   font-size: 12px;
-  color: var(--ink);
+  font-weight: 500;
+  color: var(--muted);
   font-family: 'Noto Sans SC', sans-serif;
-  transition: all 0.15s;
+  transition: all var(--t-fast);
+  box-shadow: var(--shadow-xs);
 }
 .agent-chip:hover {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
 }
 .agent-chip.active {
   background: var(--accent-deep);
   color: #fff;
   border-color: var(--accent-deep);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(139,105,20,0.3);
 }
 
 /* Cost + profit rows in ticket card */
@@ -2806,16 +2856,22 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .ch-card {
   background: #fff;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--blue);
-  border-radius: var(--r-sm);
-  padding: 12px 14px;
+  border-left: 4px solid var(--blue);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
   margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--t-base);
+  box-shadow: var(--shadow-xs);
+}
+.ch-card:hover {
+  border-left-color: var(--accent-deep);
+  box-shadow: var(--shadow);
+  transform: translateX(3px);
 }
 .ch-card:hover {
   box-shadow: var(--shadow);
@@ -9872,7 +9928,7 @@ function buildCardHTML(o, idx) {
   });
   paxWithType.forEach(({ p, badge }, displayIdx) => {
     if (!p.name) return;
-    html += `<div class="passenger-line">P${displayIdx+1}: ${escapeHtml(p.name)}${badge}</div>`;
+    html += `<div class="passenger-line">P${displayIdx+1}: <span class="copyable-name" onclick="copyText('${escapeAttr(p.name)}', this)" title="点击复制姓名">${escapeHtml(p.name)}</span>${badge}</div>`;
   });
   displaySegments.forEach(s => {
     const fromCity = STATE.airlineCityMap[s.from] || '';
@@ -10391,19 +10447,28 @@ function expandDobYear(dob) {
 // COPY
 // ============================================
 
-async function copyText(text) {
+async function copyText(text, el) {
+  let ok = false;
   try {
     await navigator.clipboard.writeText(text);
-    return true;
+    ok = true;
   } catch(e) {
     const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.position = 'fixed'; ta.style.top = '-1000px';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); document.body.removeChild(ta); return true; }
-    catch(err) { document.body.removeChild(ta); return false; }
+    try { document.execCommand('copy'); document.body.removeChild(ta); ok = true; }
+    catch(err) { document.body.removeChild(ta); }
   }
+  if (ok) {
+    toast(`✓ 已复制 ${text}`);
+    if (el) {
+      el.classList.add('copied');
+      setTimeout(() => el.classList.remove('copied'), 1400);
+    }
+  }
+  return ok;
 }
 
 async function copyElementText(id) {
