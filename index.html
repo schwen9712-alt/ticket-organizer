@@ -216,8 +216,13 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--r-md);
   padding: 18px 20px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   position: relative;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--t-base);
+}
+.section:focus-within {
+  box-shadow: var(--shadow), 0 0 0 2px rgba(139,105,20,0.08);
 }
 .section-title {
   font-family: 'Fraunces', serif;
@@ -463,7 +468,8 @@ textarea.raw-input:focus {
 }
 
 .ticket-card-body {
-  padding: 16px 18px;
+  padding: 18px 20px;
+  background: #ffffff;
 }
 
 .passenger-line {
@@ -768,19 +774,28 @@ textarea.raw-input:focus {
 .copy-wrap { position: relative; }
 .copy-btn-float {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  padding: 4px 10px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #fff;
-  font-size: 11px;
+  top: 10px;
+  right: 10px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255,255,255,0.7);
+  font-size: 10.5px;
+  font-weight: 600;
   border-radius: var(--r-sm);
   cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: all var(--t-fast);
+  backdrop-filter: blur(4px);
 }
-.copy-btn-float:hover { background: rgba(255, 255, 255, 0.2); }
+.copy-btn-float:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  border-color: rgba(255,255,255,0.4);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
 
 /* Helper text */
 .hint {
@@ -1173,21 +1188,21 @@ body.dark-mode .section-title { color: #aac; }
       </div>
     </div>
   </div>
-  <div style="padding: 6px 0 0 0; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line-soft); margin-top: 8px;">
-    <div id="worldClocks" style="display:flex; gap:16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">
-      <div style="display:flex; align-items:center; gap:5px;">
-        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">北京</span>
-        <span id="clock-beijing" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+  <div style="padding: 8px 0 0 0; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); margin-top: 10px;">
+    <div id="worldClocks" style="display:flex; gap:4px; font-family:'JetBrains Mono',monospace; font-size:11px; align-items:center;">
+      <div style="display:flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(12,27,42,0.04); border-radius:var(--r-sm);">
+        <span style="font-size:9.5px; letter-spacing:0.1em; color:var(--muted); font-weight:600;">北京</span>
+        <span id="clock-beijing" style="font-size:14px; font-weight:700; color:var(--ink); letter-spacing:0.04em;">--:--</span>
       </div>
-      <div style="color:var(--line); font-size:10px; align-self:center;">|</div>
-      <div style="display:flex; align-items:center; gap:5px;">
-        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">洛杉矶</span>
-        <span id="clock-la" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+      <span style="color:var(--line-strong); font-size:10px; padding:0 2px;">·</span>
+      <div style="display:flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(12,27,42,0.04); border-radius:var(--r-sm);">
+        <span style="font-size:9.5px; letter-spacing:0.1em; color:var(--muted); font-weight:600;">洛杉矶</span>
+        <span id="clock-la" style="font-size:14px; font-weight:700; color:var(--ink); letter-spacing:0.04em;">--:--</span>
       </div>
-      <div style="color:var(--line); font-size:10px; align-self:center;">|</div>
-      <div style="display:flex; align-items:center; gap:5px;">
-        <span style="font-size:10px; letter-spacing:0.08em; opacity:0.7;">纽约</span>
-        <span id="clock-ny" style="font-size:13px; font-weight:700; color:var(--ink); letter-spacing:0.05em;">--:--</span>
+      <span style="color:var(--line-strong); font-size:10px; padding:0 2px;">·</span>
+      <div style="display:flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(12,27,42,0.04); border-radius:var(--r-sm);">
+        <span style="font-size:9.5px; letter-spacing:0.1em; color:var(--muted); font-weight:600;">纽约</span>
+        <span id="clock-ny" style="font-size:14px; font-weight:700; color:var(--ink); letter-spacing:0.04em;">--:--</span>
       </div>
     </div>
     <button class="btn ghost small" onclick="refreshAllOrders()" title="用最新逻辑重跑所有订单：重新解析价格/舱位/儿童/航段，并补全乘客信息">🔄 用最新逻辑重跑</button>
@@ -2008,25 +2023,28 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 .order-pill {
   flex-shrink: 0;
-  padding: 6px 12px;
-  border: 1px solid var(--line-strong);
+  padding: 6px 14px;
+  border: 1.5px solid var(--line);
   background: #fff;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11.5px;
   font-family: 'JetBrains Mono', monospace;
-  color: var(--ink);
-  transition: all 0.15s;
+  color: var(--muted);
+  transition: all var(--t-fast);
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+  box-shadow: var(--shadow-xs);
 }
-.order-pill:hover { border-color: var(--ink); }
+.order-pill:hover { border-color: var(--ink); color: var(--ink); box-shadow: var(--shadow); }
 .order-pill.active {
   background: var(--ink);
-  color: var(--paper);
+  color: var(--accent);
   border-color: var(--ink);
+  font-weight: 600;
+  box-shadow: var(--shadow);
 }
 .order-pill .remove {
   opacity: 0.5;
@@ -2069,9 +2087,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 .preview-order-group {
   position: relative;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--t-base);
+}
+.preview-order-group:hover {
+  box-shadow: var(--shadow);
 }
 .preview-order-group + .preview-order-group {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 .preview-order-group .order-badge-wrap {
   position: absolute;
@@ -2136,6 +2160,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .order-card-body {
   border-radius: 0 0 var(--r-md) var(--r-md);
   overflow: hidden;
+  box-shadow: inset 0 2px 0 rgba(12,27,42,0.04);
 }
 
 /* Per-airline USD needed summary (shown at top of pending tab) */
@@ -2143,9 +2168,10 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 14px 18px;
+  padding: 16px 18px;
   margin-bottom: 20px;
   box-shadow: var(--shadow-xs);
+  overflow: hidden;
 }
 .airline-usd-header {
   display: flex;
@@ -2153,25 +2179,30 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed var(--line);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
 }
 .airline-usd-header .title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--ink);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .airline-usd-header .hint {
   font-size: 11px;
   color: var(--muted);
-  font-style: italic;
+  font-style: normal;
+  letter-spacing: 0;
 }
 .airline-usd-grid {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .airline-usd-row {
   display: grid;
@@ -2314,21 +2345,25 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   overflow-y: auto;
 }
 .cardholder-pick-row {
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--paper);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--line);
-  border-radius: var(--r-sm);
+  border-left: 4px solid transparent;
+  border-radius: var(--r-md);
   cursor: pointer;
-  transition: border-left-color 0.15s ease, background 0.15s ease;
+  transition: all var(--t-base);
+  box-shadow: var(--shadow-xs);
 }
 .cardholder-pick-row:hover {
   background: var(--cream);
   border-left-color: var(--accent);
+  box-shadow: var(--shadow);
+  transform: translateX(3px);
 }
 .cardholder-pick-row.selected {
-  border-left-color: var(--green, #2d7a3e);
-  background: #f0faf2;
+  border-left-color: var(--green);
+  background: linear-gradient(135deg, #f0faf2 0%, #e8f6ec 100%);
+  box-shadow: 0 2px 8px rgba(46,125,82,0.12);
 }
 .cardholder-pick-main {
   display: flex;
@@ -2340,6 +2375,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-weight: 700;
   color: var(--ink);
   font-size: 14px;
+  letter-spacing: -0.01em;
 }
 .cardholder-pick-meta {
   font-family: 'JetBrains Mono', monospace;
@@ -2353,19 +2389,21 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .ch-load-pill {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px 9px;
   background: var(--cream);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
-  color: var(--ink);
+  color: var(--muted);
+  transition: all var(--t-fast);
 }
 .ch-load-pill.current {
   background: var(--accent);
   border-color: var(--accent-deep);
-  color: var(--ink);
+  color: #fff;
   font-weight: 700;
+  box-shadow: 0 1px 4px rgba(200,160,74,0.3);
 }
 .airline-usd-row .order-num {
   font-weight: 700;
@@ -2515,13 +2553,14 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .price-row.cost { color: var(--red); }
 .price-row.cost .label, .price-row.cost .value { color: var(--red); }
 .price-row.profit {
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  margin-top: 6px;
-  font-size: 13px;
+  padding: 8px 12px;
+  background: var(--green-light);
+  border-radius: var(--r-sm);
+  margin-top: 8px;
 }
-.price-row.profit .label { color: var(--green); font-weight: 600; }
-.price-row.profit .value { color: var(--green); font-size: 15px; font-weight: 700; }
+.price-row.profit .label { color: var(--green); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.price-row.profit .value { color: var(--green); font-size: 17px; font-weight: 700; }
+.price-row.loss { background: var(--red-light); border-radius: var(--r-sm); padding: 8px 12px; margin-top: 8px; }
 .price-row.loss .label, .price-row.loss .value { color: var(--red) !important; }
 
 /* Finalize box in pending list */
@@ -2577,15 +2616,18 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   box-shadow: 0 0 0 3px rgba(139,105,20,0.1);
 }
 .finalize-calc {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line);
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: rgba(12,27,42,0.03);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
   display: flex;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   color: var(--muted);
+  align-items: center;
 }
 .finalize-calc strong { color: var(--ink); font-weight: 700; }
 .finalize-calc .ok strong { color: var(--green); }
@@ -2595,48 +2637,68 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .branch-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 .branch-chip {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  padding: 6px 12px;
+  border-radius: var(--r-md);
+  padding: 10px 16px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   display: flex;
-  gap: 6px;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--t-base), transform var(--t-base);
+  min-width: 80px;
+}
+.branch-chip:hover {
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
 }
 .branch-chip strong {
-  font-size: 16px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--accent-deep);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
 }
 .branch-chip .label {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 /* Pending summary pointer on new-order tab (compact) */
 .pending-pointer {
-  background: var(--ink);
+  background: linear-gradient(135deg, var(--ink) 0%, #1e3550 100%);
   color: var(--paper);
-  padding: 10px 16px;
-  border-radius: var(--r-sm);
-  margin-bottom: 14px;
+  padding: 12px 18px;
+  border-radius: var(--r-md);
+  margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  transition: all 0.15s;
-  border: 1px solid var(--ink);
+  transition: all var(--t-base);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+.pending-pointer::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 90px; height: 90px;
+  background: radial-gradient(circle, rgba(200,160,74,0.12) 0%, transparent 70%);
+  pointer-events: none;
 }
 .pending-pointer:hover {
-  background: var(--ink-2);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 .pending-pointer .pp-left {
   display: flex;
@@ -2683,8 +2745,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .verify-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(12, 27, 42, 0.55);
-  backdrop-filter: blur(3px);
+  background: rgba(12, 27, 42, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 2000;
   display: flex;
   align-items: center;
@@ -2694,49 +2757,55 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .verify-modal {
   background: var(--paper);
-  border-radius: 6px;
+  border-radius: var(--r-lg);
   max-width: 720px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-strong);
-  animation: slideUp 0.2s ease;
+  animation: slideUp 0.22s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 .verify-modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--cream) 0%, var(--paper) 100%);
+  background: linear-gradient(135deg, var(--ink) 0%, #1e3248 100%);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 .verify-modal-header h3 {
   margin: 0;
   font-family: 'Fraunces', serif;
   font-size: 16px;
   font-weight: 600;
+  color: var(--paper);
+  letter-spacing: 0.01em;
 }
 .verify-modal-header .close-btn {
-  background: none;
-  border: none;
-  font-size: 22px;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.18);
+  font-size: 18px;
   cursor: pointer;
-  color: var(--muted);
-  padding: 0 6px;
-  line-height: 1;
+  color: rgba(255,255,255,0.7);
+  padding: 2px 8px;
+  line-height: 1.4;
+  border-radius: var(--r-sm);
+  transition: all var(--t-fast);
 }
 .verify-modal-header .close-btn:hover {
-  color: var(--ink);
+  background: rgba(255,255,255,0.22);
+  color: #fff;
 }
 .verify-modal-body {
-  padding: 16px 18px;
+  padding: 18px 20px;
 }
 .verify-step {
   display: flex;
-  gap: 12px;
+  gap: 14px;
   margin-bottom: 18px;
   padding-bottom: 18px;
-  border-bottom: 1px dashed var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .verify-step:last-child {
   border-bottom: none;
@@ -2747,9 +2816,10 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   flex-shrink: 0;
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 8px;
   background: var(--ink);
-  color: var(--paper);
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2821,7 +2891,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   box-shadow: var(--shadow-strong);
   animation: slideUp 0.2s ease;
 }
-@keyframes slideUp { from{transform:translateY(20px); opacity:0} to{transform:translateY(0); opacity:1} }
+@keyframes slideUp { from{transform:translateY(24px) scale(0.98); opacity:0;} to{transform:translateY(0) scale(1); opacity:1;} }
 .modal-head {
   display: flex;
   justify-content: space-between;
@@ -2921,49 +2991,71 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 /* Cardholder detail */
 .ch-detail-header {
-  background: linear-gradient(135deg, var(--blue) 0%, #1a365d 100%);
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d2035 60%, #1a2d4a 100%);
   color: #fff;
-  padding: 14px 16px;
-  border-radius: var(--r-sm);
-  margin-bottom: 14px;
+  padding: 18px 20px;
+  border-radius: var(--r-lg);
+  margin-bottom: 16px;
   display: flex;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.ch-detail-header::after {
+  content: '';
+  position: absolute;
+  bottom: -30px; right: -30px;
+  width: 120px; height: 120px;
+  background: radial-gradient(circle, rgba(200,160,74,0.1) 0%, transparent 70%);
+  pointer-events: none;
 }
 .ch-detail-header .name {
   font-family: 'Fraunces', serif;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
+  letter-spacing: -0.01em;
 }
 .ch-detail-header .stats {
   display: flex;
-  gap: 18px;
+  gap: 20px;
   flex-wrap: wrap;
   font-family: 'JetBrains Mono', monospace;
+  align-items: flex-end;
 }
 .ch-detail-header .stats .stat {
   display: flex;
   flex-direction: column;
+  gap: 2px;
 }
 .ch-detail-header .stats .stat .v {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
+  line-height: 1;
 }
 .ch-detail-header .stats .stat .l {
-  font-size: 10px;
-  opacity: 0.7;
+  font-size: 9.5px;
+  opacity: 0.55;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .ch-detail-header .stats .stat.owed .v { color: var(--accent); }
 .ch-order-row {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
-  padding: 10px 14px;
+  padding: 10px 16px;
   margin-bottom: 6px;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 8px;
+  gap: 10px;
+  transition: box-shadow var(--t-fast), transform var(--t-fast);
+}
+.ch-order-row:hover {
+  box-shadow: var(--shadow-xs);
+  transform: translateX(2px);
 }
 .ch-order-main {
   font-size: 12px;
@@ -6700,7 +6792,7 @@ function renderAirlineUsdPanel(orders) {
         ? `<span style="background:#f0a500; color:#fff; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:700; margin-left:4px;" title="等待代理公司放位">🔒 放位</span>`
         : '';
       const noAvailBadge = o.noAvailability
-        ? `<span style="background:#888; color:#fff; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:700; margin-left:4px;">⏸ 暂时无位</span>`
+        ? `<span style="background:#888; color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:6px; letter-spacing:0.05em;">⏸ 无位</span>`
         : '';
       const linkedBadge = (() => {
         if (!o.ticketOrder && (!o.linkedOrderIds || o.linkedOrderIds.length === 0)) return '';
@@ -9846,24 +9938,24 @@ function buildCardHTML(o, idx) {
 
   // Mixed-cabin warning banner — prominent, above PNR
   if (mixedCabinInfo.isMixed) {
-    html += `<div style="background:linear-gradient(90deg, rgba(183,50,31,0.12), rgba(183,50,31,0.04)); border-left:4px solid var(--red); padding:8px 12px; margin-bottom:10px; border-radius:3px; font-size:12px; color:var(--ink);">
+    html += `<div style="background:linear-gradient(90deg, rgba(200,68,44,0.1), rgba(200,68,44,0.04)); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); font-size:12px; color:var(--ink); box-shadow:0 1px 4px rgba(200,68,44,0.1);">
       <strong style="color:var(--red);">⚠ 混舱订单 — 需要客服人工处理</strong><br>
-      <span style="color:var(--muted); font-size:11px;">${escapeHtml(mixedCabinInfo.tooltip)}</span>
+      <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">${escapeHtml(mixedCabinInfo.tooltip)}</span>
     </div>`;
   }
 
   // 🔒 Waiting-for-release banner
   if (o.waitingForRelease) {
-    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:linear-gradient(90deg,#fff3cd,#fffbea); border-left:4px solid #f0a500; padding:8px 12px; margin-bottom:10px; border-radius:3px;">
-      <span style="font-size:13px; font-weight:700; color:#7a5200;">🔒 等待放位 — 代理公司尚未释放座位</span>
-      <button onclick="toggleWaitingForRelease(${idx})" style="background:#f0a500; color:#fff; border:none; padding:3px 10px; border-radius:3px; cursor:pointer; font-size:11px; font-weight:700; white-space:nowrap;">✓ 已放位</button>
+    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:linear-gradient(90deg,#fffbf0,#fff8e8); border-left:4px solid #f0a500; padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(240,165,0,0.15);">
+      <span style="font-size:12px; font-weight:700; color:#7a5200;">🔒 等待放位 — 代理公司尚未释放座位</span>
+      <button onclick="toggleWaitingForRelease(${idx})" style="background:#f0a500; color:#fff; border:none; padding:4px 12px; border-radius:var(--r-sm); cursor:pointer; font-size:11px; font-weight:700; white-space:nowrap; box-shadow:0 1px 4px rgba(240,165,0,0.3);">✓ 已放位</button>
     </div>`;
   }
 
   if (o.pnr || o.tkt) {
-    html += `<div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:8px; letter-spacing:0.05em;">`;
-    if (o.pnr) html += `PNR: <strong style="color:var(--ink)">${escapeHtml(o.pnr)}</strong>  `;
-    html += `TKT: <strong style="color:var(--ink)">${escapeHtml(o.tkt || '暂未提供')}</strong>`;
+    html += `<div style="display:flex; align-items:center; gap:16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:10px; padding:8px 12px; background:rgba(12,27,42,0.03); border-radius:var(--r-sm);">`;
+    if (o.pnr) html += `<span>PNR <strong style="color:var(--ink); font-size:13px; letter-spacing:0.08em;">${escapeHtml(o.pnr)}</strong></span>`;
+    html += `<span>TKT <strong style="color:${o.tkt ? 'var(--ink)' : 'var(--muted)'}; font-size:${o.tkt ? '13px' : '12px'}; ${o.tkt ? 'letter-spacing:0.06em;' : 'font-style:italic;'}">${escapeHtml(o.tkt || '暂未提供')}</strong></span>`;
     html += `</div>`;
   }
 
@@ -9910,8 +10002,8 @@ function buildCardHTML(o, idx) {
       const age = calculateAgeAtFlight(p.dob, firstSegDate);
       if (age != null) {
         ageAtFlight = age;
-        if (age < 2) { paxType = 'INFANT'; badge = `<span style="background:var(--red); color:#fff; padding:1px 6px; border-radius:2px; font-size:10px; font-weight:700; margin-left:6px;">INFANT · ${age}y</span>`; }
-        else if (age < 18) { paxType = 'CHILD'; badge = `<span style="background:var(--accent-deep); color:#fff; padding:1px 6px; border-radius:2px; font-size:10px; font-weight:700; margin-left:6px;">CHILD · ${age}y</span>`; }
+        if (age < 2) { paxType = 'INFANT'; badge = `<span style="background:#c8442c; color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:8px; letter-spacing:0.05em;">INF · ${age}y</span>`; }
+        else if (age < 18) { paxType = 'CHILD'; badge = `<span style="background:var(--accent-deep); color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:8px; letter-spacing:0.05em;">CHD · ${age}y</span>`; }
       }
     }
     return { p, origIdx, badge, ageAtFlight, paxType };
@@ -9945,13 +10037,13 @@ function buildCardHTML(o, idx) {
       </div>
       <div class="segment-connector">
         ${dateBadge ? `<div class="seg-date-badge">${escapeHtml(dateBadge)}</div>` : ''}
-        <div class="plane">✈</div>
-        ${s.flight ? `<div style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:800; color:var(--ink); letter-spacing:0.06em; margin-top:2px;">${escapeHtml(s.flight)}</div>` : ''}
+        <div class="plane" style="font-size:20px; color:var(--accent); filter:drop-shadow(0 2px 4px rgba(200,160,74,0.35));">✈</div>
+        ${s.flight ? `<div style="font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:800; color:var(--ink); letter-spacing:0.08em; margin-top:3px; background:var(--cream); padding:2px 10px; border-radius:var(--r-sm); display:inline-block;">${escapeHtml(s.flight)}</div>` : ''}
         ${s.cls ? (() => {
           const airlineCls = (settings.fareClassByAirline && settings.fareClassByAirline[o.airline])
                           || (STATE.fareClassByAirline && STATE.fareClassByAirline[o.airline]);
           const clsName = (airlineCls && airlineCls[s.cls]) || STATE.classMap[s.cls] || '';
-          return `<div style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:1px;">CLASS <strong style="color:var(--ink)">${escapeHtml(s.cls)}</strong>${clsName ? ' ('+clsName+')' : ''}</div>`;
+          return `<div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:3px; letter-spacing:0.04em;">CLASS <strong style="color:var(--ink-2)">${escapeHtml(s.cls)}</strong>${clsName ? '<br><span style="font-size:9px;opacity:0.7;">('+clsName+')</span>' : ''}</div>`;
         })() : ''}
         ${s.date && s.date !== dateBadge ? `<div class="meta">${escapeHtml(s.date)}</div>` : ''}
       </div>
