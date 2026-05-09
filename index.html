@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
+  /* Core palette — warmer, richer */
   --ink: #0C1B2A;
   --ink-2: #1A2B3D;
   --paper: #F5EFE6;
@@ -19,14 +20,32 @@
   --cream: #FBF6EC;
   --accent: #C8A04A;
   --accent-deep: #8B6914;
+  --accent-light: rgba(200, 160, 74, 0.12);
   --red: #C8442C;
-  --green: #3F6B4A;
+  --red-light: rgba(200, 68, 44, 0.1);
+  --green: #2E7D52;
+  --green-light: rgba(46, 125, 82, 0.1);
   --blue: #2B4C7E;
-  --muted: #6B7280;
-  --line: rgba(12, 27, 42, 0.15);
-  --line-strong: rgba(12, 27, 42, 0.35);
-  --shadow: 0 4px 20px rgba(12, 27, 42, 0.08);
-  --shadow-strong: 0 12px 40px rgba(12, 27, 42, 0.15);
+  --blue-light: rgba(43, 76, 126, 0.1);
+  --muted: #7B8794;
+  --line: rgba(12, 27, 42, 0.1);
+  --line-strong: rgba(12, 27, 42, 0.28);
+
+  /* Elevation — more nuanced */
+  --shadow-xs: 0 1px 3px rgba(12,27,42,0.06), 0 1px 2px rgba(12,27,42,0.04);
+  --shadow: 0 4px 12px rgba(12,27,42,0.08), 0 2px 4px rgba(12,27,42,0.04);
+  --shadow-md: 0 8px 24px rgba(12,27,42,0.1), 0 3px 8px rgba(12,27,42,0.06);
+  --shadow-strong: 0 16px 48px rgba(12,27,42,0.14), 0 6px 16px rgba(12,27,42,0.08);
+
+  /* Radii — consistent rounding */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+
+  /* Transitions */
+  --t-fast: 0.12s ease;
+  --t-base: 0.2s ease;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -51,19 +70,20 @@ body {
 
 /* Header */
 .header {
-  padding: 20px 4px 24px;
-  border-bottom: 2px solid var(--ink);
-  margin-bottom: 20px;
+  padding: 20px 4px 20px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 24px;
   position: relative;
 }
 .header::after {
   content: '';
   position: absolute;
-  bottom: -6px;
+  bottom: -4px;
   left: 0;
   right: 0;
-  height: 1px;
-  background: var(--ink);
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0%, transparent 60%);
+  border-radius: 2px;
 }
 .header-top {
   display: flex;
@@ -133,42 +153,52 @@ body {
 /* Tabs */
 .tabs {
   display: flex;
-  gap: 0;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+  gap: 2px;
+  margin-bottom: 24px;
+  padding: 5px 6px;
+  background: rgba(12,27,42,0.06);
+  border-radius: var(--r-lg);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
-  padding: 12px 20px;
-  background: none;
+  padding: 8px 16px;
+  background: transparent;
   border: none;
+  border-radius: var(--r-md);
   cursor: pointer;
   font-family: 'Noto Sans SC', sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--muted);
-  border-bottom: 2px solid transparent;
   white-space: nowrap;
-  transition: all 0.2s;
+  transition: all var(--t-base);
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
 }
-.tab:hover { color: var(--ink); }
+.tab:hover { color: var(--ink); background: rgba(255,255,255,0.5); }
 .tab.active {
   color: var(--ink);
-  border-bottom-color: var(--accent);
+  background: var(--cream);
   font-weight: 600;
+  box-shadow: var(--shadow-xs);
 }
 .tab .count {
   background: var(--ink);
   color: var(--paper);
   font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 8px;
+  padding: 1px 7px;
+  border-radius: 10px;
   font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: background var(--t-base);
 }
+.tab.active .count { background: var(--accent-deep); }
 
 /* Panels */
 .panel { display: none; }
@@ -178,17 +208,17 @@ body {
 .section {
   background: var(--cream);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 16px;
+  border-radius: var(--r-md);
+  padding: 18px 20px;
   margin-bottom: 16px;
   position: relative;
 }
 .section-title {
   font-family: 'Fraunces', serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   color: var(--ink);
   margin-bottom: 12px;
   display: flex;
@@ -242,58 +272,72 @@ body {
 .field input, .field select, .field textarea {
   font-family: inherit;
   font-size: 14px;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
+  padding: 9px 12px;
+  border: 1.5px solid var(--line);
   background: #fff;
   color: var(--ink);
-  border-radius: 2px;
-  transition: border-color 0.15s;
+  border-radius: var(--r-sm);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px rgba(139, 105, 20, 0.12);
+}
+.field input:hover:not(:focus), .field select:hover:not(:focus) {
+  border-color: var(--line-strong);
 }
 .field.mono input { font-family: 'JetBrains Mono', monospace; }
 
 textarea.raw-input {
   width: 100%;
-  min-height: 120px;
+  min-height: 130px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
-  line-height: 1.6;
-  padding: 12px;
-  border: 1px solid var(--line);
+  line-height: 1.7;
+  padding: 14px;
+  border: 1.5px solid var(--line);
   background: #fff;
-  border-radius: 2px;
+  color: var(--ink);
+  border-radius: var(--r-sm);
   resize: vertical;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+textarea.raw-input:focus {
+  outline: none;
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px rgba(139, 105, 20, 0.1);
 }
 
 /* Buttons */
 .btn {
   padding: 9px 18px;
-  border: 1px solid var(--ink);
+  border: 1.5px solid var(--ink);
   background: var(--ink);
   color: var(--paper);
   font-family: 'Noto Sans SC', sans-serif;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 2px;
-  transition: all 0.15s;
+  border-radius: var(--r-sm);
+  transition: all var(--t-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  letter-spacing: 0.01em;
 }
-.btn:hover { background: var(--ink-2); }
+.btn:hover { background: var(--ink-2); transform: translateY(-1px); box-shadow: var(--shadow); }
+.btn:active { transform: translateY(0); box-shadow: none; }
 .btn.ghost {
   background: transparent;
   color: var(--ink);
+  border-color: var(--line-strong);
 }
-.btn.ghost:hover { background: var(--ink); color: var(--paper); }
-.btn.accent { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.accent { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; }
 .btn.accent:hover { background: #6b5010; }
 .btn.danger { background: var(--red); border-color: var(--red); }
-.btn.small { padding: 5px 10px; font-size: 12px; }
+.btn.small { padding: 5px 11px; font-size: 11.5px; border-radius: var(--r-sm); letter-spacing: 0; }
 .btn-row {
   display: flex;
   gap: 8px;
@@ -305,11 +349,13 @@ textarea.raw-input {
 .list-item {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 2px;
-  padding: 10px;
+  border-radius: var(--r-sm);
+  padding: 12px;
   margin-bottom: 8px;
   position: relative;
+  transition: box-shadow var(--t-base);
 }
+.list-item:hover { box-shadow: var(--shadow-xs); }
 .list-item-head {
   display: flex;
   justify-content: space-between;
@@ -337,20 +383,25 @@ textarea.raw-input {
 /* Preview card styles */
 .preview-area {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .ticket-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: var(--r-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-strong);
+  box-shadow: var(--shadow-md);
   position: relative;
   font-family: 'Noto Sans SC', sans-serif;
+  transition: box-shadow var(--t-base), transform var(--t-base);
+}
+.ticket-card:hover {
+  box-shadow: var(--shadow-strong);
+  transform: translateY(-1px);
 }
 
 .ticket-card-header {
-  padding: 14px 18px;
+  padding: 16px 20px;
   color: #fff;
   display: flex;
   justify-content: space-between;
@@ -363,10 +414,10 @@ textarea.raw-input {
   content: '';
   position: absolute;
   bottom: 0;
-  left: 18px;
-  right: 18px;
+  left: 20px;
+  right: 20px;
   height: 1px;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.15);
 }
 .tag-row {
   display: flex;
@@ -375,28 +426,30 @@ textarea.raw-input {
   align-items: center;
 }
 .tag {
-  padding: 3px 9px;
-  background: rgba(255,255,255,0.2);
-  border: 1px solid rgba(255,255,255,0.35);
-  border-radius: 3px;
-  font-size: 11px;
+  padding: 3px 10px;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 14px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.05em;
-  backdrop-filter: blur(4px);
+  letter-spacing: 0.06em;
+  backdrop-filter: blur(6px);
+  text-transform: uppercase;
 }
 .tag.airline-tag {
-  background: #fff;
+  background: rgba(255,255,255,0.95);
   color: var(--ink);
-  border-color: #fff;
+  border-color: rgba(255,255,255,0.9);
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 .trip-type {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  opacity: 0.9;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
 }
 
 .ticket-card-body {
@@ -422,59 +475,60 @@ textarea.raw-input {
   grid-template-columns: 1fr auto 1fr;
   gap: 8px;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px dashed var(--line);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
 }
 .segment:last-of-type { border-bottom: none; }
 
 .segment-endpoint { text-align: center; }
 .segment-endpoint .code {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.01em;
   line-height: 1;
   color: var(--ink);
 }
 .segment-endpoint .city {
   font-size: 10px;
   color: var(--muted);
-  margin-top: 2px;
+  margin-top: 3px;
+  letter-spacing: 0.02em;
 }
 .segment-endpoint .seg-time {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--accent-deep);
-  margin-top: 4px;
-  letter-spacing: 0.03em;
+  margin-top: 5px;
+  letter-spacing: 0.04em;
 }
 
 .segment-connector {
   text-align: center;
-  padding: 0 4px;
+  padding: 0 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
 }
 .segment-connector .seg-date-badge {
   background: var(--accent);
-  color: var(--ink);
-  padding: 3px 10px;
-  border-radius: 12px;
+  color: #fff;
+  padding: 3px 11px;
+  border-radius: 14px;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-  border: 1px solid var(--accent-deep);
+  box-shadow: 0 2px 6px rgba(200,160,74,0.3);
 }
 .segment-connector .plane {
-  font-size: 16px;
+  font-size: 18px;
   color: var(--accent);
+  filter: drop-shadow(0 1px 2px rgba(200,160,74,0.3));
 }
 .segment-connector .meta {
   font-family: 'JetBrains Mono', monospace;
@@ -553,7 +607,7 @@ textarea.raw-input {
   background: var(--ink);
   color: #E8E0D0;
   padding: 16px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 1.8;
@@ -567,7 +621,7 @@ textarea.raw-input {
   background: #1a2332;
   color: #e0dacb;
   padding: 14px 16px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   line-height: 1.9;
@@ -597,7 +651,7 @@ textarea.raw-input {
   background: var(--cream);
   border: 1px solid var(--line);
   border-left: 3px solid var(--green);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   padding: 12px 14px;
   margin-bottom: 8px;
   display: flex;
@@ -632,7 +686,7 @@ textarea.raw-input {
 .ticketed-tags .mini-tag {
   padding: 2px 6px;
   background: rgba(12, 27, 42, 0.08);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   font-size: 10px;
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
@@ -658,7 +712,7 @@ textarea.raw-input {
   background: var(--ink);
   color: var(--paper);
   padding: 10px 20px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: 13px;
   opacity: 0;
   transition: all 0.25s;
@@ -683,7 +737,7 @@ textarea.raw-input {
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #fff;
   font-size: 11px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.05em;
@@ -700,7 +754,7 @@ textarea.raw-input {
 .hint code {
   background: rgba(12, 27, 42, 0.06);
   padding: 1px 4px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   font-size: 10px;
 }
 
@@ -736,7 +790,7 @@ textarea.raw-input {
 .known-pax-item {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   padding: 10px 12px;
   margin-bottom: 6px;
   display: flex;
@@ -752,203 +806,275 @@ textarea.raw-input {
 .known-pax-info strong { font-weight: 700; }
 
 /* Responsive */
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE — Tablet & narrow desktop (≤ 600px)
+══════════════════════════════════════════════════════════════════ */
 @media (max-width: 600px) {
-  .app { padding: 10px; }
+  .app { padding: 10px 10px 24px; }
   .brand h1 { font-size: 20px; }
   .brand-sub { font-size: 12px; }
   .header-top { flex-direction: column; align-items: flex-start; gap: 8px; }
   .header-meta { text-align: left; font-size: 11px; }
-  .section { padding: 10px; }
+  .section { padding: 12px 12px; border-radius: var(--r-sm); }
   .section-title { font-size: 12px; }
   .section-title .zh { font-size: 11px; }
   .btn { padding: 8px 12px; font-size: 12px; }
   .btn.small { padding: 6px 10px; font-size: 11px; }
-  .segment-endpoint .code { font-size: 18px; }
+  .segment-endpoint .code { font-size: 20px; }
   .segment-endpoint .city { font-size: 9px; }
   .segment-endpoint .seg-time { font-size: 10px; }
   .segment-connector .meta { font-size: 10px; }
-
-  /* Tabs - horizontal scroll to avoid wrapping */
-  .tabs { overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-  .tab { flex-shrink: 0; padding: 10px 12px; font-size: 13px; }
-
-  /* Form rows - single column on narrow screens */
   .row { grid-template-columns: 1fr !important; }
   .field label { font-size: 10px; }
   .field input, .field select, .field textarea { font-size: 14px; padding: 10px; }
-
-  /* Finalize box - smaller mins for denser mobile layout */
-  .finalize-box { padding: 10px; }
+  .finalize-box { padding: 12px; }
   .finalize-head { font-size: 12px; }
   .finalize-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important; gap: 6px; }
   .finalize-field label { font-size: 9px; }
   .finalize-field input, .finalize-field select { font-size: 13px; padding: 8px; }
   .finalize-calc { font-size: 11px; gap: 10px; }
-
-  /* Ticket card - more compact */
-  .ticket-card-header { padding: 8px 10px; }
+  .ticket-card-header { padding: 10px 12px; }
   .trip-type { font-size: 10px; }
   .tag-row { gap: 4px; }
-  .tag { font-size: 10px; padding: 2px 6px; }
+  .tag { font-size: 9.5px; padding: 2px 7px; }
   .ticket-card-body { padding: 10px; }
   .passenger-line { font-size: 12px; }
   .segment { padding: 8px 0; }
   .ticket-card-price { padding: 8px 10px; }
   .price-row { font-size: 11px; }
   .price-row.total { font-size: 13px; }
-
-  /* Copy preview box - wrap long content */
   .copy-preview { font-size: 12px; padding: 12px; word-wrap: break-word; }
   .copy-btn-float { font-size: 10px; padding: 4px 8px; }
-
-  /* PNR paste textarea */
   textarea { font-size: 13px !important; }
-
-  /* Banner - vertical stack */
-  .pending-banner { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
+  .pending-banner { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px; border-radius: var(--r-md); }
   .pb-left { justify-content: flex-start; }
-  .pb-stats { justify-content: space-between; flex-wrap: wrap; }
-
-  /* Order tabs - allow horizontal scroll */
+  .pb-right { justify-content: space-between; flex-wrap: wrap; gap: 12px; }
   .order-tabs { overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
   .order-tab { flex-shrink: 0; }
-
-  /* Branch summary chips - allow wrap */
   .branch-chip { font-size: 11px; padding: 4px 8px; }
   .branch-chip strong { font-size: 14px; }
-
-  /* Modals - nearly fullscreen */
   .modal { width: 95vw; max-width: 95vw; padding: 14px; }
-
-  /* Agent preset chips row */
   .agent-chips { gap: 3px; }
   .agent-chip { font-size: 11px; padding: 2px 8px; }
+  .preview-area { gap: 10px; }
 }
 
-/* Very narrow (iPhone SE, old androids) */
-@media (max-width: 380px) {
-  .finalize-grid { grid-template-columns: 1fr !important; }
-  .section-title .zh { display: none; }
-  .brand-sub { display: none; }
-}
-
-@media (max-width: 380px) {
-  .finalize-grid { grid-template-columns: 1fr !important; }
-  .section-title .zh { display: none; }
-  .brand-sub { display: none; }
-}
-
-/* ═══════════════════════════════════════════════════════════
-   iPhone / Mobile Optimized (375px - 430px)
-   Targets iPhone SE / Pro / Max
-═══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════════════
+   IPHONE — Optimized for 375-430px (SE / Pro / Max)
+   All input font-size ≥ 16px to prevent iOS auto-zoom
+══════════════════════════════════════════════════════════════════ */
 @media (max-width: 480px) {
 
-  /* ── Header ── */
+  /* ── Header & branding ── */
+  .header { padding: 12px 0 14px; margin-bottom: 14px; }
   .header-top { gap: 4px; }
-  .world-clocks { display: none; } /* hide 3-clock bar on phone */
+  .world-clocks { display: none; }
   .header-meta { font-size: 10px; }
-  .refresh-btn { font-size: 11px; padding: 4px 8px; }
+  .brand h1 { font-size: 18px; }
 
-  /* ── Tabs ── */
-  .tabs { padding: 0 6px; gap: 0; }
-  .tab { padding: 8px 10px; font-size: 12px; min-width: 0; }
-  .tab .count { font-size: 10px; padding: 0 4px; }
+  /* ── Pill tabs — preserve pill style, just smaller ── */
+  .tabs {
+    padding: 4px 5px;
+    gap: 2px;
+    margin-bottom: 14px;
+    border-radius: var(--r-md);
+  }
+  .tab { padding: 7px 10px; font-size: 11.5px; min-width: 0; flex-shrink: 1; }
+  .tab .count { font-size: 9px; padding: 1px 5px; }
 
-  /* ── Pending banner ── */
-  .pending-banner { padding: 10px 12px; gap: 8px; }
-  .pb-stats { gap: 8px; }
-  .pb-stat-val { font-size: 15px; }
-  .pb-stat-label { font-size: 9px; }
+  /* ── Pending banner — compact vertical ── */
+  .pending-banner {
+    padding: 14px 16px;
+    gap: 10px;
+    border-radius: var(--r-md);
+  }
+  .pending-banner::before { display: none; }
+  .pb-count { font-size: 28px !important; }
+  .pb-right { gap: 14px; }
+  .pb-stat .v { font-size: 13px !important; }
+  .pb-stat .l { font-size: 9px !important; }
 
-  /* ── USD airline row (fast list) ── */
+  /* ── USD airline row — simplified grid ── */
   .airline-usd-row {
-    grid-template-columns: 28px auto auto 1fr auto auto !important;
-    font-size: 12px;
+    grid-template-columns: 28px auto 1fr auto auto auto !important;
+    font-size: 11.5px;
     padding: 8px 10px;
     gap: 4px;
   }
-  .airline-usd-row .pax-names { font-size: 12px; }
-  .airline-usd-row .amount { font-size: 13px; font-weight: 700; }
-  .airline-usd-row .per-pax { display: none; } /* hide per-pax on phone */
-  .airline-usd-row .ch-badge { font-size: 10px; max-width: 70px; overflow: hidden; text-overflow: ellipsis; }
+  .airline-usd-row:hover { transform: none; } /* no hover lift on touch */
+  .airline-usd-row .per-pax { display: none; }
+  .airline-usd-row .ch-badge { font-size: 10px; max-width: 72px; overflow: hidden; text-overflow: ellipsis; }
 
-  /* ── Pending order card ── */
-  .ticket-card-header { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
+  /* ── Order collapse header ── */
+  .order-collapse-header { padding: 8px 12px; min-height: 38px; gap: 6px; }
+  .order-collapse-header .collapse-num { font-size: 10px; padding: 1px 5px; }
+  .order-collapse-header .collapse-summary { font-size: 11px; }
+
+  /* ── Ticket card header tags ── */
   .tag-row { gap: 3px; flex-wrap: wrap; }
-  .tag { font-size: 10px; padding: 1px 5px; }
+  .tag { font-size: 9px; padding: 2px 6px; border-radius: 10px; }
+  .ticket-card { border-radius: var(--r-md); }
+  .ticket-card:hover { transform: none; box-shadow: var(--shadow-md); } /* no hover on touch */
 
   /* ── Segment display ── */
-  .segment { gap: 6px; padding: 6px 0; }
-  .segment-endpoint .code { font-size: 20px; }
-  .segment-endpoint .city { font-size: 9px; max-width: 60px; }
-  .segment-connector { min-width: 60px; }
-  .segment-connector .flight-pill { font-size: 10px; }
+  .segment { gap: 4px; padding: 8px 0; }
+  .segment-endpoint .code { font-size: 22px; }
+  .segment-endpoint .city { font-size: 9px; max-width: 64px; }
+  .segment-connector { min-width: 56px; padding: 0 4px; }
+  .segment-connector .seg-date-badge { font-size: 10px; padding: 2px 8px; }
+  .segment-connector .plane { font-size: 14px; }
 
-  /* ── Bottom action buttons on card ── */
-  .action-row, [class*="action-bar"] {
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .action-row .btn, [class*="action-bar"] .btn {
-    font-size: 11px;
-    padding: 5px 8px;
-    flex-shrink: 1;
-  }
+  /* ── Action buttons — wrap to rows ── */
+  .action-row, [class*="action-bar"] { flex-wrap: wrap; gap: 4px; }
+  .action-row .btn, [class*="action-bar"] .btn { font-size: 11px; padding: 6px 8px; flex-shrink: 1; }
 
   /* ── Finalize box ── */
-  .finalize-box { padding: 10px; }
+  .finalize-box { padding: 12px 12px; border-radius: var(--r-sm); }
   .finalize-grid { gap: 6px; }
-  .finalize-field label { font-size: 10px; }
+  .finalize-field label { font-size: 9px; }
 
-  /* ── Modals / Dialogs ── */
-  .verify-modal-overlay { align-items: flex-end !important; padding: 0 !important; }
-  .verify-modal {
-    border-radius: 16px 16px 0 0 !important;
-    max-width: 100vw !important;
-    width: 100vw !important;
-    max-height: 85vh !important;
-    overflow-y: auto;
-  }
-  .verify-modal-header { border-radius: 16px 16px 0 0 !important; }
-
-  /* ── Cardholder pick dialog ── */
-  .cardholder-pick-row { padding: 10px 12px; }
-  .cardholder-pick-name { font-size: 14px; }
-  .cardholder-pick-meta { font-size: 11px; }
-
-  /* ── Profit check dialog ── */
-  #profitCheckOverlay .verify-modal { padding-bottom: env(safe-area-inset-bottom, 16px); }
-
-  /* ── Price rows ── */
-  .price-row { font-size: 12px; flex-wrap: wrap; gap: 2px; }
-  .price-row.total { font-size: 14px; }
-  .price-row .label { flex: 1; min-width: 120px; }
-  .price-row .value { font-weight: 700; }
-
-  /* ── Paste PNR box ── */
-  .pnr-box textarea { font-size: 13px !important; min-height: 120px; }
-
-  /* ── Copy preview ── */
-  .copy-preview { font-size: 11px; word-break: break-all; }
-
-  /* ── Form field inputs ── larger touch targets ── */
+  /* ── ALL inputs ≥ 16px to prevent iOS zoom ── */
   .field input, .field select, .field textarea {
-    font-size: 16px !important; /* prevents iOS zoom on focus */
+    font-size: 16px !important;
     padding: 12px 10px;
+    border-radius: var(--r-sm);
+    min-height: 44px; /* Apple HIG touch target */
   }
   .finalize-field input, .finalize-field select {
     font-size: 16px !important;
     padding: 10px;
+    min-height: 40px;
   }
 
-  /* ── Already-ticketed card ── */
-  .ch-order-meta { font-size: 11px; flex-wrap: wrap; }
+  /* ── Modals — slide up from bottom (iOS sheet style) ── */
+  .verify-modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+  .verify-modal {
+    border-radius: var(--r-lg) var(--r-lg) 0 0 !important;
+    max-width: 100vw !important;
+    width: 100vw !important;
+    max-height: 88vh !important;
+    overflow-y: auto;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
+  .verify-modal-header { border-radius: var(--r-lg) var(--r-lg) 0 0 !important; }
 
-  /* ── Safe area for iPhone notch/home bar ── */
-  .app { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-  .tabs { padding-bottom: 2px; }
+  /* Stats dashboard on mobile */
+  #statsOverlay > div {
+    border-radius: var(--r-lg) var(--r-lg) 0 0 !important;
+    max-height: 90vh;
+    margin-top: auto;
+  }
+
+  /* ── Cardholder dialog ── */
+  .cardholder-pick-row { padding: 10px 14px; }
+  .cardholder-pick-name { font-size: 14px; }
+  .cardholder-pick-meta { font-size: 11px; }
+
+  /* ── Price rows ── */
+  .price-row { font-size: 11px; flex-wrap: wrap; gap: 2px; }
+  .price-row.total { font-size: 13px; }
+  .price-row .label { flex: 1; min-width: 110px; }
+  .price-row .value { font-weight: 700; }
+
+  /* ── PNR paste ── */
+  .pnr-box textarea { font-size: 14px !important; min-height: 120px; }
+
+  /* ── Copy preview ── */
+  .copy-preview { font-size: 11px; word-break: break-all; }
+
+  /* ── Overflow menu stays on screen ── */
+  .action-overflow-menu { right: 0; left: auto; min-width: 150px; }
+
+  /* ── Safe area (notch + home bar) ── */
+  .app { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+  /* ── Section padding ── */
+  .section { padding: 12px 12px; margin-bottom: 10px; }
+
+  /* ── Already-ticketed ── */
+  .ch-order-meta { font-size: 11px; flex-wrap: wrap; }
+  .ticketed-item { padding: 10px 12px !important; }
+
+  /* ── Dark mode overlay adapts to bottom sheet ── */
+  body.dark-mode .verify-modal { background: #16213e; }
 }
+
+/* ── Very narrow (iPhone SE 1st gen, 320px) ── */
+@media (max-width: 360px) {
+  .tabs { padding: 3px 4px; }
+  .tab { padding: 6px 8px; font-size: 11px; }
+  .finalize-grid { grid-template-columns: 1fr !important; }
+  .section-title .zh { display: none; }
+  .brand-sub { display: none; }
+  .pb-right { flex-direction: column; gap: 8px; }
+}
+
+
+
+/* ── Order card status left border ─────────────────────────────── */
+.preview-order-group { position: relative; border-left: 4px solid transparent; transition: border-color 0.2s; }
+.preview-order-group.status-unassigned { border-left-color: #ddd; }
+.preview-order-group.status-assigned   { border-left-color: #27ae60; }
+.preview-order-group.status-problem    { border-left-color: #e74c3c; }
+.preview-order-group.status-waiting    { border-left-color: #f39c12; }
+.preview-order-group.status-noavail    { border-left-color: #9e9e9e; }
+
+/* ── Drag to reorder ───────────────────────────────────────────── */
+.preview-order-group.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; background: #fffbf0; }
+
+/* ── Tab badge pop animation ───────────────────────────────────── */
+@keyframes badgePop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.6); background: #e74c3c; }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+.tab .count.pop { animation: badgePop 0.45s ease; }
+
+/* ── Collapsed action overflow menu ───────────────────────────── */
+.action-overflow { position: relative; display: inline-block; }
+.action-overflow-menu {
+  position: absolute; bottom: calc(100% + 6px); right: 0;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.15); z-index: 500; min-width: 170px;
+  padding: 4px 0; display: none;
+}
+.action-overflow-menu.open { display: block; }
+.action-overflow-menu button {
+  display: block; width: 100%; text-align: left; padding: 9px 14px;
+  border: none; background: none; cursor: pointer; font-size: 12px; color: #333;
+  white-space: nowrap; transition: background 0.1s;
+}
+.action-overflow-menu button:hover { background: #f5f5f5; }
+
+/* ── Next-step guidance glow ──────────────────────────────────── */
+.next-step-glow { animation: nextGlow 2.2s ease-in-out 3; }
+@keyframes nextGlow {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 4px rgba(39,174,96,0.5); }
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────── */
+body.dark-mode {
+  --bg: #1a1a2e; --card: #16213e; --border: #2a3550; --muted: #8899aa; --accent: #c9a84c;
+  background: #1a1a2e !important; color: #e0e0e0;
+}
+body.dark-mode .panel, body.dark-mode .section { background: #1a1a2e; }
+body.dark-mode .ticket-card, body.dark-mode .preview-order-group,
+body.dark-mode .finalize-box { background: #16213e !important; border-color: #2a3550 !important; }
+body.dark-mode .tabs, body.dark-mode .tab-bar { background: #12172a; border-color: #2a3550; }
+body.dark-mode .tab { color: #aaa; }
+body.dark-mode .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+body.dark-mode input, body.dark-mode select, body.dark-mode textarea {
+  background: #0f2044; border-color: #2a3550; color: #e0e0e0;
+}
+body.dark-mode .btn.ghost { border-color: #2a3550; color: #ccc; }
+body.dark-mode .btn.ghost:hover { background: #2a3550; }
+body.dark-mode .action-overflow-menu { background: #16213e; border-color: #2a3550; }
+body.dark-mode .action-overflow-menu button { color: #e0e0e0; }
+body.dark-mode .action-overflow-menu button:hover { background: #0f2044; }
+body.dark-mode .preview-order-group.status-unassigned { border-left-color: #3a4a6a; }
+body.dark-mode .section-title { color: #aac; }
 
 /* Official airline brand colors */
 .ticket-card[data-airline="AA"] .ticket-card-header { background: linear-gradient(135deg, #1B3A5C 0%, #0D2035 60%, #C8102E 100%); }
@@ -1277,6 +1403,8 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <div class="pb-stat"><span class="v" id="pbRevenue">¥0</span><span class="l">预计售价</span></div>
       <div class="pb-stat"><span class="v" id="pbCost">¥0</span><span class="l">预计成本</span></div>
       <div class="pb-stat profit"><span class="v" id="pbProfit">¥0</span><span class="l">预计利润</span></div>
+      <button onclick="openStatsDashboard()" title="查看月度统计、卡主排行（Ctrl+D）"
+        style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;white-space:nowrap;">📊 统计</button>
     </div>
   </div>
 
@@ -1290,7 +1418,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   </div>
 
   <div class="section">
-    <div class="section-title"><span class="num">📋</span>PENDING ORDERS <span class="zh">待出票订单</span></div>
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span><span class="num">📋</span>PENDING ORDERS <span class="zh">待出票订单</span></span>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="text" id="pendingSearchInput" placeholder="🔍 搜索姓名/航班/PNR…" oninput="filterPendingOrders(this.value)"
+          style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:180px;outline:none;">
+        <button onclick="document.getElementById('pendingSearchInput').value='';filterPendingOrders('')" 
+          style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
+      </div>
+    </div>
     <div class="preview-area" id="pendingArea">
       <div class="empty-state">
         <div class="icon">📭</div>
@@ -1349,9 +1485,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="hint" style="margin-top:8px">按出票日期分组统计。未填成本的订单不计入利润。</div>
   </div>
   <div class="section">
-    <div class="section-title" style="display:flex; align-items:center; justify-content:space-between;">
+    <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
       <span><span class="num">✓</span>TICKETED ORDERS <span class="zh">已出票记录</span></span>
-      <button class="btn small" onclick="openManualTicketDialog()" style="font-size:11px;">＋ 手动补录</button>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <input type="text" id="ticketedSearchInput" placeholder="🔍 搜索姓名/航班/PNR…" oninput="filterTicketedOrders(this.value)"
+          style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:180px;outline:none;">
+        <button onclick="document.getElementById('ticketedSearchInput').value='';filterTicketedOrders('')"
+          style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
+        <button class="btn small" onclick="openManualTicketDialog()" style="font-size:11px;">＋ 手动补录</button>
+      </div>
     </div>
     <div id="ticketedList"></div>
   </div>
@@ -1423,8 +1565,31 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 <!-- SETTINGS PANEL -->
 <div class="panel" id="panel-settings">
-  <div class="section" style="border-left: 3px solid var(--accent);">
-    <div class="section-title"><span class="num">☁</span>CLOUD SYNC <span class="zh">云端同步（手机电脑共用一份数据）</span></div>
+  <!-- Display preferences -->
+  <div class="section" style="border-left: 3px solid #8e44ad;">
+    <div class="section-title"><span class="num">🎨</span>DISPLAY <span class="zh">显示设置</span></div>
+    <div class="setting-row">
+      <div><div class="label">🌙 暗色模式</div><div class="desc">深色背景，减少眼疲劳</div></div>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode(this.checked)" style="accent-color:#8e44ad;width:16px;height:16px;">
+        <span id="darkModeLabel" style="font-size:12px;color:var(--muted);">关闭</span>
+      </label>
+    </div>
+    <div class="setting-row">
+      <div><div class="label">💾 立即导出备份</div><div class="desc">下载全量 JSON 数据备份</div></div>
+      <button class="btn ghost small" onclick="exportBackupJSON()">📥 导出 JSON</button>
+    </div>
+    <div class="setting-row">
+      <div><div class="label">📊 统计仪表板</div><div class="desc">月度收入、卡主排行</div></div>
+      <button class="btn ghost small" onclick="openStatsDashboard()">📊 打开</button>
+    </div>
+    <div class="hint" style="margin-top:8px;font-size:11px;">
+      快捷键：<kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">1-6</kbd> 切换标签 ·
+      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+K</kbd> 搜索 ·
+      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+D</kbd> 统计 ·
+      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+E</kbd> 备份
+    </div>
+  </div>
     <div class="hint" style="margin-bottom:12px">
       首次在任一设备点【创建云账号】，获得一个 Sync Key（一串字符串）。把它复制到另一台设备的这个框里，点【启用同步】。以后所有设备的数据都走云端，每次改动自动推送。
     </div>
@@ -1795,7 +1960,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   padding-bottom: 2px;
 }
 .order-nav-scroll::-webkit-scrollbar { height: 4px; }
-.order-nav-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 2px; }
+.order-nav-scroll::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--r-sm); }
 
 .order-pill {
   flex-shrink: 0;
@@ -1878,17 +2043,19 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .order-collapse-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
+  gap: 10px;
+  padding: 10px 16px;
   background: var(--ink);
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--r-md) var(--r-md) 0 0;
   cursor: pointer;
   user-select: none;
-  min-height: 38px;
+  min-height: 42px;
+  transition: background var(--t-fast);
 }
+.order-collapse-header:hover { background: var(--ink-2); }
 .order-collapse-header:only-child,
 .order-collapse-header + .order-card-body[style*="none"] ~ * {
-  border-radius: 6px;
+  border-radius: var(--r-md);
 }
 .order-collapse-header .collapse-num {
   font-family: 'JetBrains Mono', monospace;
@@ -1897,6 +2064,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   color: var(--accent);
   letter-spacing: 0.08em;
   flex-shrink: 0;
+  background: rgba(200,160,74,0.15);
+  padding: 2px 7px;
+  border-radius: var(--r-sm);
 }
 .order-collapse-header .collapse-age {
   flex-shrink: 0;
@@ -1904,7 +2074,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .order-collapse-header .collapse-summary {
   flex: 1;
   font-size: 12px;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.75);
   font-family: 'JetBrains Mono', monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -1912,15 +2082,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .order-collapse-header .collapse-chevron {
   font-size: 11px;
-  color: rgba(255,255,255,0.5);
+  color: rgba(255,255,255,0.45);
   flex-shrink: 0;
-  transition: transform 0.15s;
+  transition: transform 0.18s ease;
 }
 .order-collapse-header.is-expanded .collapse-chevron {
   transform: rotate(180deg);
 }
 .order-card-body {
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 var(--r-md) var(--r-md);
   overflow: hidden;
 }
 
@@ -1928,9 +2098,10 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .airline-usd-panel {
   background: var(--cream);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
+  border-radius: var(--r-md);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-xs);
 }
 .airline-usd-header {
   display: flex;
@@ -1963,36 +2134,41 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   grid-template-columns: 36px 12px 62px 40px 1fr 40px 80px 90px 110px 24px 24px;
   gap: 8px;
   align-items: center;
-  padding: 8px 10px;
-  background: var(--paper);
+  padding: 9px 14px;
+  background: var(--cream);
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
-  transition: background 0.15s ease, border-left-width 0.15s ease, filter 0.15s ease;
+  transition: all var(--t-fast);
+  cursor: pointer;
 }
 .airline-usd-row:hover {
-  filter: brightness(0.96);
+  background: var(--paper-2);
   border-left-width: 5px;
+  box-shadow: var(--shadow-xs);
+  transform: translateX(2px);
 }
 .airline-usd-row .ch-badge {
   font-size: 11px;
   font-weight: 600;
   color: var(--ink);
-  background: rgba(255,255,255,0.5);
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: rgba(255,255,255,0.7);
+  padding: 2px 9px;
+  border-radius: 12px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  box-shadow: var(--shadow-xs);
 }
 .airline-usd-row .ch-badge.unassigned {
   color: var(--muted);
   font-style: italic;
   background: transparent;
-  border: 1px dashed var(--line);
+  border: 1.5px dashed var(--line-strong);
+  box-shadow: none;
 }
 .usd-row-delete {
   background: transparent;
@@ -2002,7 +2178,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   width: 24px;
   height: 24px;
   display: inline-flex;
@@ -2019,7 +2195,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   color: var(--muted);
   font-size: 13px;
   cursor: pointer;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   width: 24px;
   height: 24px;
   display: inline-flex;
@@ -2098,7 +2274,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--paper);
   border: 1px solid var(--line);
   border-left: 3px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   transition: border-left-color 0.15s ease, background 0.15s ease;
 }
@@ -2195,7 +2371,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: linear-gradient(90deg, var(--ink) 0%, var(--ink-soft, #1a2e44) 100%);
   color: var(--paper);
   border-left: 4px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2215,7 +2391,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--accent);
   color: var(--ink);
   padding: 4px 12px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   font-weight: 700;
@@ -2244,7 +2420,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--accent);
   color: var(--ink);
   padding: 2px 10px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   font-size: 10px;
   font-weight: 700;
@@ -2300,49 +2476,55 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 /* Finalize box in pending list */
 .finalize-box {
-  background: linear-gradient(180deg, #fffef9 0%, var(--cream) 100%);
-  border: 1px solid var(--accent);
-  border-left: 3px solid var(--accent-deep);
-  border-radius: 4px;
-  padding: 12px 14px;
-  margin-top: 10px;
+  background: linear-gradient(160deg, #fffef9 0%, rgba(200,160,74,0.05) 100%);
+  border: 1.5px solid rgba(200,160,74,0.4);
+  border-left: 4px solid var(--accent-deep);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+  margin-top: 12px;
+  box-shadow: 0 2px 8px rgba(139,105,20,0.06);
 }
 .finalize-head {
   font-family: 'Fraunces', serif;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--accent-deep);
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .finalize-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
+  gap: 10px;
 }
 .finalize-field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
 }
 .finalize-field label {
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 9.5px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 .finalize-field input, .finalize-field select {
   font-family: 'JetBrains Mono', monospace;
   font-size: 13px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
+  padding: 7px 10px;
+  border: 1.5px solid var(--line);
   background: #fff;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 .finalize-field input:focus, .finalize-field select:focus {
   outline: none;
-  border-color: var(--ink);
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 3px rgba(139,105,20,0.1);
 }
 .finalize-calc {
   margin-top: 10px;
@@ -2369,7 +2551,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .branch-chip {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--r-sm);
   padding: 6px 12px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
@@ -2392,7 +2574,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--ink);
   color: var(--paper);
   padding: 10px 16px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
@@ -2543,7 +2725,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .verify-step .step-hint code {
   background: var(--cream);
   padding: 1px 5px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   font-family: 'JetBrains Mono', monospace;
   color: var(--ink);
 }
@@ -2625,7 +2807,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: #fff;
   border: 1px solid var(--line);
   border-left: 3px solid var(--blue);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   padding: 12px 14px;
   margin-bottom: 8px;
   display: flex;
@@ -2676,7 +2858,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-size: 10px;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   letter-spacing: 0.05em;
   margin-right: 6px;
 }
@@ -2686,7 +2868,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: linear-gradient(135deg, var(--blue) 0%, #1a365d 100%);
   color: #fff;
   padding: 14px 16px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
@@ -2720,7 +2902,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .ch-order-row {
   background: #fff;
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   padding: 10px 14px;
   margin-bottom: 6px;
   display: grid;
@@ -2752,34 +2934,48 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 /* Pending summary banner */
 .pending-banner {
-  background: linear-gradient(135deg, var(--ink) 0%, var(--ink-2) 100%);
+  background: linear-gradient(135deg, #0C1B2A 0%, #1e3248 50%, #0f2238 100%);
   color: var(--paper);
-  padding: 14px 18px;
-  border-radius: 4px;
-  margin-bottom: 16px;
+  padding: 18px 22px;
+  border-radius: var(--r-lg);
+  margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
+}
+.pending-banner::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 140px; height: 140px;
+  background: radial-gradient(circle, rgba(200,160,74,0.15) 0%, transparent 70%);
+  pointer-events: none;
 }
 .pending-banner .pb-left {
   font-size: 13px;
+  opacity: 0.85;
 }
 .pending-banner .pb-count {
   font-family: 'Fraunces', serif;
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 700;
   line-height: 1;
   margin-right: 6px;
   color: var(--accent);
+  text-shadow: 0 2px 8px rgba(200,160,74,0.3);
 }
 .pending-banner .pb-right {
   display: flex;
-  gap: 14px;
+  gap: 20px;
   flex-wrap: wrap;
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
+  align-items: center;
 }
 .pending-banner .pb-stat {
   display: flex;
@@ -2787,13 +2983,14 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   line-height: 1.3;
 }
 .pending-banner .pb-stat .v {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: #fff;
 }
 .pending-banner .pb-stat .l {
-  opacity: 0.6;
-  font-size: 10px;
+  opacity: 0.5;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
 }
 .pending-banner .pb-stat.profit .v { color: var(--accent); }
 
@@ -2817,7 +3014,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: #fff;
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   padding: 10px 14px;
   margin-bottom: 6px;
 }
@@ -2841,7 +3038,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--green);
   color: #fff;
   padding: 1px 6px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   font-size: 10px;
   margin-left: 6px;
   letter-spacing: 0.05em;
@@ -2874,7 +3071,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   background: var(--ink);
   color: var(--paper);
   padding: 12px 14px;
-  border-radius: 2px;
+  border-radius: var(--r-sm);
   margin-bottom: 12px;
   display: flex;
   justify-content: space-between;
@@ -4703,13 +4900,13 @@ function parseSingleBooking(raw) {
     // Flight+class glued (203Z), date glued to class (Z08JUN), times around route (LAX2330+0500ICN or FROM0835 1025TO)
     /^\s*S\s+([A-Z]{2})\s+(\d{1,4})([A-Z])\s*(\d{1,2}[A-Z]{3})\s+([A-Z]{3})(\d{3,4})[+\s](\d{3,4})([A-Z]{3})/,
     // TravelSky / ETAS "1.  *DL7841 J   FR24APR   ICNJFK GK1   1000 1110"  (class can be like "W1" or lowercase "s")
-    /^\s*\d*\.?\s*\*?\s*([A-Z]{2})\s*(\d{1,4})\s+([A-Za-z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\d*\.?\s*[.*]?\s*([A-Z]{2})\s*(\d{1,4})\s+([A-Za-z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
     // Sabre "1 AA 100Y 26MAY J PVGLAX HK1 930A 1030A"
-    /^\s*\d+\s+\*?\s*([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\d?\s+(\d{1,2}[A-Z]{3})\s+[A-Z]?\s*([A-Z]{3})([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\d+\s+\*?\s*([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+[A-Z]?\s*([A-Z]{3})([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
     // Amadeus "AA 100 Y 26MAY 4 PVGLAX 0930 1030"
-    /^\s*\*?\s*([A-Z0-9]{2})\s+(\d{1,4})\s+([A-Z])\d?\s+(\d{1,2}[A-Z]{3})\s+\d*\s*([A-Z]{3})\s*([A-Z]{3})(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\*?\s*([A-Z0-9]{2})\s+(\d{1,4})\s+([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+\d*\s*([A-Z]{3})\s*([A-Z]{3})(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
     // Loose "AA 100 Y 15MAY JFK-LAX"
-    /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*[-\s>→]\s*([A-Z]{3})/,
+    /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*[-\s>→]\s*([A-Z]{3})/,
     // E-ticket "AA 100 26MAY PVG LAX"
     /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s+([A-Z]{3})/,
     // Informal chat format: "MAY.06 SFO-CIN, UA 805 23:40-04:20" or "JUN.15 PVG-LAX UA888 13:30-09:20"
@@ -4992,6 +5189,14 @@ function parseSingleBooking(raw) {
           const d = parseFloat(bareDiscount[1]);
           if (d >= 10 && d <= 99) parsedDiscount = d;
         }
+      }
+      // Check if same line also contains an embedded segment
+      // e.g. "第13单，87折 超经。  1.  DL038  G  SA11JUL  PVGLAX DK1"
+      const embeddedSeg = trimmed.match(/\b([A-Z]{2})\s*(\d{1,4})\s+([A-Za-z])\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})\s+(?:DK|HK|GK)\d/);
+      if (embeddedSeg) {
+        segs.push({ from: embeddedSeg[5], to: embeddedSeg[6], date: embeddedSeg[4],
+          flight: embeddedSeg[1] + embeddedSeg[2], cls: embeddedSeg[3].toUpperCase(), depTime: '', arrTime: '' });
+        if (!airline) airline = embeddedSeg[1];
       }
       continue;
     }
@@ -5399,7 +5604,21 @@ function parseSingleBooking(raw) {
     const gdsFareLine = trimmed.match(/^\d{1,2}\s+[A-Z0-9]{4,}[+*]{0,2}\s+(?:ADT|CNN|INF|CHD)?\s*(\d{4,6})\s*(CNY|RMB)/i);
     if (gdsFareLine) {
       const amt = parseFloat(gdsFareLine[1]);
-      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+      // Detect pax type from inline keyword: "INF", "ADT", "CNN", "CHD"
+      const paxTypeM = trimmed.match(/\b(ADT|CNN|INF|CHD)\b/i);
+      const paxType = paxTypeM ? paxTypeM[1].toUpperCase() : 'ADT';
+      if (!parsedFareByType) parsedFareByType = {};
+      if (paxType === 'INF') {
+        parsedFareByType.infant = amt;
+        // Don't set rmb for INF — adult fare is the primary price
+      } else if (paxType === 'CNN' || paxType === 'CHD') {
+        parsedFareByType.child = amt;
+        if (!rmb) rmb = amt;
+      } else {
+        // ADT = adult fare — always wins over INF as primary rmb
+        parsedFareByType.adult = amt;
+        if (amt >= 500 && amt <= 500000) rmb = amt;  // override INF if already set
+      }
       // Also extract USD if present
       const usdM = trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*USD\s*$/i);
       if (usdM && !usd) usd = parseFloat(usdM[1]);
@@ -5420,7 +5639,8 @@ function parseSingleBooking(raw) {
       continue;
     }
 
-    // ── 核价超经 / 核价商务 — label line indicating cabin and that TOTAL CNY follows ──
+    // ── Skip product/order label lines: "产2：", "産2 ：", "产品2", "第2单" (already handled) ──
+    if (/^[产産]品?[\d\s一二三四五六七八九十百零：:]*$/.test(trimmed) || /^[产産]品?[\d一二三四五六七八九十]+\s*[：:]/.test(trimmed)) continue;
     const hexiaCabin = trimmed.match(/^核价\s*(超级经济|超经|经济舱?|商务舱?|公务舱?|头等舱?)/);
     if (hexiaCabin) {
       const cabM = hexiaCabin[1];
@@ -5429,12 +5649,20 @@ function parseSingleBooking(raw) {
       if (!_lastFareType) _lastFareType = 'ADULT';
       continue;
     }
-    const pHanShui = trimmed.match(/^含税\s*[:：]?\s*(\d{4,6}(?:\.\d+)?)\s*(?:CNY|RMB|元|人民币)?\s*$/i);
+    const pHanShui = trimmed.match(/^含税\s*[:：]?\s*(\d{4,6}(?:\.\d+)?)(?:\s*(?:CNY|RMB|元|人民币))?(?:\s*$|[\u4e00-\u9fa5A-Za-z\d])/i);
     if (pHanShui) {
       const amt = parseFloat(pHanShui[1]);
       if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
       continue;
     }
+    // ── Bare fare code + amount: "ZNE2WNDD 46890" (no CNY/RMB marker) ──────
+    const bareFareLine = trimmed.match(/^([A-Z][A-Z0-9]{5,})\s+(\d{4,6})\s*$/);
+    if (bareFareLine && !rmb) {
+      const amt = parseFloat(bareFareLine[2]);
+      if (amt >= 100 && amt <= 500000) rmb = amt;
+      continue;
+    }
+
     const cabinFareMulti = trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{3,6}(?:\.\d+)?)\s*\*\s*(0\.\d+|\d+\.\d+)\s*\*\s*(\d{1,2})/i);
     if (cabinFareMulti) {
       const baseFare = parseFloat(cabinFareMulti[1]);
@@ -5457,7 +5685,9 @@ function parseSingleBooking(raw) {
     const pNumCabin = trimmed.match(/^(\d{4,6})\s+(?:结算价?\s+)?(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|混舱)\s*(?:\d+PC)?\s*$/i)
       || trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{4,6}(?:\.\d+)?)\s*$/i)
       || trimmed.match(/^(\d{4,6})\s+\d+PC\s+(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱|每位|每人)\s*$/i)
-      || trimmed.match(/^(\d{4,6})\s+\d+PC\s*(?:每位|每人|\/人)?\s*$/i);  // "11483 1PC 每位"
+      || trimmed.match(/^(\d{4,6})\s+\d+PC\s*(?:每位|每人|\/人)?\s*$/i)
+      || trimmed.match(/^(\d{4,6})结算[价]?\s*$/)
+      || trimmed.match(/^\d+PC\s+(\d{4,6})\s*(?:\*\s*\d+)?\s*$/i);  // "1PC  8206  *2"  // "30235结算" / "30235结算价"  // "11483 1PC 每位"
     if (pNumCabin) {
       const amt = parseFloat(pNumCabin[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -5608,7 +5838,8 @@ function parseSingleBooking(raw) {
     const hasDiff = fareList.some((f, i) => f !== fareList[0] && f != null);
     if (hasDiff) {
       parsedPaxPrices = fareList.map(f => f || rmb || 0);
-      rmb = parsedPaxPrices[0];  // adult fare as legacy basePrice
+      // Use adult fare as base rmb (not infant fare), for proper USD conversion
+      rmb = parsedFareByType.adult || parsedPaxPrices[0];
     } else if (fareList[0]) {
       rmb = fareList[0];
     }
@@ -6680,6 +6911,7 @@ function renderPendingList() {
     if (cur.airline && o.airline !== cur.airline) return false;
     if (cur.agent && (o.agent || '(未指定)') !== cur.agent) return false;
     if (cur.label && (o.tableLabel || '未分类') !== cur.label) return false;
+    if (_pendingSearchQ && !orderMatchesSearch(o, _pendingSearchQ)) return false;
     return true;
   });
   // ────────────────────────────────────────────────────────────────────────
@@ -6776,12 +7008,18 @@ function renderPendingList() {
     items.forEach(({o, i: idx}) => {
       try {
         const group = document.createElement('div');
-        group.className = 'preview-order-group pending-order-card';
+        const statusCls = getOrderStatusClass(o);
+        group.className = `preview-order-group pending-order-card ${statusCls}`;
         group.id = `order-card-${idx}`;   // enables hover-detect for Ctrl+V paste
-        // Enable drag-and-drop image onto card
-        group.addEventListener('dragover', e => { e.preventDefault(); group.style.outline = '2px dashed var(--accent)'; });
-        group.addEventListener('dragleave', () => { group.style.outline = ''; });
+        // Enable drag-and-drop image onto card AND drag-to-reorder
+        initDragReorder(group, idx);
+        group.addEventListener('dragover', e => {
+          if (_dragSrcIdx !== null) return; // let reorder handle it
+          e.preventDefault(); group.style.outline = '2px dashed var(--accent)';
+        });
+        group.addEventListener('dragleave', () => { if (_dragSrcIdx === null) group.style.outline = ''; });
         group.addEventListener('drop', async e => {
+          if (_dragSrcIdx !== null) return; // reorder handled separately
           e.preventDefault();
           group.style.outline = '';
           const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
@@ -7136,6 +7374,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx})" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? 'background:#e0e0e0; border-color:#888; color:#555;' : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx})" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? 'background:#f3e5ff; border-color:#8e44ad; color:#6c2ea0;' : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx})" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
+      ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx})" title="与行程/价格相同的订单合并乘客" style="background:#e8f5e9;border-color:#27ae60;color:#1e7e34;">⊕ 合单</button>` : ''}
       <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green);" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
       <button class="btn ghost small" onclick="editOrderInNewTab(${idx})">✎ 完整编辑</button>
       <button class="btn ghost small" onclick="removeOrder(${idx})" style="color:var(--red); border-color:var(--red);">✕ 删除</button>
@@ -7553,6 +7792,624 @@ function closeReparseDialog(e) {
   if (e && e.target && e.target.id !== 'reparseModalOverlay') return;
   const c = document.getElementById('reparseModalContainer');
   if (c) c.innerHTML = '';
+}
+
+// ─── MERGE ORDERS ─────────────────────────────────────────────────────────────
+// Find orders whose flight itinerary, cabin, and price match this order.
+// Only compares pending (non-ticketed) orders. Returns array of STATE indices.
+function findMergeableOrders(idx) {
+  const o = STATE.orders[idx];
+  if (!o || !isMeaningfulOrder(o)) return [];
+
+  // Build a "fingerprint" for comparison: airline + sorted segment flights+dates + cabin + price
+  function fingerprint(order) {
+    const segs = (order.segments || [])
+      .map(s => `${s.flight || ''}${s.date || ''}${s.from || ''}${s.to || ''}`)
+      .sort().join('|');
+    const cabin = (order.cabin || '').trim();
+    const price = order.basePrice != null ? Math.round(order.basePrice) : null;
+    const disc = order.discount != null ? Math.round(order.discount) : null;
+    const airline = (order.airline || '').toUpperCase();
+    return `${airline}|${segs}|${cabin}|${price}|${disc}`;
+  }
+
+  const fp = fingerprint(o);
+  if (!fp.replace(/\|/g,'').trim()) return []; // empty fingerprint
+
+  return STATE.orders
+    .map((other, i) => ({ other, i }))
+    .filter(({ other, i }) =>
+      i !== idx &&
+      isMeaningfulOrder(other) &&
+      fingerprint(other) === fp
+    )
+    .map(({ i }) => i);
+}
+
+function openMergeDialog(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const mergeables = findMergeableOrders(idx);
+  if (mergeables.length === 0) { toast('未找到可合并的同行程订单'); return; }
+
+  const meaningful = STATE.orders.filter(isMeaningfulOrder);
+  const dispNum = meaningful.indexOf(o) + 1;
+
+  const candidateRows = mergeables.map(i => {
+    const other = STATE.orders[i];
+    const dNum = meaningful.indexOf(other) + 1;
+    const paxNames = (other.passengers || []).map(p => p.name || '').filter(Boolean).join(' / ') || '无乘客';
+    return `
+      <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid #ddd;border-radius:6px;cursor:pointer;margin-bottom:6px;background:#f9f9f9;">
+        <input type="checkbox" value="${i}" checked style="margin-top:3px;width:15px;height:15px;accent-color:var(--green);flex-shrink:0;">
+        <div>
+          <div style="font-weight:600;font-size:13px;">#${dNum} · ${escapeHtml(other.airline || '?')} · ${(other.segments||[]).map(s=>`${s.from}→${s.to}`).join(', ')}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${escapeHtml(paxNames)}</div>
+        </div>
+      </label>`;
+  }).join('');
+
+  const myPax = (o.passengers || []).map(p => p.name || '').filter(Boolean).join(' / ') || '无乘客';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'mergeOrderOverlay';
+  overlay.className = 'verify-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div class="verify-modal" style="background:#fff;border-radius:10px;padding:24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:16px;">⊕ 合单 — 合并乘客到 #${dispNum}</h3>
+        <button onclick="closeMergeDialog()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#666;">✕</button>
+      </div>
+      <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:6px;padding:10px 12px;margin-bottom:14px;">
+        <div style="font-size:12px;color:#1b5e20;font-weight:600;">📌 合并目标：#${dispNum} · ${escapeHtml(o.airline || '?')}</div>
+        <div style="font-size:12px;color:#2e7d32;margin-top:2px;">${escapeHtml(myPax)}</div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">选择要合并进来的订单（乘客将移入当前订单，原订单删除）：</div>
+      <div id="mergeCandidates">${candidateRows}</div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end;">
+        <button class="btn ghost small" onclick="closeMergeDialog()">取消</button>
+        <button class="btn small" onclick="doMergeOrders(${idx})" style="background:var(--green);border-color:var(--green);">⊕ 确认合单</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', _mergeKeyHandler);
+}
+
+function _mergeKeyHandler(e) {
+  if (e.key === 'Escape') closeMergeDialog();
+}
+
+function closeMergeDialog() {
+  document.getElementById('mergeOrderOverlay')?.remove();
+  document.removeEventListener('keydown', _mergeKeyHandler);
+}
+
+async function doMergeOrders(targetIdx) {
+  const target = STATE.orders[targetIdx];
+  if (!target) return;
+
+  const checks = document.querySelectorAll('#mergeCandidates input[type=checkbox]:checked');
+  const sourceIdxs = [...checks].map(c => parseInt(c.value)).filter(i => !isNaN(i));
+  if (sourceIdxs.length === 0) { toast('请至少选择一个要合并的订单'); return; }
+
+  // Merge passengers from each source into target
+  for (const srcIdx of sourceIdxs) {
+    const src = STATE.orders[srcIdx];
+    if (!src) continue;
+    for (const p of (src.passengers || [])) {
+      const already = (target.passengers || []).some(tp =>
+        tp.name === p.name && (tp.dob === p.dob || !p.dob)
+      );
+      if (!already) target.passengers.push({ ...p });
+    }
+    // If target has no screenshot, take source's
+    if (!target.screenshotUrl && src.screenshotUrl) target.screenshotUrl = src.screenshotUrl;
+  }
+
+  // Recalculate paxPrices if applicable
+  if (target.paxPrices && target.paxPrices.length > 0) {
+    const perPax = target.paxPrices[0];
+    target.paxPrices = target.passengers.map(() => perPax);
+  }
+
+  // Remove source orders (highest idx first to avoid shifting)
+  const sortedDesc = [...sourceIdxs].sort((a, b) => b - a);
+  for (const srcIdx of sortedDesc) {
+    STATE.orders.splice(srcIdx, 1);
+  }
+
+  closeMergeDialog();
+  await persistOrdersNow();
+  renderPendingList();
+  renderChasePanel();
+  toast(`✅ 合单完成，${sourceIdxs.length} 单已合并，共 ${target.passengers.length} 位乘客`);
+}
+
+// ─── END MERGE ORDERS ─────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. ORDER SEARCH — filter pending list by name / flight / PNR
+// ═══════════════════════════════════════════════════════════════════════════════
+let _pendingSearchQ = '';
+function filterPendingOrders(q) {
+  _pendingSearchQ = (q || '').trim().toLowerCase();
+  renderPendingList();
+}
+
+function orderMatchesSearch(o, q) {
+  if (!q) return true;
+  const hay = [
+    ...(o.passengers || []).map(p => p.name || ''),
+    ...(o.segments || []).map(s => s.flight || ''),
+    ...(o.segments || []).map(s => `${s.from || ''}${s.to || ''}`),
+    o.pnr || '', o.tkt || '', o.airline || '', o.client || '',
+    o.commChannel || '', o.tableLabel || ''
+  ].join(' ').toLowerCase();
+  return q.split(/\s+/).every(token => hay.includes(token));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. PASSPORT EXPIRY CHECK — warn when passport expires before or too close to flight
+// ═══════════════════════════════════════════════════════════════════════════════
+function checkPassportExpiry(o) {
+  const warnings = [];
+  const segs = o.segments || [];
+  if (segs.length === 0) return warnings;
+  const lastSeg = segs[segs.length - 1];
+  const flightDateStr = lastSeg.date || segs[0].date;
+  if (!flightDateStr) return warnings;
+
+  const MONTHS = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+  function parseIATADate(s) {
+    const m = String(s).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
+    if (!m) return null;
+    const mon = MONTHS[m[2]];
+    if (mon === undefined) return null;
+    const yr = m[3] ? (m[3].length === 4 ? parseInt(m[3]) : (parseInt(m[3]) < 30 ? 2000+parseInt(m[3]) : 1900+parseInt(m[3]))) : new Date().getFullYear();
+    return new Date(yr, mon, parseInt(m[1]));
+  }
+
+  const flightDate = parseIATADate(flightDateStr);
+  if (!flightDate) return warnings;
+
+  for (const p of (o.passengers || [])) {
+    if (!p.passportExpiry) continue;
+    const expiry = parseIATADate(p.passportExpiry);
+    if (!expiry) continue;
+    const diffDays = Math.floor((expiry - flightDate) / 86400000);
+    const name = (p.name || '').split('/')[0] || '乘客';
+    if (diffDays < 0) {
+      warnings.push({ level: 'error', msg: `⚠️ ${name} 护照已过期（${p.passportExpiry}）` });
+    } else if (diffDays < 180) {
+      warnings.push({ level: 'warn', msg: `⚠️ ${name} 护照 ${p.passportExpiry} 不足6个月（剩${diffDays}天）` });
+    }
+  }
+  return warnings;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. PRICE ANOMALY DETECTION — flag orders where price deviates >20% on same route
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildRouteKey(o) {
+  if (!o.segments || o.segments.length === 0) return null;
+  const first = o.segments[0];
+  const last = o.segments[o.segments.length - 1];
+  return `${o.airline || '?'}:${first.from || '?'}${last.to || '?'}:${o.cabin || '?'}`;
+}
+
+function detectPriceAnomalies(orders) {
+  const routeGroups = {};
+  for (const o of orders) {
+    const key = buildRouteKey(o);
+    const price = o.basePrice;
+    if (!key || !price || price <= 0) continue;
+    if (!routeGroups[key]) routeGroups[key] = [];
+    routeGroups[key].push(price);
+  }
+  const anomalyRoutes = {};
+  for (const [key, prices] of Object.entries(routeGroups)) {
+    if (prices.length < 2) continue;
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const threshold = avg * 0.25; // ±25%
+    anomalyRoutes[key] = { avg, threshold };
+  }
+  return anomalyRoutes;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. AUTO BACKUP REMINDER — every 50 ticketed orders prompt export
+// ═══════════════════════════════════════════════════════════════════════════════
+function checkAutoBackupReminder() {
+  const count = (settings.ticketed || []).length;
+  const lastRemind = settings._lastBackupRemindAt || 0;
+  if (count > 0 && count % 50 === 0 && count !== lastRemind) {
+    settings._lastBackupRemindAt = count;
+    storageSet('ticket-organizer-settings', settings);
+    setTimeout(() => {
+      const confirmed = confirm(`💾 你已有 ${count} 单已出票数据！\n\n建议导出一份 JSON 备份，防止意外丢失。\n\n点击「确定」立即导出备份。`);
+      if (confirmed) exportBackupJSON();
+    }, 500);
+  }
+}
+
+function exportBackupJSON() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version: 2,
+    orders: STATE.orders,
+    ticketed: settings.ticketed || [],
+    cardholders: settings.cardholders || [],
+    settings: { rate: settings.rate, presetAgents: settings.presetAgents }
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ticket-organizer-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('✅ 备份已导出');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. STATISTICS DASHBOARD — monthly revenue, profit, volume
+// ═══════════════════════════════════════════════════════════════════════════════
+function openStatsDashboard() {
+  const ticketed = settings.ticketed || [];
+  if (ticketed.length === 0) { toast('暂无已出票数据'); return; }
+
+  // Build monthly stats
+  const monthly = {};
+  for (const t of ticketed) {
+    const d = t.ticketedAt ? new Date(t.ticketedAt) : null;
+    const key = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : '未知';
+    if (!monthly[key]) monthly[key] = { count: 0, revenue: 0, cost: 0, profit: 0, airlines: {} };
+    monthly[key].count++;
+    const rev = t.finalPrice || 0;
+    const st = t.settlementUsd ? t.settlementUsd * (t.rate || settings.rate || 7.2) : 0;
+    monthly[key].revenue += rev;
+    monthly[key].cost += st;
+    monthly[key].profit += (rev - st);
+    const al = t.airline || '其他';
+    monthly[key].airlines[al] = (monthly[key].airlines[al] || 0) + 1;
+  }
+
+  // Cardholder leaderboard
+  const chStats = {};
+  for (const t of ticketed) {
+    const id = t.cardholderId;
+    if (!id) continue;
+    if (!chStats[id]) chStats[id] = { count: 0, profit: 0 };
+    chStats[id].count++;
+    const rev = t.finalPrice || 0;
+    const st = t.settlementUsd ? t.settlementUsd * (t.rate || settings.rate || 7.2) : 0;
+    chStats[id].profit += (rev - st);
+  }
+  const cardholders = settings.cardholders || [];
+  const chLeaderboard = Object.entries(chStats)
+    .map(([id, s]) => {
+      const ch = cardholders.find(c => c.id === id);
+      return { name: ch ? ch.name : id, ...s };
+    })
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, 10);
+
+  const sortedMonths = Object.keys(monthly).sort();
+  const totalRevenue = Object.values(monthly).reduce((a, b) => a + b.revenue, 0);
+  const totalProfit = Object.values(monthly).reduce((a, b) => a + b.profit, 0);
+  const totalCount = ticketed.length;
+
+  const monthRows = sortedMonths.map(m => {
+    const s = monthly[m];
+    const profitColor = s.profit >= 0 ? '#27ae60' : '#e74c3c';
+    const topAirline = Object.entries(s.airlines).sort((a,b)=>b[1]-a[1])[0];
+    return `<tr style="border-bottom:1px solid #f0f0f0;">
+      <td style="padding:8px 12px;font-weight:600;">${m}</td>
+      <td style="padding:8px 12px;text-align:center;">${s.count}</td>
+      <td style="padding:8px 12px;text-align:right;">¥${Math.round(s.revenue).toLocaleString()}</td>
+      <td style="padding:8px 12px;text-align:right;color:${profitColor};font-weight:600;">¥${Math.round(s.profit).toLocaleString()}</td>
+      <td style="padding:8px 12px;text-align:center;color:var(--muted);font-size:11px;">${topAirline ? topAirline[0]+' ('+topAirline[1]+')' : '-'}</td>
+    </tr>`;
+  }).join('');
+
+  const chRows = chLeaderboard.map((c, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
+    const profitColor = c.profit >= 0 ? '#27ae60' : '#e74c3c';
+    return `<tr style="border-bottom:1px solid #f0f0f0;">
+      <td style="padding:8px 12px;">${medal} ${escapeHtml(c.name)}</td>
+      <td style="padding:8px 12px;text-align:center;">${c.count}</td>
+      <td style="padding:8px 12px;text-align:right;color:${profitColor};font-weight:600;">¥${Math.round(c.profit).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'statsOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.innerHTML = `
+    <div style="background:#fff;border-radius:12px;width:min(700px,95vw);max-height:90vh;overflow-y:auto;box-shadow:0 12px 48px rgba(0,0,0,0.3);">
+      <div style="background:linear-gradient(135deg,#1a3a5c,#0d2035);color:#fff;padding:20px 24px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:18px;font-weight:700;">📊 数据统计仪表板</div>
+          <div style="font-size:12px;opacity:0.7;margin-top:2px;">共 ${totalCount} 单已出票</div>
+        </div>
+        <button onclick="document.getElementById('statsOverlay').remove()" style="border:none;background:rgba(255,255,255,0.15);color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:13px;">✕ 关闭</button>
+      </div>
+
+      <!-- Summary cards -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:20px 24px 0;">
+        <div style="background:#f0f9f4;border:1px solid #a5d6a7;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#27ae60;">¥${Math.round(totalRevenue).toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">累计总收入</div>
+        </div>
+        <div style="background:#fef9f0;border:1px solid #ffe082;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#f39c12;">¥${Math.round(totalProfit).toLocaleString()}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">累计总利润</div>
+        </div>
+        <div style="background:#f0f4ff;border:1px solid #90caf9;border-radius:8px;padding:14px;text-align:center;">
+          <div style="font-size:22px;font-weight:700;color:#1565c0;">${totalCount}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">累计已出票单数</div>
+        </div>
+      </div>
+
+      <!-- Monthly breakdown -->
+      <div style="padding:20px 24px 0;">
+        <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:10px;">📅 按月统计</div>
+        <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#f5f5f5;">
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);">月份</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--muted);">单数</th>
+              <th style="padding:8px 12px;text-align:right;color:var(--muted);">收入</th>
+              <th style="padding:8px 12px;text-align:right;color:var(--muted);">利润</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--muted);">主力航司</th>
+            </tr></thead>
+            <tbody>${monthRows}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Cardholder leaderboard -->
+      ${chLeaderboard.length > 0 ? `
+      <div style="padding:20px 24px;">
+        <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:10px;">🏆 卡主利润排行</div>
+        <div style="border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:#f5f5f5;">
+              <th style="padding:8px 12px;text-align:left;color:var(--muted);">卡主</th>
+              <th style="padding:8px 12px;text-align:center;color:var(--muted);">单数</th>
+              <th style="padding:8px 12px;text-align:right;color:var(--muted);">利润贡献</th>
+            </tr></thead>
+            <tbody>${chRows}</tbody>
+          </table>
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Export button -->
+      <div style="padding:0 24px 20px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn ghost small" onclick="exportBackupJSON()">💾 导出备份 JSON</button>
+        <button class="btn ghost small" onclick="document.getElementById('statsOverlay').remove()">关闭</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. KEYBOARD SHORTCUTS
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// TICKETED SEARCH
+// ═══════════════════════════════════════════════════════════════════════════════
+let _ticketedSearchQ = '';
+function filterTicketedOrders(q) {
+  _ticketedSearchQ = (q || '').trim().toLowerCase();
+  renderTicketed();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DARK MODE
+// ═══════════════════════════════════════════════════════════════════════════════
+function toggleDarkMode(on) {
+  document.body.classList.toggle('dark-mode', on);
+  const label = document.getElementById('darkModeLabel');
+  if (label) label.textContent = on ? '开启' : '关闭';
+  try { localStorage.setItem('ticket-dark-mode', on ? '1' : '0'); } catch(e) {}
+}
+
+function initDarkMode() {
+  let on = false;
+  try { on = localStorage.getItem('ticket-dark-mode') === '1'; } catch(e) {}
+  const toggle = document.getElementById('darkModeToggle');
+  if (toggle) toggle.checked = on;
+  toggleDarkMode(on);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATUS LEFT BORDER — set on each card based on order state
+// ═══════════════════════════════════════════════════════════════════════════════
+function getOrderStatusClass(o) {
+  if (o.noAvailability) return 'status-noavail';
+  if (o.waitingForRelease) return 'status-waiting';
+  // Problem: missing required fields
+  const missingPax = !o.passengers || o.passengers.length === 0;
+  const missingSegs = !o.segments || o.segments.length === 0;
+  if (missingPax || missingSegs) return 'status-problem';
+  if (o.cardholderId) return 'status-assigned';
+  return 'status-unassigned';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BADGE POP ANIMATION — fires when count changes
+// ═══════════════════════════════════════════════════════════════════════════════
+const _prevCounts = {};
+function animateBadgeIfChanged(id, newCount) {
+  if (_prevCounts[id] !== undefined && _prevCounts[id] !== newCount) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.remove('pop');
+      void el.offsetWidth; // reflow
+      el.classList.add('pop');
+      el.addEventListener('animationend', () => el.classList.remove('pop'), { once: true });
+    }
+  }
+  _prevCounts[id] = newCount;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// OVERFLOW ACTION MENU — collapses secondary buttons into "···"
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildOverflowMenu(id, items) {
+  // items = [{label, onclick, danger}]
+  const wrap = document.createElement('div');
+  wrap.className = 'action-overflow';
+  const trigger = document.createElement('button');
+  trigger.className = 'btn ghost small';
+  trigger.textContent = '···';
+  trigger.title = '更多操作';
+  trigger.onclick = (e) => {
+    e.stopPropagation();
+    const menu = wrap.querySelector('.action-overflow-menu');
+    menu.classList.toggle('open');
+    // Close on outside click
+    const close = () => { menu.classList.remove('open'); document.removeEventListener('click', close); };
+    if (menu.classList.contains('open')) setTimeout(() => document.addEventListener('click', close), 0);
+  };
+  const menu = document.createElement('div');
+  menu.className = 'action-overflow-menu';
+  for (const item of items) {
+    const btn = document.createElement('button');
+    btn.textContent = item.label;
+    if (item.danger) btn.style.color = 'var(--red)';
+    btn.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); item.fn(); };
+    menu.appendChild(btn);
+  }
+  wrap.appendChild(trigger);
+  wrap.appendChild(menu);
+  return wrap;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DRAG-TO-REORDER for pending list
+// ═══════════════════════════════════════════════════════════════════════════════
+let _dragSrcIdx = null;
+function initDragReorder(groupEl, stateIdx) {
+  groupEl.draggable = true;
+  groupEl.addEventListener('dragstart', (e) => {
+    _dragSrcIdx = stateIdx;
+    e.dataTransfer.effectAllowed = 'move';
+    groupEl.style.opacity = '0.5';
+  });
+  groupEl.addEventListener('dragend', () => {
+    groupEl.style.opacity = '';
+    document.querySelectorAll('.preview-order-group.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+  groupEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    groupEl.classList.add('drag-over');
+  });
+  groupEl.addEventListener('dragleave', () => groupEl.classList.remove('drag-over'));
+  groupEl.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    groupEl.classList.remove('drag-over');
+    if (_dragSrcIdx === null || _dragSrcIdx === stateIdx) return;
+    // Reorder STATE.orders
+    const moved = STATE.orders.splice(_dragSrcIdx, 1)[0];
+    const newIdx = _dragSrcIdx < stateIdx ? stateIdx - 1 : stateIdx;
+    STATE.orders.splice(newIdx, 0, moved);
+    _dragSrcIdx = null;
+    await persistOrdersNow();
+    renderPendingList();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEXT-STEP GUIDANCE — highlight what to fill after cardholder is assigned
+// ═══════════════════════════════════════════════════════════════════════════════
+function highlightNextStep(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  setTimeout(() => {
+    // If cardholder assigned but no PNR → highlight PNR field
+    if (o.cardholderId && !o.pnr) {
+      const pnrEl = document.querySelector(`input[data-field="pnr"][data-idx="${idx}"], #pnr-${idx}`);
+      if (pnrEl) { pnrEl.classList.add('next-step-glow'); pnrEl.focus(); }
+    }
+    // If PNR filled but no points type → highlight points select
+    if (o.pnr && !o.pointsType) {
+      const ptEl = document.querySelector(`#pts-type-${idx}, select[data-field="pointsType"][data-idx="${idx}"]`);
+      if (ptEl) ptEl.classList.add('next-step-glow');
+    }
+  }, 300);
+}
+
+function initKeyboardShortcuts() {
+  document.addEventListener('keydown', e => {
+    // Don't fire when typing in inputs/textareas
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Don't fire with modifier keys (except Ctrl/Cmd + specific shortcuts)
+    
+    // Ctrl/Cmd + K → focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const searchEl = document.getElementById('pendingSearchInput');
+      if (searchEl) { searchEl.focus(); searchEl.select(); }
+      return;
+    }
+
+    // Ctrl/Cmd + D → stats dashboard  
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault();
+      openStatsDashboard();
+      return;
+    }
+
+    // Ctrl/Cmd + E → export backup
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+      e.preventDefault();
+      exportBackupJSON();
+      return;
+    }
+
+    // Escape → close any open overlay
+    if (e.key === 'Escape') {
+      ['statsOverlay','mergeOrderOverlay','profitCheckOverlay'].forEach(id => {
+        document.getElementById(id)?.remove();
+      });
+    }
+
+    // Number keys 1-6 → switch tabs (only without modifiers)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      const tabMap = { '1': 'new', '2': 'pending', '3': 'chase', '4': 'ticketed', '5': 'issues', '6': 'settings' };
+      if (tabMap[e.key]) {
+        const tab = document.querySelector(`.tab[data-tab="${tabMap[e.key]}"]`);
+        if (tab) { e.preventDefault(); tab.click(); }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. CHILD AGE AUTO-CLASSIFICATION (helper used during pax display)
+// ═══════════════════════════════════════════════════════════════════════════════
+function getAutoAgeClass(dob, flightDate) {
+  if (!dob || !flightDate) return null;
+  const MONTHS = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+  const dm = String(dob).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})$/);
+  const fm = String(flightDate).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
+  if (!dm || !fm || MONTHS[dm[2]] === undefined || MONTHS[fm[2]] === undefined) return null;
+  const dobY = dm[3].length===4 ? parseInt(dm[3]) : (parseInt(dm[3])<30 ? 2000+parseInt(dm[3]) : 1900+parseInt(dm[3]));
+  const flY = fm[3] ? parseInt(fm[3]) : new Date().getFullYear();
+  let age = flY - dobY;
+  const flM = MONTHS[fm[2]], flD = parseInt(fm[1]);
+  const dobM = MONTHS[dm[2]], dobD = parseInt(dm[1]);
+  if (flM < dobM || (flM === dobM && flD < dobD)) age--;
+  if (age < 0) return null;
+  if (age < 2) return 'INFANT';
+  if (age < 12) return 'CHILD';
+  return 'ADULT';
 }
 
 // Split-order dialog. User picks which passengers to move to a NEW order.
@@ -8821,7 +9678,11 @@ function renderPendingPointer() {
     return;
   }
   pt.style.display = '';
-  document.getElementById('ppCount').textContent = meaningful.length;
+  const ppCountEl = document.getElementById('ppCount');
+  if (ppCountEl) {
+    animateBadgeIfChanged('ppCount', meaningful.length);
+    ppCountEl.textContent = meaningful.length;
+  }
   let totRev = 0, hasRev = false, totProfit = 0, hasProfit = false;
   meaningful.forEach(o => {
     const r = orderRevenue(o);
@@ -10409,15 +11270,36 @@ async function submitManualTicket(btn) {
 
 function renderTicketed() {
   const list = document.getElementById('ticketedList');
-  const count = (settings.ticketed || []).length;
-  document.getElementById('ticketedCount').textContent = count;
+  const allTicketed = settings.ticketed || [];
+  const count = allTicketed.length;
+  const ticketedCountEl = document.getElementById('ticketedCount');
+  if (ticketedCountEl) {
+    animateBadgeIfChanged('ticketedCount', count);
+    ticketedCountEl.textContent = count;
+  }
   populateMonthlyExportControls();
   if (count === 0) {
     list.innerHTML = `<div class="empty-state"><div class="icon">📋</div><div>还没有已出票记录</div></div>`;
     return;
   }
+  // Apply search filter
+  const q = _ticketedSearchQ;
+  const filtered = q ? allTicketed.filter(t => {
+    const hay = [
+      ...(t.passengers||[]).map(p => p.name||''),
+      ...(t.segments||[]).map(s => s.flight||''),
+      ...(t.segments||[]).map(s => `${s.from||''}${s.to||''}`),
+      t.pnr||'', t.tkt||'', t.airline||'', t.client||''
+    ].join(' ').toLowerCase();
+    return q.split(/\s+/).every(token => hay.includes(token));
+  }) : allTicketed;
+
   list.innerHTML = '';
-  settings.ticketed.forEach(t => {
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><div>没有符合搜索条件的已出票记录</div></div>`;
+    return;
+  }
+  filtered.forEach(t => {
     const div = document.createElement('div');
     div.className = 'ticketed-item';
     // Apply visual treatment if action status is set on this order
@@ -12801,6 +13683,7 @@ async function doMarkTicketed(idx) {
     renderCardholdersList();
     renderPendingBanner();
     renderPendingList();
+    checkAutoBackupReminder();
   } catch (e) {
     // Something went wrong — do NOT remove the order. User can retry.
     console.error('doMarkTicketed error:', e);
@@ -14196,6 +15079,9 @@ async function mergeImportData(event) {
   setupBackToTopScrollListener();
   loadTeamConfig();
   _loadCollapsedOrders();
+  initKeyboardShortcuts();
+  checkAutoBackupReminder();
+  initDarkMode();
 
   // Auto-fetch exchange rate on startup, then every hour
   fetchRate();
