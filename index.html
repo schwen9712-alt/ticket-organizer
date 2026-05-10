@@ -159,14 +159,15 @@ body {
 /* Tabs */
 .tabs {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   margin-bottom: 24px;
   padding: 5px 6px;
-  background: rgba(12,27,42,0.06);
+  background: rgba(12,27,42,0.07);
   border-radius: var(--r-lg);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  box-shadow: inset 0 1px 3px rgba(12,27,42,0.08);
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
@@ -186,12 +187,12 @@ body {
   gap: 6px;
   position: relative;
 }
-.tab:hover { color: var(--ink); background: rgba(255,255,255,0.5); }
+.tab:hover { color: var(--ink); background: rgba(255,255,255,0.6); }
 .tab.active {
   color: var(--ink);
-  background: var(--cream);
-  font-weight: 600;
-  box-shadow: var(--shadow-xs);
+  background: #fff;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(12,27,42,0.12), 0 0 0 0.5px rgba(12,27,42,0.06);
 }
 .tab .count {
   background: var(--ink);
@@ -204,7 +205,7 @@ body {
   letter-spacing: 0.03em;
   transition: background var(--t-base);
 }
-.tab.active .count { background: var(--accent-deep); }
+.tab.active .count { background: var(--accent-deep); color: #fff; }
 
 /* Panels */
 .panel { display: none; }
@@ -215,14 +216,15 @@ body {
   background: var(--cream);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 18px 20px;
-  margin-bottom: 14px;
+  padding: 20px 22px;
+  margin-bottom: 16px;
   position: relative;
   box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--t-base);
+  transition: box-shadow var(--t-base), border-color var(--t-base);
 }
 .section:focus-within {
-  box-shadow: var(--shadow), 0 0 0 2px rgba(139,105,20,0.08);
+  border-color: rgba(139,105,20,0.25);
+  box-shadow: var(--shadow), 0 0 0 3px rgba(139,105,20,0.07);
 }
 .section-title {
   font-family: 'Fraunces', serif;
@@ -238,18 +240,19 @@ body {
 }
 .section-title .num {
   font-family: 'JetBrains Mono', monospace;
-  background: var(--ink);
+  background: linear-gradient(135deg, var(--ink) 0%, #1e3248 100%);
   color: var(--accent);
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(12,27,42,0.2);
+  box-shadow: 0 2px 6px rgba(12,27,42,0.25);
+  letter-spacing: 0;
 }
 .section-title .zh {
   font-family: 'Noto Sans SC', sans-serif;
@@ -340,19 +343,21 @@ textarea.raw-input:focus {
   align-items: center;
   gap: 6px;
   letter-spacing: 0.01em;
+  box-shadow: 0 1px 3px rgba(12,27,42,0.2);
 }
-.btn:hover { background: var(--ink-2); transform: translateY(-1px); box-shadow: var(--shadow); }
-.btn:active { transform: translateY(0); box-shadow: none; }
+.btn:hover { background: var(--ink-2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(12,27,42,0.25); }
+.btn:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(12,27,42,0.15); }
 .btn.ghost {
   background: transparent;
   color: var(--ink);
   border-color: var(--line-strong);
+  box-shadow: none;
 }
-.btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-.btn.accent { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; }
-.btn.accent:hover { background: #6b5010; }
-.btn.danger { background: var(--red); border-color: var(--red); }
-.btn.small { padding: 5px 11px; font-size: 11.5px; border-radius: var(--r-sm); letter-spacing: 0; }
+.btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: 0 3px 8px rgba(12,27,42,0.2); }
+.btn.accent { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; box-shadow: 0 2px 8px rgba(139,105,20,0.35); }
+.btn.accent:hover { background: #6b5010; box-shadow: 0 4px 14px rgba(139,105,20,0.4); }
+.btn.danger { background: var(--red); border-color: var(--red); box-shadow: 0 2px 6px rgba(183,50,31,0.3); }
+.btn.small { padding: 5px 11px; font-size: 11.5px; border-radius: var(--r-sm); letter-spacing: 0; box-shadow: none; }
 .btn-row {
   display: flex;
   gap: 8px;
@@ -758,19 +763,19 @@ textarea.raw-input:focus {
   position: fixed;
   bottom: 28px;
   left: 50%;
-  transform: translateX(-50%) translateY(12px);
-  background: var(--ink);
+  transform: translateX(-50%) translateY(16px);
+  background: linear-gradient(135deg, var(--ink) 0%, #1a3050 100%);
   color: var(--paper);
-  padding: 10px 22px;
+  padding: 10px 22px 10px 18px;
   border-radius: var(--r-md);
   font-size: 13px;
   opacity: 0;
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.24s cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
   z-index: 9999;
   font-weight: 500;
-  box-shadow: var(--shadow-strong);
-  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: var(--shadow-strong), 0 0 0 1px rgba(255,255,255,0.05);
+  border-left: 4px solid var(--accent);
   max-width: 80vw;
   text-align: center;
 }
@@ -808,14 +813,14 @@ textarea.raw-input:focus {
 
 /* Helper text */
 .hint {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--muted);
   margin-top: 6px;
-  line-height: 1.6;
-  padding: 8px 10px;
+  line-height: 1.65;
+  padding: 10px 14px;
   background: rgba(12,27,42,0.03);
   border-radius: var(--r-sm);
-  border-left: 2px solid var(--line);
+  border-left: 3px solid var(--line-strong);
 }
 .hint code {
   background: rgba(12, 27, 42, 0.08);
@@ -1674,6 +1679,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <kbd style="background:var(--cream);border:1px solid var(--line-strong);padding:2px 7px;border-radius:4px;font-size:10px;font-family:JetBrains Mono,monospace;box-shadow:0 1px 2px rgba(0,0,0,0.1);">Ctrl+E</kbd> 备份
     </div>
   </div>
+
+  <div class="section" style="border-left: 3px solid var(--accent);">
+    <div class="section-title"><span class="num">☁</span>CLOUD SYNC <span class="zh">云端同步（手机电脑共用一份数据）</span></div>
     <div class="hint" style="margin-bottom:12px">
       首次在任一设备点【创建云账号】，获得一个 Sync Key（一串字符串）。把它复制到另一台设备的这个框里，点【启用同步】。以后所有设备的数据都走云端，每次改动自动推送。
     </div>
@@ -2557,14 +2565,14 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   margin-bottom: 8px;
 }
 .agent-chip {
-  padding: 4px 12px;
+  padding: 5px 14px;
   border: 1.5px solid var(--line);
   background: #fff;
   border-radius: 20px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--ink);
   font-family: 'Noto Sans SC', sans-serif;
   transition: all var(--t-fast);
   box-shadow: var(--shadow-xs);
@@ -2577,11 +2585,12 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   transform: translateY(-1px);
 }
 .agent-chip.active {
-  background: var(--accent-deep);
-  color: #fff;
-  border-color: var(--accent-deep);
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(139,105,20,0.3);
+  background: var(--ink);
+  color: var(--accent);
+  border-color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(12,27,42,0.25);
+  transform: translateY(-1px);
 }
 
 /* Cost + profit rows in ticket card */
@@ -5074,11 +5083,9 @@ function parseSingleBooking(raw) {
   }
 
   const segPatterns = [
-    // Sabre SS command format: "SS UA0198 T 25MAY LAXPVG 13:15-17:45"
-    // Prefix "SS" (Sell Segment), carrier+flight (can be glued or spaced), cls, date,
-    // FROMTO concatenated or spaced, dep-time then arr-time separated by "-" or space.
-    // Capture 8 groups: (carrier, flight, cls, date, from, to, depTime, arrTime)
-    /^\s*SS\s+([A-Z0-9]{2})\s*(\d{1,4})\s*([A-Z])\s*(\d{1,2}[A-Z]{3})\s+([A-Z]{3})\s*([A-Z]{3})\s+(\d{1,2}:?\d{2})\s*[-\s]\s*(\d{1,2}:?\d{2})/,
+    // Sabre SS command format: "SS UA0198 T 25MAY LAXPVG 13:15-17:45" (times optional)
+    // Also handles "SS AA127 S 15MAY26 DFWPVG NN1" (no times, status code NN1 at end)
+    /^\s*SS\s+([A-Z0-9]{2})\s*(\d{1,4})\s*([A-Z])\s*(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+(?:[A-Z]{2}\d?|\d{1,2}:?\d{2})\s*[-\s]?\s*(\d{1,2}:?\d{2}))?/,
     // TravelSky Eterm with "S" prefix: "S OZ    203Z08JUN LAX2330+0500ICN0S    388"
     // Flight+class glued (203Z), date glued to class (Z08JUN), times around route (LAX2330+0500ICN or FROM0835 1025TO)
     /^\s*S\s+([A-Z]{2})\s+(\d{1,4})([A-Z])\s*(\d{1,2}[A-Z]{3})\s+([A-Z]{3})(\d{3,4})[+\s](\d{3,4})([A-Z]{3})/,
@@ -5224,7 +5231,18 @@ function parseSingleBooking(raw) {
     // Tolerates two common deviations:
     //   - missing "/" between DOB and gender: "10OCT01F/06JUN32" (should be "10OCT01/F/06JUN32")
     //   - missing "/PN" suffix at end: ".../MA/BOYI" (should be ".../MA/BOYI/P1")
-    const ssrMatch = trimmed.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(\d{1,2}[A-Z]{3}\d{2})\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?\s*$/i);
+    // ── SSR DOCS — extract trailing price before matching ─────────────────
+    // e.g. "SSR DOCS AA HK1 P/.../WANG/P1  9393" — price may trail after /P1
+    let ssrLine = trimmed;
+    if (/^SSR\s/i.test(trimmed)) {  // only attempt price extraction on actual SSR lines
+      const ssrTrailingPrice = ssrLine.match(/\s+(\d{4,6})\s*$/);
+      if (ssrTrailingPrice && !rmb) {
+        const amt = parseFloat(ssrTrailingPrice[1]);
+        if (amt >= 500 && amt <= 500000) rmb = amt;
+        ssrLine = ssrLine.slice(0, ssrLine.length - ssrTrailingPrice[0].length);
+      }
+    }
+    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(\d{1,2}[A-Z]{3}\d{2})\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?\s*$/i);
     if (ssrMatch) {
       const dob = ssrMatch[1].toUpperCase();
       const gender = ssrMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
@@ -5551,6 +5569,7 @@ function parseSingleBooking(raw) {
           depTime = m[6]; arrTime = m[7]; cls = '';
         }
         else if (m.length === 9) [, carrier, flight, cls, date, from, to, depTime, arrTime] = m;
+        else if (m.length === 8) [, carrier, flight, cls, date, from, to, arrTime] = m;  // SS format: 7 groups, optional time
         else if (m.length === 7) [, carrier, flight, cls, date, from, to] = m;
         else if (m.length === 6) { [, carrier, flight, date, from, to] = m; cls = ''; }
         else continue;
@@ -5845,20 +5864,28 @@ function parseSingleBooking(raw) {
       if (amt >= 100 && amt <= 500000) rmb = amt;
       continue;
     }
+    // ── Standalone plain number (e.g. " 9393" on its own line) ─────────────
+    const plainNumber = trimmed.match(/^(\d{4,6})\s*$/);
+    if (plainNumber && !rmb) {
+      const amt = parseFloat(plainNumber[1]);
+      if (amt >= 500 && amt <= 500000) rmb = amt;
+      continue;
+    }
 
     const cabinFareMulti = trimmed.match(/^(?:公务舱?|商务舱?|头等舱?|超级经济舱?|超经|经济舱?|经济|混舱)结算?\s*(\d{3,6}(?:\.\d+)?)\s*\*\s*(0\.\d+|\d+\.\d+)\s*\*\s*(\d{1,2})/i);
     if (cabinFareMulti) {
       const baseFare = parseFloat(cabinFareMulti[1]);
       const disc = parseFloat(cabinFareMulti[2]);
       const paxN = parseInt(cabinFareMulti[3]);
-      const perPax = +(baseFare * disc).toFixed(2);
+      const perPax = baseFare;  // 结算价 IS the final per-pax price; *0.88 shows how it was derived (informational)
       if (baseFare > 100 && disc > 0 && disc <= 1 && paxN > 0) {
-        if (!rmb) rmb = perPax;
-        if (!parsedDiscount) parsedDiscount = Math.round(disc * 100);
+        if (!rmb) rmb = baseFare;
+        // Do NOT set parsedDiscount — 结算价 is already the final price; *0.88 is informational only
+        // Setting discount=88 would cause the formula to show 33971×88%×2 instead of 33971×2
         const cabM = trimmed.match(/(公务|商务舱?|头等舱?|超级经济|超经|经济舱?|经济)/);
         const _cm = {'公务':'商务舱','商务':'商务舱','商务舱':'商务舱','头等':'头等舱','头等舱':'头等舱','超经':'超级经济舱','超级经济':'超级经济舱','经济':'经济舱','经济舱':'经济舱'};
         if (cabM && _cm[cabM[1]] && parsedCabin === undefined) parsedCabin = _cm[cabM[1]];
-        if (paxN > 1 && parsedPaxPrices === undefined) parsedPaxPrices = Array(paxN).fill(perPax);
+        if (paxN > 1 && parsedPaxPrices === undefined) parsedPaxPrices = Array(paxN).fill(baseFare);
       }
       continue;
     }
@@ -15786,31 +15813,36 @@ async function mergeImportData(event) {
     setTimeout(() => {
       const banner = document.createElement('div');
       banner.style.cssText = `
-        position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-        background:var(--ink); color:#fff; padding:14px 20px; border-radius:6px;
-        z-index:9999; box-shadow:0 4px 16px rgba(0,0,0,0.3); max-width:420px;
-        display:flex; align-items:center; gap:12px; font-size:13px; line-height:1.4;
+        position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(8px);
+        background:linear-gradient(135deg,var(--ink) 0%,#1a3050 100%);
+        color:#fff; padding:16px 20px; border-radius:var(--r-lg);
+        z-index:9999; box-shadow:0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.06);
+        max-width:440px; width:calc(100vw - 48px);
+        display:flex; align-items:center; gap:14px; font-size:13px; line-height:1.4;
+        opacity:0; transition:opacity 0.3s ease, transform 0.3s ease;
+        border-left:4px solid var(--accent);
       `;
       banner.innerHTML = `
-        <span style="font-size:20px;">💾</span>
-        <div style="flex:1;">
-          <strong>每日备份提醒</strong><br>
-          <span style="opacity:0.8; font-size:12px;">你有 ${ticketedCount} 单已出票数据。建议导出一份 JSON 备份，防止意外丢失。</span>
+        <span style="font-size:24px; flex-shrink:0;">💾</span>
+        <div style="flex:1; min-width:0;">
+          <div style="font-weight:700; font-size:13px; margin-bottom:2px;">每日备份提醒</div>
+          <div style="opacity:0.7; font-size:11.5px; line-height:1.5;">你有 ${ticketedCount} 单已出票数据。建议导出一份 JSON 备份，防止意外丢失。</div>
         </div>
-        <div style="display:flex; flex-direction:column; gap:6px;">
-          <button onclick="exportAllData(); this.closest('div[style]').remove();"
-            style="background:var(--accent); color:var(--ink); border:none; padding:6px 12px; border-radius:3px; cursor:pointer; font-weight:700; font-size:12px; white-space:nowrap;">
+        <div style="display:flex; flex-direction:column; gap:6px; flex-shrink:0;">
+          <button onclick="exportAllData(); this.closest('[data-backup-banner]').remove();"
+            style="background:var(--accent); color:var(--ink); border:none; padding:7px 14px; border-radius:var(--r-sm); cursor:pointer; font-weight:700; font-size:12px; white-space:nowrap; box-shadow:0 2px 6px rgba(200,160,74,0.3);">
             📥 立即导出
           </button>
-          <button onclick="this.closest('div[style]').remove();"
-            style="background:transparent; color:#fff; border:1px solid rgba(255,255,255,0.3); padding:4px 12px; border-radius:3px; cursor:pointer; font-size:11px;">
+          <button onclick="this.closest('[data-backup-banner]').remove();"
+            style="background:transparent; color:rgba(255,255,255,0.6); border:1px solid rgba(255,255,255,0.2); padding:5px 14px; border-radius:var(--r-sm); cursor:pointer; font-size:11px;">
             稍后
           </button>
         </div>
       `;
+      banner.setAttribute('data-backup-banner', '1');
       document.body.appendChild(banner);
-      // Auto-dismiss after 30 seconds
-      setTimeout(() => { if (banner.parentNode) banner.remove(); }, 30000);
+      requestAnimationFrame(() => { banner.style.opacity = '1'; banner.style.transform = 'translateX(-50%) translateY(0)'; });
+      setTimeout(() => { if (banner.parentNode) { banner.style.opacity='0'; banner.style.transform='translateX(-50%) translateY(8px)'; setTimeout(()=>banner.remove(),300); } }, 30000);
     }, 3000);
   })();
 
