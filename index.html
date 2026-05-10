@@ -584,10 +584,18 @@ textarea.raw-input:focus {
 .segment-details strong { color: var(--ink); font-weight: 600; }
 
 .ticket-card-price {
-  padding: 14px 18px;
-  background: var(--cream);
+  padding: 14px 20px;
+  background: linear-gradient(180deg, var(--paper-2) 0%, var(--cream) 100%);
   border-top: 1px solid var(--line);
   position: relative;
+}
+.ticket-card-price::before {
+  left: -8px;
+  background: linear-gradient(180deg, var(--paper-2), var(--cream));
+}
+.ticket-card-price::after {
+  right: -8px;
+  background: linear-gradient(180deg, var(--paper-2), var(--cream));
 }
 .ticket-card-price::before {
   content: '';
@@ -693,11 +701,12 @@ textarea.raw-input:focus {
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  transition: box-shadow var(--t-base), transform var(--t-base);
+  transition: box-shadow var(--t-base), transform var(--t-base), border-left-color var(--t-base);
 }
 .ticketed-item:hover {
   box-shadow: var(--shadow);
-  transform: translateX(2px);
+  transform: translateX(3px);
+  border-left-color: var(--accent-deep);
 }
 .ticketed-info {
   flex: 1;
@@ -1077,6 +1086,13 @@ textarea.raw-input:focus {
 .preview-order-group.status-problem    { border-left-color: #e74c3c; }
 .preview-order-group.status-waiting    { border-left-color: #f39c12; }
 .preview-order-group.status-noavail    { border-left-color: #9e9e9e; }
+.preview-order-group.agent-highlight-match {
+  outline: 2.5px solid var(--accent) !important;
+  outline-offset: 1px;
+}
+.preview-order-group.agent-highlight-dim {
+  pointer-events: auto;
+}
 
 /* ── Drag to reorder ───────────────────────────────────────────── */
 .preview-order-group.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; background: #fffbf0; }
@@ -1134,6 +1150,13 @@ body.dark-mode .action-overflow-menu button { color: #e0e0e0; }
 body.dark-mode .action-overflow-menu button:hover { background: #0f2044; }
 body.dark-mode .preview-order-group.status-unassigned { border-left-color: #3a4a6a; }
 body.dark-mode .section-title { color: #aac; }
+
+/* Table label tag color coding */
+.tag.label-A { background: rgba(46,125,82,0.25) !important; border-color: rgba(46,125,82,0.4) !important; }
+.tag.label-B { background: rgba(43,76,126,0.25) !important; border-color: rgba(43,76,126,0.4) !important; }
+.tag.label-C { background: rgba(139,69,19,0.2) !important; border-color: rgba(139,69,19,0.35) !important; }
+.tag.label-D { background: rgba(100,30,130,0.2) !important; border-color: rgba(100,30,130,0.35) !important; }
+.tag.label-G { background: rgba(200,160,74,0.3) !important; border-color: rgba(200,160,74,0.5) !important; font-weight: 700; }
 
 /* Official airline brand colors */
 .ticket-card[data-airline="AA"] .ticket-card-header { background: linear-gradient(135deg, #1B3A5C 0%, #0D2035 60%, #C8102E 100%); }
@@ -1472,17 +1495,19 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <span class="title">💳 各订单美金金额</span>
       <span class="hint">无色 = 未分配卡主 · 蓝色 = 已分配 · 点击订单号跳转</span>
     </div>
-    <div id="airlineSummaryBar" style="margin-bottom:10px;"></div>
+    <div id="airlineSummaryBar" style="margin-bottom:8px;"></div>
+    <div id="agentSummaryBar" style="margin-bottom:12px;"></div>
     <div class="airline-usd-grid" id="airlineUsdGrid"></div>
   </div>
 
   <div class="section">
-    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <span><span class="num">📋</span>PENDING ORDERS <span class="zh">待出票订单</span></span>
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
+      <span style="display:flex;align-items:center;gap:8px;"><span class="num" style="background:var(--ink);">📋</span><span style="font-size:13px;font-weight:700;letter-spacing:0.1em;">PENDING ORDERS</span> <span class="zh" style="font-size:12px;font-weight:400;color:var(--muted);">待出票订单</span></span>
       <div style="display:flex;align-items:center;gap:6px;">
         <input type="text" id="pendingSearchInput" placeholder="🔍 搜索姓名/航班/PNR…" oninput="filterPendingOrders(this.value)"
-          style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:180px;outline:none;">
-        <button onclick="document.getElementById('pendingSearchInput').value='';filterPendingOrders('')" 
+          style="padding:6px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);font-size:12px;width:190px;outline:none;transition:border-color 0.15s;font-family:inherit;"
+          onfocus="this.style.borderColor='var(--accent-deep)'" onblur="this.style.borderColor='var(--line)'">
+        <button onclick="document.getElementById('pendingSearchInput').value='';filterPendingOrders('')"
           style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
       </div>
     </div>
@@ -1643,10 +1668,10 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <button class="btn ghost small" onclick="openStatsDashboard()">📊 打开</button>
     </div>
     <div class="hint" style="margin-top:8px;font-size:11px;">
-      快捷键：<kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">1-6</kbd> 切换标签 ·
-      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+K</kbd> 搜索 ·
-      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+D</kbd> 统计 ·
-      <kbd style="background:#f0f0f0;padding:2px 5px;border-radius:3px;font-size:10px;">Ctrl+E</kbd> 备份
+      快捷键：<kbd style="background:var(--cream);border:1px solid var(--line-strong);padding:2px 7px;border-radius:4px;font-size:10px;font-family:JetBrains Mono,monospace;box-shadow:0 1px 2px rgba(0,0,0,0.1);">1-6</kbd> 切换标签 ·
+      <kbd style="background:var(--cream);border:1px solid var(--line-strong);padding:2px 7px;border-radius:4px;font-size:10px;font-family:JetBrains Mono,monospace;box-shadow:0 1px 2px rgba(0,0,0,0.1);">Ctrl+K</kbd> 搜索 ·
+      <kbd style="background:var(--cream);border:1px solid var(--line-strong);padding:2px 7px;border-radius:4px;font-size:10px;font-family:JetBrains Mono,monospace;box-shadow:0 1px 2px rgba(0,0,0,0.1);">Ctrl+D</kbd> 统计 ·
+      <kbd style="background:var(--cream);border:1px solid var(--line-strong);padding:2px 7px;border-radius:4px;font-size:10px;font-family:JetBrains Mono,monospace;box-shadow:0 1px 2px rgba(0,0,0,0.1);">Ctrl+E</kbd> 备份
     </div>
   </div>
     <div class="hint" style="margin-bottom:12px">
@@ -2113,14 +2138,14 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   align-items: center;
   gap: 10px;
   padding: 10px 16px;
-  background: var(--ink);
+  background: linear-gradient(135deg, #0d1f30 0%, var(--ink) 100%);
   border-radius: var(--r-md) var(--r-md) 0 0;
   cursor: pointer;
   user-select: none;
   min-height: 42px;
-  transition: background var(--t-fast);
+  transition: filter var(--t-fast);
 }
-.order-collapse-header:hover { background: var(--ink-2); }
+.order-collapse-header:hover { filter: brightness(1.2); }
 .order-collapse-header:only-child,
 .order-collapse-header + .order-card-body[style*="none"] ~ * {
   border-radius: var(--r-md);
@@ -2312,28 +2337,30 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   right: 24px;
   z-index: 100;
   background: var(--ink);
-  color: var(--paper);
+  color: var(--accent);
   border: 2px solid var(--accent);
-  padding: 10px 16px;
-  border-radius: 24px;
+  padding: 10px 18px;
+  border-radius: 28px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(200,160,74,0);
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(16px) scale(0.95);
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease, background 0.15s ease;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.15s ease;
 }
 #backToOverviewBtn.visible {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
   pointer-events: auto;
 }
 #backToOverviewBtn:hover {
-  background: var(--accent-deep);
+  background: #1a3050;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 0 4px rgba(200,160,74,0.2);
+  transform: translateY(-2px) scale(1);
 }
 
 /* Cardholder assignment dialog */
@@ -2448,22 +2475,30 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 /* Pending orders grouped by agent */
 .agent-group-header {
-  margin: 24px 0 10px 0;
-  padding: 10px 14px;
-  background: linear-gradient(90deg, var(--ink) 0%, var(--ink-soft, #1a2e44) 100%);
+  margin: 20px 0 8px 0;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--ink) 0%, #1a3050 60%, #162840 100%);
   color: var(--paper);
   border-left: 4px solid var(--accent);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
-  box-shadow: var(--shadow);
+  gap: 10px;
+  box-shadow: var(--shadow-md);
+  position: relative;
+  overflow: hidden;
 }
-.agent-group-header:first-child {
-  margin-top: 0;
+.agent-group-header::after {
+  content: '';
+  position: absolute;
+  right: -20px; top: -20px;
+  width: 80px; height: 80px;
+  background: radial-gradient(circle, rgba(200,160,74,0.12) 0%, transparent 70%);
+  pointer-events: none;
 }
+.agent-group-header:first-child { margin-top: 0; }
 .agent-group-title {
   display: flex;
   align-items: center;
@@ -2472,31 +2507,31 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .agent-chip-large {
   background: var(--accent);
   color: var(--ink);
-  padding: 4px 12px;
-  border-radius: var(--r-sm);
+  padding: 4px 14px;
+  border-radius: 16px;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 6px rgba(200,160,74,0.3);
 }
 .agent-group-count {
-  color: var(--paper);
-  opacity: 0.85;
-  font-size: 12px;
+  color: rgba(255,255,255,0.6);
+  font-size: 11.5px;
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.04em;
 }
 .agent-group-total {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: var(--paper);
-  opacity: 0.92;
+  font-size: 12px;
+  color: rgba(255,255,255,0.65);
 }
 .agent-group-total strong {
   color: var(--accent);
   font-weight: 700;
-  font-size: 14px;
-  margin-left: 4px;
+  font-size: 16px;
+  margin-left: 6px;
+  letter-spacing: -0.01em;
 }
 .preview-order-group .order-badge {
   background: var(--accent);
@@ -6607,6 +6642,8 @@ function renderAirlineUsdPanel(orders) {
   grid.innerHTML = '';
   // Render airline summary bar at top
   renderAirlineSummaryBar(meaningful.map(x => x.o));
+  // Render agent summary bar
+  renderAgentSummaryBar(meaningful.map(x => x.o));
   // Single unified color for all assigned orders — simple and clean
   const ASSIGNED_BG = '#ddeeff';  // unified light blue
   const cardholderColorMap = new Map();  // kept for API compat, all assigned → same color
@@ -6618,8 +6655,13 @@ function renderAirlineUsdPanel(orders) {
 
   // Group by AIRLINE, sorted small→large within each group
   // Airlines ordered by total USD descending (biggest first)
+  // Apply agent filter if active
+  const filteredIndexed = _usdAgentFilter
+    ? indexed.filter(item => (item.o.agent || '(未指定)') === _usdAgentFilter)
+    : indexed;
+
   const byAirlineMap = {};
-  indexed.forEach(item => {
+  filteredIndexed.forEach(item => {
     const al = (item.o.airline || '—').toUpperCase();
     if (!byAirlineMap[al]) byAirlineMap[al] = [];
     byAirlineMap[al].push(item);
@@ -6753,6 +6795,7 @@ function renderAirlineUsdPanel(orders) {
         : '';
       const row = document.createElement('div');
       row.className = 'airline-usd-row';
+      row.dataset.agent = o.agent || '(未指定)';
       if (bgColor) row.style.background = bgColor;
       if (!hasPrice) row.style.background = '#fff5f2';
       const mixed = detectMixedCabin(o);
@@ -6827,6 +6870,10 @@ function renderAirlineUsdPanel(orders) {
       grid.appendChild(row);
     });
   });
+  // Re-apply agent highlight to newly rendered rows
+  if (window._usdAgentHighlight) {
+    setTimeout(() => applyAgentHighlight(window._usdAgentHighlight), 30);
+  }
 }
 
 // Airline summary bar — compact visual showing total USD per airline, sorted largest first
@@ -6894,6 +6941,115 @@ function renderAirlineSummaryBar(orders) {
           <span style="color:var(--muted); font-size:10px;">(${count}单)</span>
         </span>`).join('')}
     </div>`;
+}
+
+// Sync agent highlight from USD panel chips → pending list cards
+// Does NOT hide orders — highlights matching ones, dims others
+function syncAgentFilter(agent) {
+  window._usdAgentHighlight = agent || null;
+  // Apply highlight/dim to all pending order cards immediately (no re-render needed)
+  applyAgentHighlight(agent || null);
+}
+
+function applyAgentHighlight(agent) {
+  // Target the USD summary rows in the airline panel, NOT the detail cards below
+  const rows = document.querySelectorAll('.airline-usd-row');
+  rows.forEach(row => {
+    const rowAgent = row.dataset.agent || '';
+    if (!agent) {
+      // No filter — restore all
+      row.style.opacity = '';
+      row.style.transform = '';
+      row.style.boxShadow = '';
+      row.style.borderLeftWidth = '';
+    } else if (rowAgent === agent) {
+      // Match — spotlight
+      row.style.opacity = '1';
+      row.style.transform = 'translateX(4px)';
+      row.style.boxShadow = '0 0 0 2px var(--accent), var(--shadow)';
+      row.style.borderLeftWidth = '5px';
+    } else {
+      // No match — dim
+      row.style.opacity = '0.3';
+      row.style.transform = '';
+      row.style.boxShadow = 'none';
+      row.style.borderLeftWidth = '';
+    }
+  });
+  // Restore all order cards below (undo any previous card changes)
+  document.querySelectorAll('.preview-order-group.pending-order-card').forEach(card => {
+    card.style.opacity = '';
+    card.style.transform = '';
+    card.style.boxShadow = '';
+  });
+}
+
+// ── Agent summary bar — clickable chips to filter USD rows by agent ──────────
+let _usdAgentFilter = null;  // null = show all
+
+function renderAgentSummaryBar(orders) {
+  const bar = document.getElementById('agentSummaryBar');
+  if (!bar) return;
+
+  // Aggregate by agent
+  const byAgent = {};
+  orders.forEach(o => {
+    const agent = o.agent || '(未指定)';
+    const rate = effectiveRate(o);
+    if (!rate || rate <= 0) return;
+    const hasPP = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
+    const fareRmb = hasPP
+      ? o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
+      : (o.basePrice || 0) * (o.passengers.length || 1);
+    const usd = fareRmb / rate;
+    if (!byAgent[agent]) byAgent[agent] = { usd: 0, count: 0, assigned: 0 };
+    byAgent[agent].usd += usd;
+    byAgent[agent].count++;
+    if (o.cardholderId) byAgent[agent].assigned++;
+  });
+
+  const sorted = Object.entries(byAgent)
+    .map(([agent, v]) => ({ agent, ...v }))
+    .sort((a, b) => b.count - a.count);
+
+  if (sorted.length === 0) { bar.innerHTML = ''; return; }
+
+  const totalOrders = sorted.reduce((s, x) => s + x.count, 0);
+
+  bar.innerHTML = `
+    <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:8px 10px;
+                background:rgba(12,27,42,0.03); border-radius:var(--r-sm); border:1px solid var(--line);">
+      <span style="font-size:10px; font-weight:700; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; flex-shrink:0; margin-right:2px;">代理</span>
+      <button onclick="window._usdAgentFilter=null; syncAgentFilter(null); renderAirlineUsdPanel()"
+        style="padding:4px 12px; border-radius:14px; font-size:11.5px; font-weight:600; cursor:pointer; transition:all 0.12s; flex-shrink:0;
+               border:1.5px solid ${_usdAgentFilter===null?'var(--accent-deep)':'var(--line)'};
+               background:${_usdAgentFilter===null?'var(--accent-deep)':'#fff'};
+               color:${_usdAgentFilter===null?'#fff':'var(--ink)'};
+               box-shadow:${_usdAgentFilter===null?'0 2px 6px rgba(139,105,20,0.25)':'var(--shadow-xs)'};">
+        全部 <span style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-left:3px;
+                          background:${_usdAgentFilter===null?'rgba(255,255,255,0.25)':'var(--ink)'}; color:${_usdAgentFilter===null?'#fff':'var(--paper)'};
+                          padding:1px 6px; border-radius:8px;">${totalOrders}</span>
+      </button>
+      ${sorted.map(({ agent, count, usd, assigned }) => {
+        const isActive = _usdAgentFilter === agent;
+        const pendingCount = count - assigned;
+        const safeAgent = escapeAttr(agent);
+        return `<button onclick="window._usdAgentFilter=${isActive?'null':"'"+safeAgent+"'"}; syncAgentFilter(${isActive?'null':"'"+safeAgent+"'"}); renderAirlineUsdPanel()"
+          title="$${Math.round(usd).toLocaleString()} · ${assigned}已分配 / ${pendingCount}待分配"
+          style="padding:4px 12px; border-radius:14px; font-size:11.5px; font-weight:${isActive?700:500}; cursor:pointer; transition:all 0.12s; flex-shrink:0;
+                 border:1.5px solid ${isActive?'var(--accent-deep)':'var(--line)'};
+                 background:${isActive?'var(--accent-deep)':'#fff'};
+                 color:${isActive?'#fff':'var(--ink)'};
+                 box-shadow:${isActive?'0 2px 6px rgba(139,105,20,0.25)':'var(--shadow-xs)'};">
+          ${escapeHtml(agent)}
+          <span style="font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; margin-left:3px;
+                       background:${isActive?'rgba(255,255,255,0.25)':'var(--ink)'}; color:${isActive?'#fff':'var(--paper)'};
+                       padding:1px 6px; border-radius:8px;">${count}</span>
+          ${pendingCount > 0 ? `<span style="font-size:9px; color:${isActive?'rgba(255,255,255,0.7)':'var(--muted)'}; margin-left:1px;">+${pendingCount}待</span>` : ''}
+        </button>`;
+      }).join('')}
+    </div>
+  `;
 }
 
 // Quick delete from the USD summary list. Prompts for confirmation.
@@ -7006,7 +7162,7 @@ function renderPendingList() {
   if (!filterBar) {
     filterBar = document.createElement('div');
     filterBar.id = 'pendingFilterBar';
-    filterBar.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid var(--line);border-radius:6px;';
+    filterBar.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:var(--cream);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow-xs);';
     area.parentNode.insertBefore(filterBar, area);
   }
 
@@ -7037,22 +7193,101 @@ function renderPendingList() {
   };
 
   filterBar.innerHTML = '';
-  filterBar.appendChild(makeSelect('f-airline', '航司', airlines, cur.airline, 'airline'));
-  filterBar.appendChild(makeSelect('f-agent', '代理', agents, cur.agent, 'agent'));
-  filterBar.appendChild(makeSelect('f-label', '分类', labels, cur.label, 'label'));
+
+  // Build agent count map
+  const agentCounts = {};
+  meaningful.forEach(({o}) => {
+    const ag = o.agent || '(未指定)';
+    if (!agentCounts[ag]) agentCounts[ag] = { count: 0, assigned: 0 };
+    agentCounts[ag].count++;
+    if (o.cardholderId) agentCounts[ag].assigned++;
+  });
+  const sortedAgents = Object.entries(agentCounts).sort((a,b) => b[1].count - a[1].count);
+
+  // Filter controls: label + row
+  const filterLabel = document.createElement('div');
+  filterLabel.style.cssText = 'display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;';
+
+  // Airline select (compact)
+  const airlineSel = document.createElement('select');
+  airlineSel.style.cssText = 'font-size:12px; padding:5px 10px; border:1.5px solid var(--line); border-radius:var(--r-md); background:#fff; cursor:pointer; flex-shrink:0; font-family:inherit; color:var(--ink); transition:border-color 0.12s;';
+  airlineSel.innerHTML = `<option value="">全部航司</option>` + airlines.map(v => `<option value="${escapeAttr(v)}" ${cur.airline===v?'selected':''}>${escapeHtml(v)}</option>`).join('');
+  airlineSel.onchange = () => { window._pendingFilter={...cur, airline:airlineSel.value}; renderPendingList(); };
+  filterLabel.appendChild(airlineSel);
+
+  // Label select (compact)
+  const labelSel = document.createElement('select');
+  labelSel.style.cssText = 'font-size:12px; padding:5px 10px; border:1.5px solid var(--line); border-radius:var(--r-md); background:#fff; cursor:pointer; flex-shrink:0; font-family:inherit; color:var(--ink); transition:border-color 0.12s;';
+  labelSel.innerHTML = `<option value="">全部表</option>` + labels.map(v => `<option value="${escapeAttr(v)}" ${cur.label===v?'selected':''}>${escapeHtml(v)}</option>`).join('');
+  labelSel.onchange = () => { window._pendingFilter={...cur, label:labelSel.value}; renderPendingList(); };
+  filterLabel.appendChild(labelSel);
+
+  // Agent chips with count
+  const agentChipsDiv = document.createElement('div');
+  agentChipsDiv.style.cssText = 'display:flex; gap:4px; flex-wrap:wrap; align-items:center; flex:1;';
+
+  // "全部" chip
+  const allChip = document.createElement('button');
+  allChip.style.cssText = `padding:3px 10px; border-radius:14px; font-size:11.5px; font-weight:600; cursor:pointer; transition:all 0.12s;
+    border:1.5px solid ${!window._usdAgentHighlight?'var(--ink)':'var(--line)'};
+    background:${!window._usdAgentHighlight?'var(--ink)':'#fff'};
+    color:${!window._usdAgentHighlight?'var(--paper)':'var(--muted)'};`;
+  allChip.innerHTML = `全部 <span style="font-family:'JetBrains Mono',monospace;font-size:9px;opacity:0.7;">${meaningful.length}</span>`;
+  allChip.onclick = () => {
+    window._usdAgentFilter = null;
+    window._usdAgentHighlight = null;
+    renderAirlineUsdPanel();
+    applyAgentHighlight(null);
+  };
+  agentChipsDiv.appendChild(allChip);
+
+  sortedAgents.forEach(([agent, stats]) => {
+    const isActive = (window._usdAgentHighlight || '') === agent;
+    const pct = Math.round(stats.assigned / stats.count * 100);
+    const chip = document.createElement('button');
+    chip.style.cssText = `padding:3px 10px; border-radius:14px; font-size:11.5px; font-weight:${isActive?700:500}; cursor:pointer; transition:all 0.12s; position:relative;
+      border:1.5px solid ${isActive?'var(--accent-deep)':'var(--line)'};
+      background:${isActive?'var(--accent-deep)':'#fff'};
+      color:${isActive?'#fff':'var(--ink)'};
+      box-shadow:${isActive?'0 2px 6px rgba(139,105,20,0.25)':'var(--shadow-xs)'};`;
+    chip.title = `${agent}：${stats.count}单，${stats.assigned}已分配，${stats.count-stats.assigned}待分配（${pct}%完成）`;
+    chip.innerHTML = `${escapeHtml(agent)}
+      <span style="margin-left:4px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700;
+                   background:${isActive?'rgba(255,255,255,0.25)':'var(--ink)'}; color:${isActive?'#fff':'var(--paper)'};
+                   padding:1px 5px; border-radius:8px;">${stats.count}</span>`;
+    chip.onclick = () => {
+      const newAgent = isActive ? null : agent;
+      window._usdAgentFilter = newAgent;
+      window._usdAgentHighlight = newAgent;
+      renderAirlineUsdPanel();
+      applyAgentHighlight(newAgent);
+      if (newAgent) {
+        setTimeout(() => {
+          const pendingArea = document.getElementById('pendingArea');
+          if (pendingArea) pendingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+      }
+    };
+    agentChipsDiv.appendChild(chip);
+  });
+  filterLabel.appendChild(agentChipsDiv);
 
   // Clear button
   if (cur.airline || cur.agent || cur.label) {
     const clearBtn = document.createElement('button');
-    clearBtn.textContent = '✕ 清除筛选';
+    clearBtn.textContent = '✕';
+    clearBtn.title = '清除筛选';
     clearBtn.className = 'btn ghost small';
+    clearBtn.style.cssText += 'border-radius:50%;width:26px;height:26px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
     clearBtn.onclick = () => {
       window._pendingFilter = { airline: '', agent: '', label: '' };
       try { sessionStorage.removeItem('pendingFilter'); } catch(e) {}
       renderPendingList();
     };
-    filterBar.appendChild(clearBtn);
+    filterLabel.appendChild(clearBtn);
   }
+
+  filterBar.appendChild(filterLabel);
 
   // Apply filter to meaningful list
   const filtered = meaningful.filter(({o}) => {
@@ -7262,9 +7497,10 @@ function renderPendingList() {
       }
     });
   });
+  // Agent highlight is applied to USD rows only - no re-apply needed here
 }
 
-// Extract the finalize form + action buttons into a helper so renderPendingList stays clean.
+// Extract the finalize form + action buttons into a helper so renderPendingList
 function renderPendingOrderGroupExtras(group, o, idx) {
 
     // Inline finalize form (编码, 渠道, 卡主, 积分方式, 积分/折扣)
@@ -7488,7 +7724,7 @@ function renderPendingOrderGroupExtras(group, o, idx) {
 
     const actions = document.createElement('div');
     actions.id = `order-actions-${idx}`;
-    actions.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;';
+    actions.style.cssText = 'display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid var(--line);';
     renderPendingOrderActions(actions, o, idx);
     group.appendChild(actions);
 }
@@ -9916,7 +10152,7 @@ function detectMixedCabin(o) {
 
 function buildCardHTML(o, idx) {
   const tags = [];
-  if (o.tableLabel) tags.push(`<span class="tag">表${escapeHtml(o.tableLabel)}</span>`);
+  if (o.tableLabel) tags.push(`<span class="tag label-${escapeHtml(o.tableLabel)}">表${escapeHtml(o.tableLabel)}</span>`);
   if (o.agent) tags.push(`<span class="tag">代理 ${escapeHtml(o.agent)}</span>`);
   if (o.branch) tags.push(`<span class="tag">${escapeHtml(o.branch)}${o.client ? escapeHtml(o.client) : ''}</span>`);
   if (o.airline) tags.push(`<span class="tag airline-tag">${escapeHtml(o.airline)}</span>`);
@@ -10120,18 +10356,18 @@ function buildCardHTML(o, idx) {
       } else {
         if (o.customRate && o.usd) {
           // USD fare format: show USD as primary fare
-          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${o.customRate} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${o.customRate} × ${discountStr} × ${pax}</span></div>`;
           html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD × ${pax}人</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(o.usd * pax).toFixed(2)}</span></div>`;
         } else if (o.usd && o.usd > 0 && !o.customRate && !o.basePrice) {
           // Plain USD fare (e.g. "3297.73 USD") — show USD as primary, CNY as derived
-          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${discountStr} × ${pax}</span></div>`;
           html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           const usdAfterDisc = o.usd * (o.discount || 100) / 100;
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD (× ${pax}人)</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(usdAfterDisc * pax).toFixed(2)}</span></div>`;
         } else {
-          html += `<div class="price-row"><span class="label">PRICE 售价${specialBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
-          html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row total"><span class="label">= 收入 REVENUE</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           const basePriceUsd = o.basePrice != null ? o.basePrice / effectiveRate(o) : null;
           if (basePriceUsd != null) {
             html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">≈ 人均运价 USD (${o.basePrice} ÷ ${effectiveRate(o).toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${basePriceUsd.toFixed(2)}</span></div>`;
@@ -11943,9 +12179,10 @@ function renderChasePanel() {
     const route = seg0 ? seg0.from + '→' + (segN||seg0).to : '';
     const price = o.rmb ? '¥' + Math.round(o.rmb).toLocaleString() : '';
     colHeader.innerHTML = `
-      <span class="collapse-num">ORDER #${idx+1}</span>
+      <span class="collapse-num">#${idx+1}</span>
+      ${o.airline ? `<span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.06em;flex-shrink:0;">${escapeHtml(o.airline)}</span>` : ''}
       ${o.createdAt ? (buildAgeBadge(o.createdAt) ? buildAgeBadge(o.createdAt).outerHTML : '') : ''}
-      ${o.waitingForRelease ? '<span style="background:#f0a500;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;flex-shrink:0;">🔒 放位</span>' : ''}
+      ${o.waitingForRelease ? '<span style="background:#f0a500;color:#fff;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:700;flex-shrink:0;">🔒 放位</span>' : ''}
       <span class="collapse-summary">${escapeHtml([paxNames, route, o.cabin||'', price].filter(Boolean).join('  ·  '))}</span>
       <span class="collapse-chevron">▾</span>`;
     group.appendChild(colHeader);
@@ -12271,11 +12508,16 @@ function renderDailySummary() {
 // ============================================
 
 const ACTION_STATUS_META = {
-  'VOID':    { label: '作废', cn: 'VOID',    color: '#7c8aa3', bg: '#f0f2f5', excludeFromReport: true  },
-  'CANCEL':  { label: '取消', cn: 'CANCEL',  color: '#b7321f', bg: '#fff0ed', excludeFromReport: true  },
-  'REFUND':  { label: '退票', cn: 'REFUND',  color: '#a06600', bg: '#fff4d6', excludeFromReport: true  },
-  'CHANGE':  { label: '改期', cn: 'CHANGE',  color: '#1f6f4a', bg: '#e6f5ec', excludeFromReport: false },
-  'REISSUE': { label: '补票', cn: 'REISSUE', color: '#3955a3', bg: '#e8edfa', excludeFromReport: false }
+  'VOID':    { label: '作废', cn: 'VOID',    color: '#7c8aa3', bg: '#f0f2f5', excludeFromReport: true,
+    steps: ['待作废', '已分配操作员', '已提交', '待确认', '已作废'] },
+  'CANCEL':  { label: '取消', cn: 'CANCEL',  color: '#b7321f', bg: '#fff0ed', excludeFromReport: true,
+    steps: ['待取消', '已分配操作员', '已联系航司', '等待退款', '已完成'] },
+  'REFUND':  { label: '退票', cn: 'REFUND',  color: '#a06600', bg: '#fff4d6', excludeFromReport: true,
+    steps: ['待退票', '已分配操作员', '已提交申请', '退款处理中', '款项到账'] },
+  'CHANGE':  { label: '改期', cn: 'CHANGE',  color: '#1f6f4a', bg: '#e6f5ec', excludeFromReport: false,
+    steps: ['待改期', '已分配操作员', '已联系航司', '等待出新票', '已完成'] },
+  'REISSUE': { label: '补票', cn: 'REISSUE', color: '#3955a3', bg: '#e8edfa', excludeFromReport: false,
+    steps: ['待补票', '已分配操作员', '已确认方案', '出票中', '已完成'] }
 };
 
 // US Federal holidays (observed dates) — used for ARC void deadline calculation.
@@ -12557,52 +12799,155 @@ function renderActionsList() {
 
   items.forEach(a => {
     const meta = ACTION_STATUS_META[a.status] || ACTION_STATUS_META['VOID'];
+    const steps = meta.steps || ['待处理', '处理中', '已完成'];
+    const currentStep = a.progressStep != null ? a.progressStep : 0;
+    const isCollapsed = a._collapsed === true;
+
     const card = document.createElement('div');
-    card.style.cssText = `background:#fff; border:1px solid var(--line); border-left:4px solid ${meta.color}; border-radius:4px; padding:12px 14px;`;
+    card.style.cssText = `background:#fff; border:1px solid var(--line); border-left:4px solid ${meta.color}; border-radius:var(--r-md); overflow:hidden; box-shadow:var(--shadow-xs); transition:box-shadow 0.2s;`;
+    card.onmouseenter = () => card.style.boxShadow = 'var(--shadow)';
+    card.onmouseleave = () => card.style.boxShadow = 'var(--shadow-xs)';
+
     const created = new Date(a.createdAt);
-    const createdStr = `${created.getMonth()+1}月${created.getDate()}日 ${String(created.getHours()).padStart(2,'0')}:${String(created.getMinutes()).padStart(2,'0')}`;
+    const createdStr = `${created.getMonth()+1}/${created.getDate()} ${String(created.getHours()).padStart(2,'0')}:${String(created.getMinutes()).padStart(2,'0')}`;
     const tagPills = [];
-    if (a.agent) tagPills.push(`<span style="background:var(--ink); color:#fff; padding:1px 8px; border-radius:2px; font-size:10px;">代理 ${escapeHtml(a.agent)}</span>`);
-    if (a.airline) tagPills.push(`<span style="background:#fff; border:1px solid var(--line); padding:1px 8px; border-radius:2px; font-size:10px; font-weight:700;">${escapeHtml(a.airline)}</span>`);
-    if (a.cardholderName) tagPills.push(`<span style="background:#e8f3ff; padding:1px 8px; border-radius:2px; font-size:10px;">💳 ${escapeHtml(a.cardholderName)}</span>`);
+    if (a.tableLabel) {
+      const lblColors = {A:'#27ae60',B:'#2b4c7e',C:'#7b3f00',D:'#6a1e82',E:'#1a7a7a',F:'#6b6b00',G:'#c8a04a'};
+      tagPills.push(`<span style="background:${lblColors[a.tableLabel]||'#666'}; color:#fff; padding:2px 10px; border-radius:10px; font-size:10px; font-weight:700;">表${escapeHtml(a.tableLabel)}</span>`);
+    }
+    if (a.agent) tagPills.push(`<span style="background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.3); padding:2px 8px; border-radius:10px; font-size:10px;">代理 ${escapeHtml(a.agent)}</span>`);
+    if (a.cardholderName) tagPills.push(`<span style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); padding:2px 8px; border-radius:10px; font-size:10px;">💳 ${escapeHtml(a.cardholderName)}</span>`);
+    if (a.airline) tagPills.push(`<span style="background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">${escapeHtml(a.airline)}</span>`);
+
+    // Progress summary for collapsed header
+    const stepLabel = steps[currentStep] || '';
+    const progressPct = Math.round((currentStep / (steps.length - 1)) * 100);
+
+    // Build progress stepper HTML
+    const stepperHtml = steps.map((step, i) => {
+      const done = i < currentStep;
+      const active = i === currentStep && !a.completed;
+      const color = meta.color;
+      return `<button onclick="updateActionStep('${a.id}', ${i})" title="点击更新进度到「${step}」"
+        style="padding:4px 12px; border-radius:14px; font-size:11px; font-weight:${active?700:500};
+               border:1.5px solid ${done||active?color:'var(--line)'};
+               background:${done?color:active?meta.bg:'#fff'};
+               color:${done?'#fff':active?color:'var(--muted)'};
+               cursor:pointer; transition:all 0.12s; white-space:nowrap;">
+        ${done?'✓':active?'▶':String(i+1)} ${step}
+      </button>${i<steps.length-1 ? '<span style="color:var(--line-strong);font-size:10px;align-self:center;flex-shrink:0;">→</span>' : ''}`;
+    }).join('');
 
     let amountStr = '';
     if (a.amount != null) {
       const sign = a.amountType === 'refund' ? '退款' : (a.amountType === 'charge' ? '补收' : '金额');
-      amountStr = `<div style="margin-top:6px; font-family:'JetBrains Mono',monospace; font-size:12px;">${sign}: <strong style="color:${a.amountType === 'refund' ? 'var(--green)' : 'var(--red)'};">¥${Number(a.amount).toLocaleString()}</strong></div>`;
+      amountStr = `<span style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:${a.amountType === 'refund' ? 'var(--green)' : 'var(--red)'};">${sign} ¥${Number(a.amount).toLocaleString()}</span>`;
     }
 
+    const bodyId = `action-body-${a.id}`;
+
     card.innerHTML = `
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px; flex-wrap:wrap;">
-        <span style="background:${meta.bg}; color:${meta.color}; padding:3px 10px; border-radius:3px; font-weight:700; font-size:12px; letter-spacing:0.05em;">${meta.label} ${meta.cn}</span>
+      <!-- Clickable collapse header -->
+      <div onclick="toggleActionCard('${a.id}', this)" style="display:flex; align-items:center; gap:8px; padding:10px 14px; background:${meta.color}; cursor:pointer; flex-wrap:wrap; user-select:none;">
+        <span style="color:#fff; font-weight:700; font-size:12px; letter-spacing:0.06em; flex-shrink:0; padding:2px 10px; background:rgba(0,0,0,0.18); border-radius:10px;">${meta.label}</span>
         ${tagPills.join('')}
-        <span style="margin-left:auto; font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">${createdStr}</span>
+        ${amountStr}
+        ${a.completed ? `<span style="background:rgba(255,255,255,0.2); color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700;">✓ 已完成</span>` : `
+          <span style="background:rgba(255,255,255,0.18); color:#fff; padding:2px 8px; border-radius:10px; font-size:10px; border:1px solid rgba(255,255,255,0.3);">▶ ${stepLabel}</span>
+        `}
+        <span style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0;">
+          <span style="font-size:10px; color:rgba(255,255,255,0.6); font-family:'JetBrains Mono',monospace;">${createdStr}</span>
+          <span class="action-chevron" style="color:rgba(255,255,255,0.6); font-size:12px; transition:transform 0.2s;">${isCollapsed ? '▸' : '▾'}</span>
+        </span>
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; font-size:12px; line-height:1.6;">
-        ${a.passengerName ? `<div><span style="color:var(--muted);">乘客：</span><strong>${escapeHtml(a.passengerName)}</strong></div>` : ''}
-        ${a.pnr ? `<div><span style="color:var(--muted);">PNR：</span><span style="font-family:'JetBrains Mono',monospace; font-weight:600;">${escapeHtml(a.pnr)}</span></div>` : ''}
-        ${a.tkt ? `<div><span style="color:var(--muted);">票号：</span><span style="font-family:'JetBrains Mono',monospace;">${escapeHtml(a.tkt)}</span></div>` : ''}
-        ${a.flightNo ? `<div><span style="color:var(--muted);">航班：</span><strong>${escapeHtml(a.flightNo)}</strong></div>` : ''}
-        ${a.route ? `<div><span style="color:var(--muted);">航段：</span>${escapeHtml(a.route)}</div>` : ''}
-        ${a.date ? `<div><span style="color:var(--muted);">日期：</span>${escapeHtml(a.date)}</div>` : ''}
-        ${a.handler ? `<div><span style="color:var(--muted);">处理人：</span>${escapeHtml(a.handler)}</div>` : ''}
-      </div>
-      ${a.reason ? `<div style="margin-top:8px; padding:6px 10px; background:var(--cream); border-radius:3px; font-size:12px;"><span style="color:var(--muted);">原因：</span>${escapeHtml(a.reason)}</div>` : ''}
-      ${a.note ? `<div style="margin-top:6px; font-size:11px; color:var(--muted); font-style:italic;">📝 ${escapeHtml(a.note)}</div>` : ''}
-      ${amountStr}
-      ${a.status === 'VOID' && !a.completed ? buildVoidCountdownHTML(a) : ''}
-      <div style="display:flex; gap:6px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);">
-        ${a.completed
-          ? `<span style="background:var(--green); color:#fff; padding:4px 10px; border-radius:3px; font-size:11px; font-weight:700;">✓ 已完成 ${new Date(a.completedAt).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>`
-          : `<button class="btn small" onclick="completeAction('${a.id}')" style="background:var(--green); border-color:var(--green); color:#fff;" title="标记此处理已完成 ${meta.excludeFromReport ? '— 原订单将被标记并从报表中排除' : '— 原订单仅添加状态标记'}">✓ 完成</button>`
-        }
-        <button class="btn ghost small" onclick="openEditActionDialog('${a.id}')">✎ 编辑</button>
-        <button class="btn ghost small" onclick="copyActionAsText('${a.id}')">📋 复制</button>
-        <button class="btn ghost small" onclick="removeAction('${a.id}')" style="color:var(--red); border-color:var(--red); margin-left:auto;">✕ 删除</button>
+
+      <!-- Collapsible body -->
+      <div id="${bodyId}" style="display:${isCollapsed ? 'none' : 'block'};">
+
+        <!-- Core info -->
+        <div style="padding:12px 14px 0;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; font-size:12px; line-height:1.7;">
+            ${a.passengerName ? `<div><span style="color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:0.05em;">乘客</span><br><strong style="font-size:13px;">${escapeHtml(a.passengerName)}</strong></div>` : ''}
+            ${a.pnr ? `<div><span style="color:var(--muted); font-size:10px; text-transform:uppercase; letter-spacing:0.05em;">PNR</span><br><span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px;">${escapeHtml(a.pnr)}</span></div>` : ''}
+            ${a.tkt ? `<div><span style="color:var(--muted); font-size:10px;">票号</span><br><span style="font-family:'JetBrains Mono',monospace; font-size:12px;">${escapeHtml(a.tkt)}</span></div>` : ''}
+            ${a.flightNo ? `<div><span style="color:var(--muted); font-size:10px;">航班</span><br><strong>${escapeHtml(a.flightNo)}</strong></div>` : ''}
+            ${a.route ? `<div><span style="color:var(--muted); font-size:10px;">航段</span><br>${escapeHtml(a.route)}</div>` : ''}
+            ${a.date ? `<div><span style="color:var(--muted); font-size:10px;">日期</span><br>${escapeHtml(a.date)}</div>` : ''}
+            ${a.handler ? `<div><span style="color:var(--muted); font-size:10px;">处理人</span><br>${escapeHtml(a.handler)}</div>` : ''}
+            ${a.reason ? `<div style="grid-column:1/-1;"><span style="color:var(--muted); font-size:10px;">原因</span><br>${escapeHtml(a.reason)}</div>` : ''}
+          </div>
+
+          <!-- Chase 账户信息 -->
+          ${(a.cardholderName || a.cardLast4 || a.tripId || a.chaseLogin || a.chaseCard) ? `
+          <div style="margin-top:10px; padding:10px 14px; background:#f0f6ff; border:1px solid #b3d1f7; border-left:3px solid #0070c9; border-radius:var(--r-sm);">
+            <div style="font-size:9.5px; font-weight:700; letter-spacing:0.1em; color:#0070c9; text-transform:uppercase; margin-bottom:8px;">💳 Chase 账户信息</div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:6px 16px; font-size:12px;">
+              ${a.cardholderName ? `<div><span style="color:var(--muted); font-size:10px;">卡主</span><br><strong>${escapeHtml(a.cardholderName)}</strong></div>` : ''}
+              ${a.cardLast4 ? `<div><span style="color:var(--muted); font-size:10px;">卡号后四位</span><br><span style="font-family:'JetBrains Mono',monospace; font-weight:700; font-size:16px; letter-spacing:0.15em;">••••${escapeHtml(a.cardLast4)}</span></div>` : ''}
+              ${a.tripId ? `<div><span style="color:var(--muted); font-size:10px;">Trip ID</span><br><span style="font-family:'JetBrains Mono',monospace; font-weight:600; font-size:12px;" onclick="copyText('${escapeAttr(a.tripId)}', this)" class="copyable-name">${escapeHtml(a.tripId)}</span></div>` : ''}
+              ${a.chaseLogin ? `<div><span style="color:var(--muted); font-size:10px;">登录账户</span><br><span onclick="copyText('${escapeAttr(a.chaseLogin)}', this)" class="copyable-name">${escapeHtml(a.chaseLogin)}</span></div>` : ''}
+              ${a.chasePwd ? `<div><span style="color:var(--muted); font-size:10px;">密码</span><br><span style="font-family:'JetBrains Mono',monospace; font-size:12px; cursor:pointer; letter-spacing:0.1em;" onclick="const el=this; el.dataset.shown=el.dataset.shown==='1'?'0':'1'; el.textContent=el.dataset.shown==='1'?el.dataset.pwd:el.dataset.mask;" data-pwd="${escapeAttr(a.chasePwd)}" data-mask="${'•'.repeat((a.chasePwd||'').length)}">${'•'.repeat((a.chasePwd||'').length)}</span></div>` : ''}
+              ${a.chaseCard ? `<div><span style="color:var(--muted); font-size:10px;">Chase 卡号</span><br><span style="font-family:'JetBrains Mono',monospace; font-size:11px;" onclick="copyText('${escapeAttr(a.chaseCard)}', this)" class="copyable-name">${escapeHtml(a.chaseCard)}</span></div>` : ''}
+            </div>
+          </div>` : ''}
+
+          <!-- 操作说明 -->
+          ${a.remarks ? `
+          <div style="margin-top:10px; padding:10px 12px; background:#fffbf0; border:1px solid rgba(200,160,74,0.3); border-left:3px solid var(--accent-deep); border-radius:var(--r-sm);">
+            <div style="font-size:10px; color:var(--accent-deep); font-weight:700; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">⚡ 操作说明</div>
+            <div style="font-size:13px; line-height:1.7; color:var(--ink); white-space:pre-wrap;">${escapeHtml(a.remarks)}</div>
+          </div>` : ''}
+
+          ${a.note ? `<div style="margin-top:8px; font-size:11px; color:var(--muted); font-style:italic;">📝 ${escapeHtml(a.note)}</div>` : ''}
+          ${a.status === 'VOID' && !a.completed ? buildVoidCountdownHTML(a) : ''}
+        </div>
+
+        <!-- Progress stepper -->
+        ${!a.completed ? `
+        <div style="padding:10px 14px 0; margin-top:8px; border-top:1px solid var(--line);">
+          <div style="font-size:10px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:6px;">进度</div>
+          <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap; overflow-x:auto;">${stepperHtml}</div>
+        </div>` : ''}
+
+        <!-- Action buttons -->
+        <div style="display:flex; gap:6px; padding:10px 14px; margin-top:8px; border-top:1px solid var(--line); background:var(--paper); flex-wrap:wrap;">
+          ${a.completed
+            ? `<span style="background:var(--green-light); color:var(--green); padding:4px 12px; border-radius:10px; font-size:11px; font-weight:700; border:1px solid var(--green);">✓ 完成于 ${new Date(a.completedAt).toLocaleString('zh-CN', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>`
+            : `<button class="btn small" onclick="completeAction('${a.id}')" style="background:var(--green); border-color:var(--green); color:#fff;">✓ 标记完成</button>`
+          }
+          <button class="btn ghost small" onclick="openEditActionDialog('${a.id}')">✎ 编辑</button>
+          <button class="btn ghost small" onclick="copyActionAsText('${a.id}')">📋 复制</button>
+          <button class="btn ghost small" onclick="removeAction('${a.id}')" style="color:var(--red); border-color:var(--red); margin-left:auto;">✕ 删除</button>
+        </div>
       </div>
     `;
     list.appendChild(card);
   });
+}
+
+async function updateActionStep(id, step) {
+  const a = (settings.actions || []).find(x => x.id === id);
+  if (!a) return;
+  a.progressStep = step;
+  await storageSet('ticket-organizer-settings', settings);
+  renderActionsList();
+  const meta = ACTION_STATUS_META[a.status];
+  const stepLabel = meta?.steps?.[step] || '进度更新';
+  toast(`✓ 进度更新：${stepLabel}`);
+}
+
+function toggleActionCard(id, headerEl) {
+  const a = (settings.actions || []).find(x => x.id === id);
+  if (!a) return;
+  const bodyId = `action-body-${id}`;
+  const body = document.getElementById(bodyId);
+  const chevron = headerEl?.querySelector('.action-chevron');
+  if (!body) return;
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+  if (chevron) chevron.textContent = isHidden ? '▾' : '▸';
+  // Persist collapse state in memory only (no storage needed)
+  a._collapsed = !isHidden;
 }
 
 // Open dialog to create a new blank action
@@ -12628,7 +12973,7 @@ function openActionDialog(existing, prefilled = {}) {
   overlay.onclick = (e) => { if (e.target === overlay) closeActionDialog(); };
 
   const dialog = document.createElement('div');
-  dialog.style.cssText = 'background:#fff; border-radius:6px; padding:20px 24px; max-width:680px; width:100%; max-height:90vh; overflow-y:auto;';
+  dialog.style.cssText = 'background:var(--paper); border-radius:var(--r-lg); padding:0; max-width:700px; width:100%; max-height:92vh; overflow-y:auto; box-shadow:var(--shadow-strong);';
   dialog.onclick = (e) => e.stopPropagation();
 
   const statusOpts = Object.entries(meta).map(([k, v]) =>
@@ -12636,71 +12981,189 @@ function openActionDialog(existing, prefilled = {}) {
   ).join('');
 
   dialog.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-      <h3 style="margin:0; font-size:16px;">${isNew ? '＋ 新建处理记录' : '✎ 编辑处理记录'}</h3>
-      <button class="btn ghost small" onclick="closeActionDialog()">✕</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; background:linear-gradient(135deg,var(--ink) 0%,#1e3248 100%); border-radius:var(--r-lg) var(--r-lg) 0 0;">
+      <h3 style="margin:0; font-size:16px; font-family:'Fraunces',serif; color:var(--paper); font-weight:600;">${isNew ? '＋ 新建处理记录' : '✎ 编辑处理记录'}</h3>
+      <button style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.7); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; font-size:14px;" onclick="closeActionDialog()">✕</button>
     </div>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-      <div class="field"><label>处理类型 *</label>
-        <select id="ad-status" style="padding:6px 10px; border:1px solid var(--line); border-radius:3px;">${statusOpts}</select>
+    <div style="padding:20px 24px; display:flex; flex-direction:column; gap:18px;">
+
+      <!-- Row 1: Type + Table label -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field">
+          <label>处理类型 <span style="color:var(--red);">*</span></label>
+          <select id="ad-status" style="padding:8px 10px; border:1.5px solid var(--line); border-radius:var(--r-sm); font-size:14px; background:#fff;">${statusOpts}</select>
+        </div>
+        <div class="field">
+          <label>表 Label</label>
+          <select id="ad-tableLabel" style="padding:8px 10px; border:1.5px solid var(--line); border-radius:var(--r-sm); font-size:14px; background:#fff;">
+            <option value="">— 选择 —</option>
+            ${['A','B','C','D','E','F','G'].map(l => `<option value="${l}" ${(a.tableLabel||'')=== l?'selected':''}>表 ${l}</option>`).join('')}
+          </select>
+        </div>
       </div>
-      <div class="field"><label>代理</label>
-        <input id="ad-agent" value="${escapeAttr(a.agent)}" placeholder="季凯 / 罗 / …">
+
+      <!-- Row 2: Passenger + PNR -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div class="field">
+          <label>乘客名</label>
+          <input id="ad-pax" value="${escapeAttr(a.passengerName)}" placeholder="LI/JIAN" style="font-family:'JetBrains Mono',monospace; font-size:14px;">
+        </div>
+        <div class="field">
+          <label>PNR</label>
+          <input id="ad-pnr" value="${escapeAttr(a.pnr)}" placeholder="ABC123" style="text-transform:uppercase; font-family:'JetBrains Mono',monospace; font-size:14px;">
+        </div>
       </div>
-      <div class="field"><label>航司</label>
-        <input id="ad-airline" value="${escapeAttr(a.airline)}" placeholder="UA / AA / DL …" style="text-transform:uppercase">
+
+      <!-- Row 3: Agent selection -->
+      <div class="field">
+        <label>代理</label>
+        <div id="ad-agent-chips" style="display:flex; flex-wrap:wrap; gap:5px; margin-bottom:6px;"></div>
+        <input id="ad-agent" value="${escapeAttr(a.agent||'')}" placeholder="或直接输入代理名…"
+          style="font-size:13px;" oninput="document.querySelectorAll('.ad-agent-chip').forEach(c=>c.classList.toggle('active', c.dataset.name===this.value))">
       </div>
-      <div class="field"><label>PNR</label>
-        <input id="ad-pnr" value="${escapeAttr(a.pnr)}" placeholder="ABC123" style="text-transform:uppercase; font-family:'JetBrains Mono',monospace;">
+
+      <!-- Section: Chase 账户信息 -->
+      <div style="background:var(--cream); border:1.5px solid var(--line); border-left:4px solid #0070c9; border-radius:var(--r-md); padding:14px 16px;">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.1em; color:#0070c9; text-transform:uppercase; margin-bottom:12px;">💳 Chase 账户信息</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="field">
+            <label>卡主名字</label>
+            <input id="ad-cardholder" value="${escapeAttr(a.cardholderName)}" placeholder="JOHN / 张三" style="font-size:14px;">
+          </div>
+          <div class="field">
+            <label>卡号后四位</label>
+            <input id="ad-cardLast4" value="${escapeAttr(a.cardLast4||'')}" placeholder="1234" maxlength="4" style="font-family:'JetBrains Mono',monospace; font-size:16px; letter-spacing:0.2em; font-weight:700;">
+          </div>
+          <div class="field">
+            <label>TRIP ID</label>
+            <input id="ad-tripId" value="${escapeAttr(a.tripId||'')}" placeholder="CHN-XXXXXXXX" style="font-family:'JetBrains Mono',monospace; font-size:13px;">
+          </div>
+          <div class="field">
+            <label>CHASE 登录账户</label>
+            <input id="ad-chaseLogin" value="${escapeAttr(a.chaseLogin||'')}" placeholder="email@gmail.com" style="font-size:13px;">
+          </div>
+          <div class="field">
+            <label>CHASE 账户密码</label>
+            <input id="ad-chasePwd" type="text" value="${escapeAttr(a.chasePwd||'')}" placeholder="密码" style="font-family:'JetBrains Mono',monospace; font-size:13px;">
+          </div>
+          <div class="field">
+            <label>CHASE 完整卡号</label>
+            <input id="ad-chaseCard" value="${escapeAttr(a.chaseCard||'')}" placeholder="4111 1111 1111 1234" style="font-family:'JetBrains Mono',monospace; font-size:13px; letter-spacing:0.05em;">
+          </div>
+        </div>
       </div>
-      <div class="field"><label>票号 TKT</label>
-        <input id="ad-tkt" value="${escapeAttr(a.tkt)}" placeholder="016-XXXXXXX" style="font-family:'JetBrains Mono',monospace;">
+
+      <!-- 操作说明 -->
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:6px;">
+          <span style="background:var(--accent-deep); color:#fff; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px;">⚡</span>
+          操作说明
+          <span style="font-weight:400; color:var(--muted); font-size:11px;">具体怎么处理这张票</span>
+        </label>
+        <textarea id="ad-remarks" rows="3" style="padding:10px 12px; border:1.5px solid var(--accent); border-radius:var(--r-sm); font-family:inherit; resize:vertical; font-size:13px; line-height:1.6; background:#fffef9;" placeholder="例：登录 Chase Travel 申请退款，Trip ID: XXXX，预计7-10工作日，通知客户…">${escapeHtml(a.remarks||'')}</textarea>
       </div>
-      <div class="field"><label>乘客名</label>
-        <input id="ad-pax" value="${escapeAttr(a.passengerName)}" placeholder="LI/JIAN">
+
+      <!-- 进度步骤 -->
+      <div class="field">
+        <label style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+          <span style="background:#3955a3; color:#fff; width:18px; height:18px; border-radius:4px; display:inline-flex; align-items:center; justify-content:center; font-size:10px;">📊</span>
+          进度
+          <span style="font-weight:400; color:var(--muted); font-size:11px;">点击步骤更新</span>
+        </label>
+        <div id="ad-progress-steps" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+        <input type="hidden" id="ad-progressStep" value="${a.progressStep != null ? a.progressStep : 0}">
       </div>
-      <div class="field"><label>航班号</label>
-        <input id="ad-flight" value="${escapeAttr(a.flightNo)}" placeholder="UA199">
+
+      <!-- Hidden fields -->
+      <input type="hidden" id="ad-sourceOrderId" value="${escapeAttr(a.sourceOrderId||'')}">
+      <input type="hidden" id="ad-source" value="${escapeAttr(a.source||'manual')}">
+      <input type="hidden" id="ad-sourceTicketedAt" value="${a.sourceTicketedAt||''}">
+      <!-- Legacy fields (not shown but preserved for old records) -->
+      <input type="hidden" id="ad-agent" value="${escapeAttr(a.agent||'')}">
+      <input type="hidden" id="ad-airline" value="${escapeAttr(a.airline||'')}">
+      <input type="hidden" id="ad-tkt" value="${escapeAttr(a.tkt||'')}">
+      <input type="hidden" id="ad-flight" value="${escapeAttr(a.flightNo||'')}">
+      <input type="hidden" id="ad-route" value="${escapeAttr(a.route||'')}">
+      <input type="hidden" id="ad-date" value="${escapeAttr(a.date||'')}">
+      <input type="hidden" id="ad-handler" value="${escapeAttr(a.handler||'')}">
+      <input type="hidden" id="ad-reason" value="${escapeAttr(a.reason||'')}">
+      <input type="hidden" id="ad-amountType" value="${escapeAttr(a.amountType||'')}">
+      <input type="hidden" id="ad-amount" value="${a.amount != null ? a.amount : ''}">
+      <input type="hidden" id="ad-note" value="${escapeAttr(a.note||'')}">
+
+      <div style="display:flex; gap:10px; justify-content:flex-end; padding-top:4px; border-top:1px solid var(--line);">
+        <button class="btn ghost" onclick="closeActionDialog()">取消</button>
+        <button class="btn accent" onclick="saveAction('${a.id}', ${isNew})">💾 保存</button>
       </div>
-      <div class="field"><label>航段</label>
-        <input id="ad-route" value="${escapeAttr(a.route)}" placeholder="PVG-LAX">
-      </div>
-      <div class="field"><label>日期</label>
-        <input id="ad-date" value="${escapeAttr(a.date)}" placeholder="5月7日 / 07MAY">
-      </div>
-      <div class="field"><label>卡主</label>
-        <input id="ad-cardholder" value="${escapeAttr(a.cardholderName)}" placeholder="BEN B">
-      </div>
-      <div class="field" style="grid-column:1/-1;"><label>处理原因</label>
-        <input id="ad-reason" value="${escapeAttr(a.reason)}" placeholder="客户取消行程 / 改签 / 重复出票 …">
-      </div>
-      <div class="field"><label>处理人</label>
-        <input id="ad-handler" value="${escapeAttr(a.handler)}" placeholder="自己 / 客服 …">
-      </div>
-      <div class="field"><label>金额类型</label>
-        <select id="ad-amountType" style="padding:6px 10px; border:1px solid var(--line); border-radius:3px;">
-          <option value="" ${!a.amountType ? 'selected' : ''}>无</option>
-          <option value="refund" ${a.amountType === 'refund' ? 'selected' : ''}>退款（退给客户）</option>
-          <option value="charge" ${a.amountType === 'charge' ? 'selected' : ''}>补收（向客户收）</option>
-        </select>
-      </div>
-      <div class="field"><label>金额 ¥</label>
-        <input id="ad-amount" type="number" step="0.01" value="${a.amount != null ? a.amount : ''}" placeholder="2500">
-      </div>
-      <div class="field" style="grid-column:1/-1;"><label>备注</label>
-        <textarea id="ad-note" rows="2" style="padding:6px 10px; border:1px solid var(--line); border-radius:3px; font-family:inherit; resize:vertical;" placeholder="任意备注...">${escapeHtml(a.note)}</textarea>
-      </div>
-      <input type="hidden" id="ad-sourceOrderId" value="${escapeAttr(a.sourceOrderId || '')}">
-      <input type="hidden" id="ad-source" value="${escapeAttr(a.source || 'manual')}">
-      <input type="hidden" id="ad-sourceTicketedAt" value="${a.sourceTicketedAt || ''}">
-    </div>
-    <div style="display:flex; gap:10px; margin-top:16px; justify-content:flex-end;">
-      <button class="btn ghost" onclick="closeActionDialog()">取消</button>
-      <button class="btn accent" onclick="saveAction('${a.id}', ${isNew})">💾 保存</button>
     </div>
   `;
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
+  // Render progress steps and agent chips after DOM insertion
+  renderDialogProgressSteps();
+  document.getElementById('ad-status')?.addEventListener('change', renderDialogProgressSteps);
+  // Agent chips
+  const agentChipsEl = document.getElementById('ad-agent-chips');
+  const currentAgent = a.agent || '';
+  const presetAgents = (settings.presetAgents || []);
+  if (agentChipsEl && presetAgents.length > 0) {
+    agentChipsEl.innerHTML = presetAgents.map(ag => `
+      <button type="button" class="ad-agent-chip agent-chip${currentAgent === ag ? ' active' : ''}" data-name="${escapeAttr(ag)}"
+        style="padding:4px 12px; border:1.5px solid var(--line); background:#fff; border-radius:20px; cursor:pointer; font-size:12px; font-weight:500; color:var(--muted); transition:all 0.12s; box-shadow:var(--shadow-xs);"
+        onclick="
+          document.getElementById('ad-agent').value='${escapeAttr(ag)}';
+          document.querySelectorAll('.ad-agent-chip').forEach(c=>{
+            const on=c.dataset.name==='${escapeAttr(ag)}';
+            c.style.background=on?'var(--accent-deep)':'#fff';
+            c.style.color=on?'#fff':'var(--muted)';
+            c.style.borderColor=on?'var(--accent-deep)':'var(--line)';
+          });
+        ">${escapeHtml(ag)}</button>
+    `).join('');
+    // Set initial active state
+    document.querySelectorAll('.ad-agent-chip').forEach(c => {
+      if (c.dataset.name === currentAgent) {
+        c.style.background = 'var(--accent-deep)';
+        c.style.color = '#fff';
+        c.style.borderColor = 'var(--accent-deep)';
+      }
+    });
+  }
+}
+
+function renderDialogProgressSteps() {
+  const statusSel = document.getElementById('ad-status');
+  const container = document.getElementById('ad-progress-steps');
+  const hiddenInput = document.getElementById('ad-progressStep');
+  if (!statusSel || !container || !hiddenInput) return;
+  const status = statusSel.value;
+  const meta = ACTION_STATUS_META[status];
+  const steps = meta?.steps || ['待处理', '处理中', '已完成'];
+  const current = parseInt(hiddenInput.value) || 0;
+  container.innerHTML = '';
+  steps.forEach((step, i) => {
+    const done = i < current;
+    const active = i === current;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.style.cssText = `
+      padding:6px 14px; border-radius:20px; font-size:12px; font-weight:${active ? 700 : 500};
+      cursor:pointer; border:2px solid ${done || active ? (meta.color||'var(--accent-deep)') : 'var(--line)'};
+      background:${done ? (meta.color||'var(--green)') : active ? (meta.bg||'var(--cream)') : '#fff'};
+      color:${done ? '#fff' : active ? (meta.color||'var(--ink)') : 'var(--muted)'};
+      display:flex; align-items:center; gap:4px; transition:all 0.15s;
+    `;
+    btn.innerHTML = `${done ? '✓' : active ? '▶' : String(i+1)} ${step}`;
+    btn.onclick = () => { hiddenInput.value = i; renderDialogProgressSteps(); };
+    container.appendChild(btn);
+    // Connector arrow between steps
+    if (i < steps.length - 1) {
+      const arrow = document.createElement('span');
+      arrow.textContent = '→';
+      arrow.style.cssText = 'color:var(--muted); font-size:11px; align-self:center; flex-shrink:0;';
+      container.appendChild(arrow);
+    }
+  });
 }
 
 function closeActionDialog() {
@@ -12712,20 +13175,29 @@ async function saveAction(id, isNew) {
   ensureActionsArray();
   const data = {
     status: document.getElementById('ad-status').value,
-    agent: document.getElementById('ad-agent').value.trim(),
-    airline: document.getElementById('ad-airline').value.trim().toUpperCase(),
-    pnr: document.getElementById('ad-pnr').value.trim().toUpperCase(),
-    tkt: document.getElementById('ad-tkt').value.trim(),
+    tableLabel: document.getElementById('ad-tableLabel')?.value || '',
     passengerName: document.getElementById('ad-pax').value.trim(),
-    flightNo: document.getElementById('ad-flight').value.trim().toUpperCase(),
-    route: document.getElementById('ad-route').value.trim().toUpperCase(),
-    date: document.getElementById('ad-date').value.trim(),
+    pnr: document.getElementById('ad-pnr').value.trim().toUpperCase(),
     cardholderName: document.getElementById('ad-cardholder').value.trim(),
-    reason: document.getElementById('ad-reason').value.trim(),
-    handler: document.getElementById('ad-handler').value.trim(),
-    amountType: document.getElementById('ad-amountType').value,
-    amount: parseFloat(document.getElementById('ad-amount').value) || null,
-    note: document.getElementById('ad-note').value.trim(),
+    cardLast4: document.getElementById('ad-cardLast4')?.value.trim() || '',
+    tripId: document.getElementById('ad-tripId')?.value.trim() || '',
+    chaseLogin: document.getElementById('ad-chaseLogin')?.value.trim() || '',
+    chasePwd: document.getElementById('ad-chasePwd')?.value || '',
+    chaseCard: document.getElementById('ad-chaseCard')?.value.trim() || '',
+    remarks: document.getElementById('ad-remarks')?.value.trim() || '',
+    progressStep: parseInt(document.getElementById('ad-progressStep')?.value) || 0,
+    // Legacy fields preserved from old records
+    agent: document.getElementById('ad-agent')?.value.trim() || '',
+    airline: document.getElementById('ad-airline')?.value || '',
+    tkt: document.getElementById('ad-tkt')?.value || '',
+    flightNo: document.getElementById('ad-flight')?.value || '',
+    route: document.getElementById('ad-route')?.value || '',
+    date: document.getElementById('ad-date')?.value || '',
+    handler: document.getElementById('ad-handler')?.value || '',
+    reason: document.getElementById('ad-reason')?.value || '',
+    amountType: document.getElementById('ad-amountType')?.value || '',
+    amount: parseFloat(document.getElementById('ad-amount')?.value) || null,
+    note: document.getElementById('ad-note')?.value || '',
     sourceOrderId: document.getElementById('ad-sourceOrderId')?.value || '',
     source: document.getElementById('ad-source')?.value || 'manual',
     sourceTicketedAt: parseInt(document.getElementById('ad-sourceTicketedAt')?.value, 10) || null
@@ -13997,7 +14469,11 @@ function renderDiscountRulesList() {
     const div = document.createElement('div');
     div.className = 'known-pax-item';
     const parts = [];
-    if (r.tableLabel) parts.push(`<span style="background:#e8edfa; padding:1px 6px; border-radius:2px;">表 <strong>${escapeHtml(r.tableLabel)}</strong></span>`);
+    if (r.tableLabel) {
+      const lblColors = {A:'#d4edda',B:'#d4e6f1',C:'#fde8d8',D:'#e8d4f0',G:'#fef3cd'};
+      const lblBg = lblColors[r.tableLabel] || '#e8edfa';
+      parts.push(`<span style="background:${lblBg}; padding:2px 7px; border-radius:10px; font-weight:700; font-size:10px;">表${escapeHtml(r.tableLabel)}</span>`);
+    }
     if (r.agent) parts.push(`代理 <strong>${escapeHtml(r.agent)}</strong>`);
     if (r.airline) parts.push(`航司 <strong>${escapeHtml(r.airline)}</strong>`);
     if (r.originRegion === 'US') parts.push(`<span style="background:#fff4d6; padding:1px 6px; border-radius:2px;">🇺🇸 美国始发</span>`);
