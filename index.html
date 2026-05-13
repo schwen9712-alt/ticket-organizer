@@ -5300,6 +5300,37 @@ function parseSingleBooking(raw) {
       continue;
     }
 
+    // ── 出生：YYYY.M.D  — standalone DOB line following a name line ──────────
+    const cnDobLine = trimmed.match(/^出生[：:]\s*(.+)/);
+    if (cnDobLine && pax.length > 0) {
+      const dob = extractDOB(cnDobLine[1]);
+      if (dob) {
+        const last = pax[pax.length - 1];
+        if (!last.dob) last.dob = dob;
+      }
+      continue;
+    }
+
+    // ── 有效期：YYYY.M.D  — passport expiry (informational, store on last pax) ─
+    const cnExpLine = trimmed.match(/^有效期[：:]\s*(.+)/);
+    if (cnExpLine && pax.length > 0) {
+      const exp = extractDOB(cnExpLine[1]);
+      if (exp) {
+        const last = pax[pax.length - 1];
+        if (!last.passportExpiry) last.passportExpiry = exp;
+      }
+      continue;
+    }
+
+    // ── Standalone passport number (1–2 letters + 7–9 digits, alone on a line) ─
+    // e.g. "EE5928031"  "EJ3709942"  "G12345678"
+    const standalonePassport = trimmed.match(/^([A-Z]{1,2}\d{7,9})$/);
+    if (standalonePassport && pax.length > 0) {
+      const last = pax[pax.length - 1];
+      if (!last.passportNo) last.passportNo = standalonePassport[1];
+      continue;
+    }
+
     // Standalone cabin keyword line: a line that is ONLY a cabin word (e.g. "经济舱", "商务舱")
     // Common in Chinese booking system outputs where cabin is on its own line
     if (parsedCabin === undefined) {
