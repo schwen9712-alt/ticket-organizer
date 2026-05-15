@@ -16,8 +16,39 @@
 <title>订单整理工具 · Ticket Organizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,500&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* JetBrains Mono — loaded from the OFFICIAL upstream repo via JSDelivr CDN,
+   not Google Fonts. Google's hosted version strips the OpenType feature
+   tables (ss01 / ss02 / zero) we need for slashed-zero glyphs that prevent
+   0/8/O confusion in flight numbers. The upstream .woff2 files include all
+   features. Pinned to v2.304 (latest stable release as of 2023). */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@v2.304/fonts/webfonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@v2.304/fonts/webfonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@v2.304/fonts/webfonts/JetBrainsMono-SemiBold.woff2') format('woff2');
+  font-weight: 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@v2.304/fonts/webfonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono@v2.304/fonts/webfonts/JetBrainsMono-ExtraBold.woff2') format('woff2');
+  font-weight: 800; font-style: normal; font-display: swap;
+}
 :root {
   /* Core palette — warmer, richer */
   --ink: #0C1B2A;
@@ -2643,6 +2674,7 @@ html[data-lang="en"] .zh {
   <button class="tab" data-tab="team" id="teamTab" style="display:none;"><span data-i18n="tab.team">👥 全员</span> <span class="count" id="teamCount">0</span></button>
   <button class="tab" data-tab="ticketed"><span data-i18n="tab.ticketed">✓ 已出票</span> <span class="count" id="ticketedCount">0</span></button>
   <button class="tab" data-tab="actions"><span data-i18n="tab.actions">⚠ 处理</span> <span class="count" id="actionsCount">0</span></button>
+  <button class="tab" data-tab="speed"><span data-i18n="tab.speed">📥 收单建议</span></button>
   <button class="tab" data-tab="cardholders"><span data-i18n="tab.cardholders">💳 卡主</span> <span class="count" id="cardholdersCount">0</span></button>
   <button class="tab" data-tab="settings" data-i18n="tab.settings">⚙ 设置</button>
 </nav>
@@ -2682,6 +2714,16 @@ SUN/KAILAI MS 女 28SEP08
       <button class="btn" onclick="parsePNR()">⚡ 解析 Parse</button>
       <button class="btn ghost" onclick="clearRaw()">清空</button>
       <button class="btn ghost" onclick="loadSample()">加载示例</button>
+
+      <!-- New-order wait time indicator. Tells the user (or member entering)
+           how long a NEW order paste-and-parsed here would wait before
+           being ticketed, given the current queue. Updates whenever the
+           pending list changes. Empty when no queue data. -->
+      <span id="newOrderEta" style="display:none; align-items:center; gap:6px; padding:5px 11px; background:var(--cream); border:1px solid var(--line); border-radius:var(--r-md); font-size:11.5px; color:var(--ink); font-family:'JetBrains Mono',monospace; cursor:help; letter-spacing:0.02em;">
+        <span style="font-size:13px;">⏱</span>
+        <span style="opacity:0.6;">新单等</span>
+        <strong id="newOrderEtaValue" style="color:var(--accent-deep);">—</strong>
+      </span>
 
       <!-- Special discount: applied when parsing, overrides default discount for this batch -->
       <div style="display:flex; align-items:center; gap:8px; margin-left:auto; padding:6px 12px; background:var(--cream); border:1.5px dashed var(--accent); border-radius:var(--r-md);">
@@ -2895,6 +2937,13 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <div class="pb-stat eta" id="pbEtaStat" style="display:none;" title="基于近 14 天工作时段平均出票速度估算">
         <span class="v" id="pbEta">—</span><span class="l" id="pbEtaLabel" data-i18n="pb.label.eta">预计完成</span>
       </div>
+      <!-- New-order wait time: how long would a *new* order coming in NOW
+           wait before being processed? Lets the user/agent set customer
+           expectations on arrival. Distinct from pbEtaStat (which says
+           when ALL current pending orders will be done). -->
+      <div class="pb-stat newOrderWait" id="pbNewOrderWaitStat" style="display:none;" title="新单录入后预计开始处理的时间">
+        <span class="v" id="pbNewOrderWaitV">—</span><span class="l">新单等候</span>
+      </div>
       <!-- Today vs same time last week — performance snapshot -->
       <div class="pb-stat scoreboard" id="pbScoreboardStat" style="display:none;" title="今日截至此刻 vs 上周同一天同时段">
         <span class="v" id="pbScoreboardV">—</span><span class="l" id="pbScoreboardL">今日 vs 同期</span>
@@ -3034,6 +3083,21 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   </div>
 </div>
 
+<!-- SPEED ANALYSIS PANEL ─────────────────────────────────────────────────────
+     Shows which combinations of airline × USD-band historically ticket
+     fastest. Helps user know which incoming orders are "easy wins" to do
+     first vs which to warn customers about. Two main blocks:
+       1. Actionable: pending orders that fall in fast / slow lanes today
+       2. Reference: the airline × amount-band speed matrix from history
+────────────────────────────────────────────────────────────────────────── -->
+<div class="panel" id="panel-speed">
+  <div class="section">
+    <div class="section-title"><span class="num">📥</span>INTAKE GUIDE <span class="zh">收单建议</span></div>
+    <div class="hint" style="margin-bottom:12px">基于历史出票数据 + 当前待出票队列压力，给代理什么样的订单值得多收、什么暂时少收的明确建议。</div>
+    <div id="speedAnalysisArea"></div>
+  </div>
+</div>
+
 <!-- CARDHOLDERS PANEL -->
 <div class="panel" id="panel-cardholders">
   <div class="section">
@@ -3083,7 +3147,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <button class="btn ghost small" onclick="exportBackupJSON()">📥 导出 JSON</button>
     </div>
     <div class="setting-row">
-      <div><div class="label">📊 统计仪表板</div><div class="desc">月度收入、卡主排行</div></div>
+      <div><div class="label">📊 统计仪表板</div><div class="desc">月度收入、卡主出票排行</div></div>
       <button class="btn ghost small" onclick="openStatsDashboard()">📊 打开</button>
     </div>
     <div class="hint" style="margin-top:8px;font-size:11px;">
@@ -3710,7 +3774,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .airline-usd-row {
   display: grid;
-  grid-template-columns: 36px 12px 62px 40px 1fr 40px 80px 90px 110px 24px 24px 24px;
+  grid-template-columns: 16px 36px 12px 62px 40px 1fr 40px 80px 90px 110px 24px 24px 24px;
   gap: 8px;
   align-items: center;
   padding: 9px 14px;
@@ -3722,6 +3786,34 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-size: 13px;
   transition: all var(--t-fast);
   cursor: pointer;
+}
+
+/* Drag handle — leftmost column, only fully visible on hover */
+.usd-row-drag {
+  cursor: grab;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+  line-height: 1;
+  opacity: 0.25;
+  user-select: none;
+  transition: opacity 0.15s, color 0.15s;
+  /* Increase tappable area on touch without changing visual */
+  padding: 6px 0;
+  margin: -6px 0;
+}
+.airline-usd-row:hover .usd-row-drag { opacity: 0.8; color: var(--ink); }
+.usd-row-drag:hover { opacity: 1 !important; color: var(--accent-deep) !important; cursor: grab; }
+.usd-row-drag:active { cursor: grabbing; }
+.airline-usd-row.row-dragging {
+  opacity: 0.4;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  transform: scale(1.01);
+  z-index: 100;
+}
+.airline-usd-row.row-drop-target {
+  border-top: 2px solid var(--accent-deep) !important;
+  margin-top: -2px;
 }
 .airline-usd-row:hover {
   background: var(--paper-2);
@@ -4798,6 +4890,43 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   color: rgba(200,160,74,0.7);
 }
 
+/* ─── Glyph disambiguation for monospace ─────────────────────────────────
+   JetBrains Mono ships with a slashed-zero stylistic alternate (ss02). We
+   turn it on globally so '0' is always visibly distinct from 'O' and '8' —
+   critical for flight numbers like "DL180" / "DL181" where 0/8 and 1/I are
+   easy to misread when entering into ticketing.
+   `tnum` enables tabular numerals so digits align in columns.
+
+   The attribute-selector match covers inline-style mono usage (most
+   common in this app), and the explicit list covers semantic monospace
+   elements. */
+*[style*="JetBrains Mono"],
+*[style*="monospace"],
+.monoclear, code, pre, kbd, samp,
+input[type="text"], input[type="number"], textarea {
+  font-feature-settings: 'ss02' 1, 'zero' 1, 'tnum' 1 !important;
+  font-variant-numeric: slashed-zero tabular-nums !important;
+}
+
+/* Flight-number tile on ticket card. Heavier weight + wider letter spacing
+   + slashed zero make every digit unambiguous (0 vs 8, 1 vs I, 6 vs G). */
+.flight-num-tile {
+  font-family: 'JetBrains Mono', monospace;
+  font-feature-settings: 'ss02' 1, 'zero' 1, 'tnum' 1, 'ss01' 1;
+  font-variant-numeric: slashed-zero tabular-nums;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: 0.12em;       /* wider spacing kills 0/O fusion */
+  margin-top: 3px;
+  background: var(--cream);
+  padding: 3px 11px;
+  border-radius: var(--r-sm);
+  display: inline-block;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+}
+
 /* ── Today vs baseline scoreboard ── */
 /* Tone classes: ahead=green, behind=red, neutral=gold. Each gets a 1px hairline left border. */
 .pending-banner .pb-stat.scoreboard {
@@ -4993,6 +5122,10 @@ function newOrder(init = {}) {
     // order header. Persisted to cloud sync.
     urgent: init.urgent || false,
     urgentSetAt: init.urgentSetAt || null,
+    // Manual sort position (number) — user-controlled order within the same
+    // status rank. Lower number = earlier in list. Null = no manual override,
+    // use automatic sort. Set by dragging rows in the pending list.
+    manualOrder: init.manualOrder != null ? init.manualOrder : null,
     linkedOrderIds: init.linkedOrderIds || [],   // IDs of related orders
     ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
     enteredBy: init.enteredBy || '',
@@ -5328,11 +5461,49 @@ function computeTicketingETA(pendingCount) {
   }
   if (activeHours.length === 0) return null;
 
-  // Rate = tickets / (active_hours_per_day × number_of_days_observed)
-  const sampleDays = Math.max(1, daysSeen.size);
-  const activeHoursTotal = activeHours.length * sampleDays;
-  const ticketsPerActiveHour = recent.length / activeHoursTotal;
+  // ── Recency-weighted rate ────────────────────────────────────────────────
+  // Old algorithm used a flat 14-day average, so today's 30-ticket burst
+  // barely moved the needle vs the 200-ticket baseline → the displayed rate
+  // looked "frozen". Now each ticket gets a weight that decays with age:
+  //   today's ticket = weight 1.0
+  //   yesterday      = weight 0.85
+  //   7 days ago     = weight 0.35
+  //   14 days ago    = weight 0.13
+  // We compute weighted ticket count vs weighted observable hours so the
+  // rate reflects current pace more than ancient pace.
+  const halfLifeMs = 4 * 24 * 3600_000;  // half-life: 4 days
+  const decay = (ageMs) => Math.pow(0.5, ageMs / halfLifeMs);
+
+  let weightedTicketSum = 0;
+  recent.forEach(t => {
+    weightedTicketSum += decay(now - t.ticketedAt);
+  });
+
+  // Weighted observable hours: each day contributes `activeHours.length`
+  // hours, each weighted by decay at that day's midpoint.
+  let weightedHoursSum = 0;
+  const dayKeys = [...daysSeen];
+  dayKeys.forEach(dayKey => {
+    const dayDate = new Date(dayKey);
+    const dayAgeMs = now - (dayDate.getTime() + 12 * 3600_000);  // midpoint
+    weightedHoursSum += activeHours.length * decay(Math.max(0, dayAgeMs));
+  });
+  // Also include today's partial hours up to now (so a fresh start today
+  // doesn't have zero observable hours weight)
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const hoursToday = Math.min(activeHours.length, (now - todayStart.getTime()) / 3600_000);
+  if (!daysSeen.has(new Date(now).toDateString()) && hoursToday > 0) {
+    weightedHoursSum += hoursToday;  // weight 1.0 since it's "now"
+  }
+
+  if (weightedHoursSum <= 0) return null;
+  const ticketsPerActiveHour = weightedTicketSum / weightedHoursSum;
   if (ticketsPerActiveHour <= 0) return null;
+
+  // Keep sampleDays for tooltip transparency
+  const sampleDays = Math.max(1, daysSeen.size);
+  // ──────────────────────────────────────────────────────────────────────────
 
   // Estimate clock-time to complete `pendingCount` orders, advancing the clock
   // only during active hours. Cap at 14 days for sanity.
@@ -5394,6 +5565,536 @@ function computeTicketingETA(pendingCount) {
     finishAt: cursor.getTime(),
   };
 }
+
+// ─── New-order wait time chip ──────────────────────────────────────────────
+// Tells the user roughly how long a brand-new order would wait before being
+// ticketed, given the current queue + team throughput. Updates whenever the
+// pending list or ticketed history changes.
+//
+// Logic:
+//   1. Get team rate (orders/active-hour) and active hour count from same
+//      throughput model as the banner ETA.
+//   2. Compute "queue position" — current pending count + 1 (the new order).
+//   3. Walk the clock from now, stepping by active hours, until cumulative
+//      tickets-completed reaches the new order's position.
+//   4. Bucket the resulting hours into human-friendly labels with color cues.
+function renderNewOrderEta() {
+  const el = document.getElementById('newOrderEta');
+  const valEl = document.getElementById('newOrderEtaValue');
+  if (!el || !valEl) return;
+
+  // Get current pending count (exclude no-availability orders since they're paused)
+  const pending = (STATE.orders || []).filter(o =>
+    isMeaningfulOrder(o) && !o.noAvailability && o.tableLabel !== 'G'
+  ).length;
+
+  // If queue's empty AND we have throughput data → "立即处理"
+  // If no throughput data at all → hide chip
+  const est = computeTicketingETA(pending + 1);
+  if (!est) {
+    el.style.display = 'none';
+    const bs = document.getElementById('pbNewOrderWaitStat');
+    if (bs) bs.style.display = 'none';
+    return;
+  }
+
+  // est.etaMs is the elapsed time-from-now for the new order to be finished.
+  // est.finishAt is the absolute timestamp when the new order finishes.
+  // We MUST bucket by wall-clock proximity (today / tomorrow / day-after),
+  // not by elapsed hours — 16 elapsed hours from 2pm lands at 6am NEXT day,
+  // which is NOT "today". Previous version had this bug.
+  const hours = est.etaMs / 3600_000;
+  const now = new Date();
+  const finish = new Date(est.finishAt || now.getTime() + est.etaMs);
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  const tomorrowEnd = new Date(todayEnd.getTime() + 24 * 3600_000);
+  const dayAfterEnd = new Date(todayEnd.getTime() + 48 * 3600_000);
+  const isToday    = finish <= todayEnd;
+  const isTomorrow = !isToday && finish <= tomorrowEnd;
+  const isDayAfter = !isToday && !isTomorrow && finish <= dayAfterEnd;
+
+  // Bucket into human-friendly labels with color escalating from green → red.
+  // Green = "新单很快能处理", Red = "排队较久，建议告知客户"
+  let label, color, tip;
+  if (pending === 0) {
+    label = '立即处理';
+    color = 'var(--green)';
+    tip = '当前无积压订单，新单录入后会被立即处理。';
+  } else if (hours < 2) {
+    // Special-case: under 2 hours — show hour count regardless of wall-clock day
+    const h = Math.max(1, Math.round(hours));
+    label = `~ ${h} 小时`;
+    color = 'var(--green)';
+    tip = `新订单进入队列后预计 ${h} 小时左右出。当前积压 ${pending} 单，团队速度 ${est.rate.toFixed(1)} 单/活跃小时。`;
+  } else if (isToday) {
+    // Finishes by end of today wall-clock
+    label = `今天内`;
+    color = 'var(--accent-deep)';
+    tip = `新订单预计今天工作时段内出。当前积压 ${pending} 单，团队速度 ${est.rate.toFixed(1)} 单/活跃小时。`;
+  } else if (isTomorrow) {
+    // Finishes tomorrow — show specific time if computable
+    const hh = finish.getHours();
+    const mm = String(finish.getMinutes()).padStart(2, '0');
+    label = `明天 ${hh}:${mm}`;
+    color = 'var(--warning-deep)';
+    tip = `新订单预计明天 ${hh}:${mm} 左右出。当前积压 ${pending} 单。建议告知客户。`;
+  } else if (isDayAfter) {
+    label = `后天`;
+    color = 'var(--warning-deep)';
+    tip = `新订单预计后天出。当前积压 ${pending} 单较多，建议告知客户。`;
+  } else {
+    // 3+ days out — count calendar days (not work-hour days)
+    const daysOut = Math.ceil((finish - now) / (24 * 3600_000));
+    label = `${daysOut} 天后`;
+    color = 'var(--red)';
+    tip = `⚠ 当前积压严重 (${pending} 单)，新订单预计 ${daysOut} 天后才能出。强烈建议告知客户或增加人手。`;
+  }
+
+  // Update DOM — both the PNR-section chip and the pending-banner stat
+  valEl.textContent = label;
+  valEl.style.color = color;
+  el.title = tip + `\n\n※ 估算基于近 ${est.sampleDays} 天工作时段平均出票速度，每位新员工录入新单后看此提示即可。`;
+  el.style.display = 'inline-flex';
+
+  // Mirror into pending banner stat
+  const bannerStat = document.getElementById('pbNewOrderWaitStat');
+  const bannerV = document.getElementById('pbNewOrderWaitV');
+  if (bannerStat && bannerV) {
+    bannerV.textContent = label;
+    bannerV.style.color = color === 'var(--green)'      ? '#79e8a8'
+                        : color === 'var(--accent-deep)' ? 'var(--accent)'
+                        : color === 'var(--warning-deep)' ? '#ffb567'
+                        : color === 'var(--red)'         ? '#ff6b5a'
+                        : '#fff';
+    bannerStat.title = tip;
+    bannerStat.style.display = '';
+  }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SPEED ANALYSIS — bucket historical orders by airline × USD-band and
+// compute median time-to-ticket. Drives the "速度分析" tab.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// USD amount bands. Edges chosen to roughly match typical fare ranges:
+// <$1k = simple economy; $1-3k = mid-range; $3-10k = premium; $10k+ = first/big group
+const USD_BANDS = [
+  { key: '<$1k',     min: 0,     max: 1000,   label: '<$1k',     short: '<1k' },
+  { key: '$1-3k',    min: 1000,  max: 3000,   label: '$1-3k',    short: '1-3k' },
+  { key: '$3-10k',   min: 3000,  max: 10000,  label: '$3-10k',   short: '3-10k' },
+  { key: '$10k+',    min: 10000, max: Infinity, label: '$10k+',  short: '10k+' },
+];
+
+// Compute USD for an order (handles paxPrices array and basePrice + passenger multiplier)
+function _orderUsd(o, rate) {
+  if (!o) return 0;
+  rate = rate || (settings.rate || 7.2);
+  const hasPP = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
+  const paxCount = (o.passengers || []).length || 1;
+  const fareRmb = hasPP
+    ? o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
+    : (o.basePrice || 0) * paxCount;
+  return fareRmb / rate;
+}
+
+function _bandFor(usd) {
+  for (const b of USD_BANDS) {
+    if (usd >= b.min && usd < b.max) return b.key;
+  }
+  return USD_BANDS[USD_BANDS.length - 1].key;
+}
+
+// Median helper — more robust to outliers than mean.
+function _median(arr) {
+  if (!arr.length) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
+}
+
+// Format milliseconds → human-friendly duration ("2.5h", "45min", "3.2 天")
+function _humanDuration(ms) {
+  if (ms == null || !isFinite(ms)) return '—';
+  const minutes = ms / 60_000;
+  if (minutes < 60) return `${Math.round(minutes)} 分钟`;
+  const hours = ms / 3600_000;
+  if (hours < 24) return `${hours.toFixed(1)} 小时`;
+  return `${(hours / 24).toFixed(1)} 天`;
+}
+
+// Color for a speed value (ms): green=fast, gold=ok, orange=slow, red=very slow
+function _speedColor(ms, allMedians) {
+  if (ms == null || allMedians.length < 3) return 'var(--ink)';
+  const sorted = [...allMedians].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  if (ms <= q1) return 'var(--green)';
+  if (ms <= q3) return 'var(--accent-deep)';
+  if (ms <= q3 * 1.5) return 'var(--warning-deep)';
+  return 'var(--red)';
+}
+
+function renderSpeedAnalysis() {
+  const area = document.getElementById('speedAnalysisArea');
+  if (!area) return;
+
+  const allTicketed = (settings.ticketed || []);
+
+  // ════════════════════════════════════════════════════════════════════════
+  // 收单建议 — Intake Guide (for the operator, not the agent)
+  //
+  // Audience: YOU, deciding whether to tell agents to bring more of a
+  // certain order type before a big order shows up.
+  //
+  // Two judgment criteria (per your input):
+  //
+  //   1. 出票速度 — how fast does our team process this combo?
+  //      Derived from the median TIME BETWEEN successive ticketedAt
+  //      timestamps in the same [airline × band] cell. This number means:
+  //      "every X hours, the team clears one order of this kind."
+  //      We use it instead of (ticketedAt − createdAt) because the
+  //      historical createdAt timestamps are unreliable (most are wrong
+  //      due to legacy migration). The cadence-between-tickets method
+  //      uses only ticketedAt which IS reliable.
+  //
+  //   2. 当前队列拥堵 — how many pending orders are already in this
+  //      same combo right now? More = adding more makes customers wait
+  //      longer.
+  //
+  // The combination gives an honest "estimated wait time if a new order
+  // of this type comes in NOW": cadence × (pending + 1). This is what
+  // actually matters when telling agents what to bring.
+  // ════════════════════════════════════════════════════════════════════════
+
+  // ─── Step 1: filter ticketed entries with airline + ticketedAt ───
+  const volumeUsable = [];
+  allTicketed.forEach(t => {
+    if (!t.ticketedAt) return;
+    const airlineRaw = (t.airline || '').toString().trim().toUpperCase();
+    if (!airlineRaw) return;
+    volumeUsable.push({ ...t, _airline: airlineRaw });
+  });
+
+  if (volumeUsable.length === 0) {
+    area.innerHTML = `
+      <div style="padding:40px; text-align:center; color:var(--muted); background:var(--cream); border-radius:var(--r-md); border:1px dashed var(--line);">
+        <div style="font-size:36px; margin-bottom:12px; opacity:0.4;">📥</div>
+        <div style="font-size:14px; font-weight:600; color:var(--ink); margin-bottom:6px;">需要更多历史数据</div>
+        <div style="font-size:12px; line-height:1.6;">${allTicketed.length} 单历史中没有可用于分析的航司信息。</div>
+      </div>
+    `;
+    return;
+  }
+
+  // ─── Step 2: bucket history per cell, sort ticketedAt for cadence calc ───
+  const matrixCount = {};   // {airline -> {band -> count}}
+  const matrixTimes = {};   // {airline -> {band -> [ticketedAt, ...] sorted asc}}
+  volumeUsable.forEach(t => {
+    const usd = _orderUsd(t, t.rate || settings.rate || 7.2);
+    const band = _bandFor(usd);
+    const al = t._airline;
+    if (!matrixCount[al]) matrixCount[al] = {};
+    matrixCount[al][band] = (matrixCount[al][band] || 0) + 1;
+    if (!matrixTimes[al]) matrixTimes[al] = {};
+    if (!matrixTimes[al][band]) matrixTimes[al][band] = [];
+    matrixTimes[al][band].push(t.ticketedAt);
+  });
+  Object.keys(matrixTimes).forEach(al => {
+    Object.keys(matrixTimes[al]).forEach(band => {
+      matrixTimes[al][band].sort((a, b) => a - b);
+    });
+  });
+
+  // ─── Step 3: compute per-cell cadence (median inter-ticket gap) ───
+  // Returns ms-between-tickets, or null if insufficient data (<3 timestamps).
+  // Caps individual gaps at 14 days to filter out data voids (vacation,
+  // long quiet stretches) that would falsely inflate the cadence.
+  function computeCadenceMs(al, band) {
+    const times = matrixTimes[al] && matrixTimes[al][band];
+    if (!times || times.length < 3) return null;
+    // Use the most recent 30 to keep cadence current (older paces drift)
+    const recent = times.slice(-30);
+    const gaps = [];
+    for (let i = 1; i < recent.length; i++) {
+      const g = recent[i] - recent[i - 1];
+      if (g > 0 && g < 14 * 24 * 3600_000) gaps.push(g);
+    }
+    if (gaps.length < 2) return null;
+    return _median(gaps);
+  }
+
+  // Pre-compute cadence for every cell that has data
+  const cadenceByCell = {};   // {"UA|$1-3k": cadenceMs}
+  Object.keys(matrixCount).forEach(al => {
+    Object.keys(matrixCount[al]).forEach(band => {
+      const c = computeCadenceMs(al, band);
+      if (c != null) cadenceByCell[al + '|' + band] = c;
+    });
+  });
+
+  // ─── Step 4: bucket current pending per cell ───
+  const pendingCount = {};
+  const pending = (STATE.orders || []).filter(o =>
+    isMeaningfulOrder(o) && !o.noAvailability && o.tableLabel !== 'G'
+  );
+  pending.forEach(o => {
+    const usd = _orderUsd(o);
+    const band = _bandFor(usd);
+    const al = (o.airline || '').toUpperCase();
+    if (!al) return;
+    if (!pendingCount[al]) pendingCount[al] = {};
+    pendingCount[al][band] = (pendingCount[al][band] || 0) + 1;
+  });
+
+  // ─── Step 5: per-cell verdict ─────────────────────────────────────────
+  // Combines cadence + pending congestion + history depth.
+  //
+  // "Estimated wait" for a NEW order of this type = cadence × (pending+1).
+  // We bucket on that single number:
+  //   ≤4h   → 🟢 建议多收 (we'd clear it fast)
+  //   ≤16h  → 🟡 可以收
+  //   ≤48h  → 🟠 谨慎
+  //   >48h or no data → 🔴 暂缓
+  // History gates:
+  //   if history < 3 entries → 🔴 不熟悉
+  //   if history = 0 and band ≥ $10k → 🔴 大单不要碰
+  function getVerdict(al, band) {
+    const historyN = (matrixCount[al] && matrixCount[al][band]) || 0;
+    const pendingN = (pendingCount[al] && pendingCount[al][band]) || 0;
+    const cadenceMs = cadenceByCell[al + '|' + band];
+
+    // History-based exclusions take priority
+    if (historyN === 0) {
+      if (band === '$10k+' || band === '$3-10k') {
+        return { tier: 'avoid', label: '🔴 从未做过', color: 'var(--red)',
+                 cadenceMs: null, waitMs: null, historyN, pendingN,
+                 note: '没有同类经验，金额大风险高，建议转出' };
+      }
+      return { tier: 'caution', label: '🟡 首次可试', color: 'var(--warning-deep)',
+               cadenceMs: null, waitMs: null, historyN, pendingN,
+               note: '没做过同类，金额较小可以试试' };
+    }
+    if (historyN <= 2) {
+      return { tier: 'avoid', label: '🔴 极少做过', color: 'var(--red)',
+               cadenceMs: null, waitMs: null, historyN, pendingN,
+               note: `仅 ${historyN} 单经验，建议转出或谨慎接` };
+    }
+
+    // We have history. Need cadence to estimate wait time.
+    if (cadenceMs == null) {
+      // History exists but inter-ticket gaps mostly out of range (long voids)
+      // — treat as low priority signal
+      if (pendingN >= 3) {
+        return { tier: 'avoid', label: '🔴 拥堵·暂缓', color: 'var(--red)',
+                 cadenceMs: null, waitMs: null, historyN, pendingN,
+                 note: `已有 ${pendingN} 单待处理` };
+      }
+      return { tier: 'caution', label: '🟡 速度未知', color: 'var(--warning-deep)',
+               cadenceMs: null, waitMs: null, historyN, pendingN,
+               note: '历史样本少或时间分散，无法估算速度' };
+    }
+
+    // Estimated wait if a new order comes in now
+    const waitMs = cadenceMs * (pendingN + 1);
+    const waitH = waitMs / 3600_000;
+
+    if (waitH <= 4) {
+      return { tier: 'recommend', label: '🟢 建议多收', color: 'var(--green)',
+               cadenceMs, waitMs, historyN, pendingN,
+               note: `团队消化间隔 ${_humanDuration(cadenceMs)} · 新单约 ${_humanDuration(waitMs)} 出` };
+    }
+    if (waitH <= 16) {
+      return { tier: 'ok', label: '🟡 可以收', color: 'var(--accent-deep)',
+               cadenceMs, waitMs, historyN, pendingN,
+               note: `团队消化间隔 ${_humanDuration(cadenceMs)} · 新单约 ${_humanDuration(waitMs)} 出` };
+    }
+    if (waitH <= 48) {
+      return { tier: 'caution', label: '🟠 谨慎', color: 'var(--warning-deep)',
+               cadenceMs, waitMs, historyN, pendingN,
+               note: `队列已堵 (${pendingN} 单) · 新单约 ${_humanDuration(waitMs)} 出` };
+    }
+    return { tier: 'avoid', label: '🔴 暂缓', color: 'var(--red)',
+             cadenceMs, waitMs, historyN, pendingN,
+             note: `队列已堵 (${pendingN} 单) · 新单约 ${_humanDuration(waitMs)} 出，建议先消化` };
+  }
+
+  // ─── Step 6: build verdict map for all cells with any data ───
+  const airlineList = Object.keys(matrixCount).sort((a, b) => {
+    const sa = Object.values(matrixCount[a]).reduce((s, n) => s + n, 0);
+    const sb = Object.values(matrixCount[b]).reduce((s, n) => s + n, 0);
+    return sb - sa;
+  });
+
+  const allCellVerdicts = [];
+  airlineList.forEach(al => {
+    USD_BANDS.forEach(b => {
+      const historyN = (matrixCount[al] && matrixCount[al][b.key]) || 0;
+      const pendingN = (pendingCount[al] && pendingCount[al][b.key]) || 0;
+      if (historyN === 0 && pendingN === 0) return;  // no data, skip
+      const v = getVerdict(al, b.key);
+      allCellVerdicts.push({ al, band: b.key, ...v });
+    });
+  });
+
+  // ─── Step 7: build the actionable recommendation list ───
+  // 建议多收: sort by waitMs asc (fastest first)
+  // 暂缓: sort by waitMs desc (worst first)
+  const recommendCells = allCellVerdicts
+    .filter(c => c.tier === 'recommend' || c.tier === 'ok')
+    .sort((a, b) => (a.waitMs || Infinity) - (b.waitMs || Infinity))
+    .slice(0, 6);
+
+  const avoidCells = allCellVerdicts
+    .filter(c => c.tier === 'avoid' || (c.tier === 'caution' && c.pendingN >= 3))
+    .sort((a, b) => (b.waitMs || 0) - (a.waitMs || 0))
+    .slice(0, 6);
+
+  // ─── Step 8: build recommendation list HTML ───
+  const recCardRow = (c) => `
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 14px; background:var(--cream); border-radius:var(--r-sm); margin-bottom:6px; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px; font-family:'JetBrains Mono',monospace; font-size:12.5px; flex-shrink:0;">
+        <strong style="color:var(--ink); min-width:34px;">${escapeHtml(c.al)}</strong>
+        <span style="color:var(--muted);">·</span>
+        <span style="color:var(--ink-2); min-width:60px;">${c.band}</span>
+      </div>
+      <div style="font-size:11px; color:var(--muted); text-align:right; line-height:1.4; flex:1;">
+        ${c.cadenceMs != null ? `消化间隔 <strong style="color:var(--ink); font-family:'JetBrains Mono',monospace;">${_humanDuration(c.cadenceMs)}</strong> · ` : ''}
+        队列 <strong style="color:${c.pendingN >= 3 ? 'var(--red)' : 'var(--ink)'}; font-family:'JetBrains Mono',monospace;">${c.pendingN}</strong> 单
+        ${c.waitMs != null ? ` · 新单约 <strong style="color:${c.tier === 'avoid' ? 'var(--red)' : c.tier === 'recommend' ? 'var(--green)' : 'var(--accent-deep)'}; font-family:'JetBrains Mono',monospace;">${_humanDuration(c.waitMs)}</strong> 出` : ''}
+      </div>
+    </div>
+  `;
+
+  const recommendHtml = `
+    <div style="background:#fff; border:1px solid var(--line); border-left:3px solid var(--green); border-radius:var(--r-md); padding:14px 18px; margin-bottom:10px;">
+      <div style="font-size:13px; font-weight:700; color:var(--green); margin-bottom:6px;">✅ 建议告诉代理多收</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">出票速度快 + 队列不堵 = 多送进来我们都能消化</div>
+      ${recommendCells.length > 0
+        ? recommendCells.map(recCardRow).join('')
+        : '<div style="font-size:12px; color:var(--muted); padding:8px 0;">— 当前没有显著推荐组合（数据不足或全部组合处于中等状态）</div>'}
+    </div>
+  `;
+
+  const avoidHtml = `
+    <div style="background:#fff; border:1px solid var(--line); border-left:3px solid var(--red); border-radius:var(--r-md); padding:14px 18px; margin-bottom:14px;">
+      <div style="font-size:13px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠ 建议告诉代理暂缓 / 转出</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">队列拥堵 / 历史不熟悉 = 新单送来会等很久或做不好</div>
+      ${avoidCells.length > 0
+        ? avoidCells.map(recCardRow).join('')
+        : '<div style="font-size:12px; color:var(--muted); padding:8px 0;">— 当前没有需要暂缓的组合（队列正常）</div>'}
+    </div>
+  `;
+
+  // ─── Step 9: copy-pasteable agent message ───
+  const messageLines = [];
+  if (recommendCells.length > 0) {
+    const top = recommendCells.slice(0, 4).map(c => `${c.al} ${c.band}`).join('、');
+    messageLines.push(`✅ 建议优先收：${top}`);
+  }
+  avoidCells.slice(0, 3).forEach(c => {
+    if (c.historyN === 0) {
+      messageLines.push(`🚫 ${c.al} ${c.band} 没做过同类，建议转出。`);
+    } else if (c.cadenceMs != null && c.waitMs != null) {
+      messageLines.push(`⚠ 当前 ${c.al} ${c.band} 队列已有 ${c.pendingN} 单，新单约 ${_humanDuration(c.waitMs)} 出，请告知客户。`);
+    } else if (c.pendingN >= 3) {
+      messageLines.push(`⚠ ${c.al} ${c.band} 队列已有 ${c.pendingN} 单待处理，建议先告知客户。`);
+    }
+  });
+  const messageText = messageLines.length > 0
+    ? messageLines.join('\n')
+    : '（暂无显著建议 — 各组合处于正常水位）';
+
+  const messageHtml = `
+    <div style="background:#fff; border:1px solid var(--line); border-left:3px solid var(--accent); border-radius:var(--r-md); padding:14px 18px; margin-bottom:14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+        <div style="font-size:13px; font-weight:700; color:var(--accent-deep);">💬 对代理沟通话术</div>
+        <button onclick="navigator.clipboard.writeText(this.parentNode.nextElementSibling.textContent.trim()).then(()=>{this.textContent='✓ 已复制';setTimeout(()=>{this.textContent='📋 复制';},1500);})" style="border:1px solid var(--line); background:#fff; color:var(--ink); padding:4px 12px; border-radius:var(--r-sm); font-size:11px; cursor:pointer; font-family:inherit;">📋 复制</button>
+      </div>
+      <pre style="margin:0; padding:12px 14px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; line-height:1.7; color:var(--ink); white-space:pre-wrap; word-break:break-word;">${escapeHtml(messageText)}</pre>
+    </div>
+  `;
+
+  // ─── Step 10: detailed matrix ───
+  const matrixHeader = `<th style="text-align:left; padding:9px 12px; background:var(--cream); font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.06em;">航司</th>` +
+    USD_BANDS.map(b => `<th style="text-align:center; padding:9px 12px; background:var(--cream); font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.06em;">${b.label}</th>`).join('');
+
+  const matrixRows = airlineList.map(al => {
+    const cells = USD_BANDS.map(b => {
+      const historyN = (matrixCount[al] && matrixCount[al][b.key]) || 0;
+      const pendingN = (pendingCount[al] && pendingCount[al][b.key]) || 0;
+      if (historyN === 0 && pendingN === 0) {
+        return `<td style="padding:8px 10px; text-align:center; color:var(--line-strong); font-size:11px; border:1px solid var(--line);">—</td>`;
+      }
+      const v = getVerdict(al, b.key);
+      const pendingPill = pendingN > 0
+        ? `<span style="display:inline-block; margin-left:4px; background:rgba(184,60,44,0.12); color:var(--red); padding:1px 5px; border-radius:7px; font-size:9.5px; font-weight:700;" title="当前待出票">+${pendingN}</span>`
+        : '';
+      const cadenceLine = v.cadenceMs != null
+        ? `<div style="font-size:9.5px; color:var(--muted); margin-top:2px; font-family:'JetBrains Mono',monospace;">每 ${_humanDuration(v.cadenceMs)}/单</div>`
+        : '';
+      return `<td style="padding:8px 10px; text-align:center; vertical-align:top; border:1px solid var(--line);" title="${escapeAttr(v.note)}">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:12.5px; color:var(--ink); font-weight:700;">${historyN}<span style="font-size:9.5px; color:var(--muted); font-weight:400; margin-left:1px;">单</span>${pendingPill}</div>
+        <div style="font-size:10.5px; color:${v.color}; font-weight:700; margin-top:3px; white-space:nowrap;">${v.label}</div>
+        ${cadenceLine}
+      </td>`;
+    }).join('');
+    return `<tr>
+      <td style="padding:8px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); background:var(--cream); border:1px solid var(--line);">${escapeHtml(al)}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  const matrixHtml = `
+    <div style="background:#fff; border:1px solid var(--line); border-radius:var(--r-md); padding:16px 18px; margin-bottom:14px; overflow-x:auto;">
+      <div style="font-size:13px; font-weight:700; color:var(--ink); margin-bottom:6px;">📊 详细矩阵 — 航司 × 金额段</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:14px; line-height:1.5;">
+        每格显示：<strong>历史出票数</strong> + <span style="background:rgba(184,60,44,0.12); color:var(--red); padding:1px 4px; border-radius:5px; font-size:9.5px;">+N</span> 当前队列 + <strong>每 X/单</strong> 消化间隔（出票节奏）。
+        鼠标停在格子上看详细解读。
+      </div>
+      <table style="width:100%; border-collapse:collapse;">
+        <thead><tr>${matrixHeader}</tr></thead>
+        <tbody>${matrixRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // ─── Step 11: top stats card ───
+  const recCount = allCellVerdicts.filter(c => c.tier === 'recommend' || c.tier === 'ok').length;
+  const avoidCount = allCellVerdicts.filter(c => c.tier === 'avoid' || (c.tier === 'caution' && c.pendingN >= 3)).length;
+  const statsHtml = `
+    <div style="background:linear-gradient(135deg, rgba(200,160,74,0.08), rgba(200,160,74,0.02)); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(4,1fr); gap:18px;">
+      <div>
+        <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">历史出票</div>
+        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--ink); line-height:1.1;">${volumeUsable.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
+      </div>
+      <div>
+        <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">当前待出票</div>
+        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--accent-deep); line-height:1.1;">${pending.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
+      </div>
+      <div>
+        <div style="font-size:10px; color:var(--green); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">建议多收</div>
+        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--green); line-height:1.1;">${recCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
+      </div>
+      <div>
+        <div style="font-size:10px; color:var(--red); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">建议暂缓</div>
+        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--red); line-height:1.1;">${avoidCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
+      </div>
+    </div>
+  `;
+
+  // ─── Final assembly ───
+  area.innerHTML = `
+    ${statsHtml}
+    ${recommendHtml}
+    ${avoidHtml}
+    ${messageHtml}
+    ${matrixHtml}
+  `;
+}
+// ═══════════════════════════════════════════════════════════════════════════
 
 // Format the predicted finish time. Examples:
 //   today 14:30   → 今天 14:30
@@ -5695,6 +6396,7 @@ document.querySelectorAll('.tab').forEach(t => {
     // Render Chase panel on demand
     if (t.dataset.tab === 'chase') renderChasePanel();
     if (t.dataset.tab === 'team') renderTeamPanel();
+    if (t.dataset.tab === 'speed') renderSpeedAnalysis();
   });
 });
 
@@ -6591,8 +7293,9 @@ function renderPassengers() {
       <div class="row">
         <div class="field mono" style="grid-column: 1 / -1">
           <label>Name 姓名 (LASTNAME/FIRSTNAME)</label>
-          <input type="text" value="${escapeAttr(p.name)}" oninput="curr().passengers[${i}].name = this.value.toUpperCase(); renderOrderTabs(); renderPreview(); updateOFACBar(${i}); checkOFACDebounced(this.value, () => updateOFACBar(${i}))" style="text-transform:uppercase" placeholder="QIU/XIAOGANG">
+          <input type="text" value="${escapeAttr(p.name)}" oninput="curr().passengers[${i}].name = this.value.toUpperCase(); renderOrderTabs(); renderPreview(); updateOFACBar(${i}); checkOFACDebounced(this.value, () => updateOFACBar(${i})); updatePaxHistoryBanner(${i})" style="text-transform:uppercase" placeholder="QIU/XIAOGANG">
           <div id="ofac-bar-${i}">${buildOFACWarningHTML(p.name, i)}</div>
+          <div id="pax-history-bar-${i}">${buildPassengerHistoryHTML(p.name, p.dob, p.passportNo, curr().id, i)}</div>
         </div>
       </div>
       <div class="row" id="pax-details-${i}" style="margin-top:8px; display:${hasDetails ? 'grid' : 'none'}; grid-template-columns: 1fr 1fr;">
@@ -6606,7 +7309,7 @@ function renderPassengers() {
         </div>
         <div class="field mono">
           <label>DOB 生日 (DDMMMYY)</label>
-          <input type="text" value="${escapeAttr(p.dob || '')}" oninput="curr().passengers[${i}].dob = this.value.toUpperCase(); renderPreview()" style="text-transform:uppercase" placeholder="05JAN70">
+          <input type="text" value="${escapeAttr(p.dob || '')}" oninput="curr().passengers[${i}].dob = this.value.toUpperCase(); renderPreview(); updatePaxHistoryBanner(${i})" style="text-transform:uppercase" placeholder="05JAN70">
         </div>
       </div>`;
     wrap.appendChild(div);
@@ -7284,9 +7987,12 @@ function parseSingleBooking(raw) {
 
     // Labeled field format (multi-line passenger info):
     //   "名字：CHEN/GONGHAI" / "姓名：WANG/LI"
-    //   "出生日期 1969-06-14" / "出生日期：1969-06-14"
+    //   "出生日期 1969-06-14" / "出生日期：1969-06-14" / "生日：1947年10月29日"
     //   "性别：男" / "性别：女"
-    const labeledName = trimmed.match(/^(?:名字|姓名)[：:\s]\s*([A-Z]{2,}\/[A-Z][A-Z\s]*)/i);
+    //   "护照号：360092169" / "护照号码：EE1234567"
+    //   "护照代码 ： TWN" / "国籍：中国" (extra spaces around colon allowed)
+    //   "有效期：2031年3月5日"
+    const labeledName = trimmed.match(/^(?:名字|姓名)\s*[：:]?\s*([A-Z]{2,}\/[A-Z][A-Z\s]*)/i);
     if (labeledName) {
       // Strip trailing title suffixes: MR, MRS, MS, MISS, DR, MSTR
       const name = labeledName[1].trim().replace(/\s+/g, ' ')
@@ -7296,7 +8002,8 @@ function parseSingleBooking(raw) {
       }
       continue;
     }
-    const labeledDob = trimmed.match(/^出生日期[：:\s]\s*(.+)/);
+    // DOB labels: 出生日期 / 生日 (the latter common in personal-style inputs)
+    const labeledDob = trimmed.match(/^(?:出生日期|生日|出生|DOB|Date of Birth)\s*[：:]?\s*(.+)/i);
     if (labeledDob) {
       const dob = extractDOB(labeledDob[1]);
       if (dob && pax.length > 0) {
@@ -7305,7 +8012,7 @@ function parseSingleBooking(raw) {
       }
       continue;
     }
-    const labeledGender = trimmed.match(/^性别[：:\s]\s*([男女MF])/i);
+    const labeledGender = trimmed.match(/^性别\s*[：:]?\s*([男女MF])/i);
     if (labeledGender) {
       const g = labeledGender[1];
       const gender = (g === '男' || g.toUpperCase() === 'M') ? 'MALE' : 'FEMALE';
@@ -7313,6 +8020,21 @@ function parseSingleBooking(raw) {
         const last = pax[pax.length - 1];
         if (!last.gender) last.gender = gender;
       }
+      continue;
+    }
+    // Passport number: "护照号：360092169" or "护照号码：EE1234567" — Taiwan/
+    // Korean passports may be digit-only, hence the broader regex.
+    const labeledPassport = trimmed.match(/^护照(?:号|号码|N[Oo]\.?)\s*[：:]?\s*([A-Z0-9]{5,12})/i);
+    if (labeledPassport && pax.length > 0) {
+      const last = pax[pax.length - 1];
+      if (!last.passportNo) last.passportNo = labeledPassport[1].toUpperCase();
+      continue;
+    }
+    // Nationality / passport country code: "护照代码：TWN" / "国籍：CHN"
+    const labeledNationality = trimmed.match(/^(?:护照代码|国籍|Nationality)\s*[：:]?\s*([A-Za-z]{2,3})/i);
+    if (labeledNationality && pax.length > 0) {
+      const last = pax[pax.length - 1];
+      if (!last.nationality) last.nationality = labeledNationality[1].toUpperCase();
       continue;
     }
 
@@ -8937,6 +9659,10 @@ function renderAirlineUsdPanel(orders) {
   };
   Object.values(byAirlineMap).forEach(group => {
     group.sort((a, b) => {
+      // Priority 0: urgent flag → bubble to absolute top of group
+      const aUrgent = a.o.urgent ? 1 : 0;
+      const bUrgent = b.o.urgent ? 1 : 0;
+      if (aUrgent !== bUrgent) return bUrgent - aUrgent;
       // Priority 1: already assigned cardholder → float to top
       const aAssigned = a.o.cardholderId ? 1 : 0;
       const bAssigned = b.o.cardholderId ? 1 : 0;
@@ -8945,6 +9671,15 @@ function renderAirlineUsdPanel(orders) {
       const aMixed = detectMixedCabin(a.o).isMixed ? 1 : 0;
       const bMixed = detectMixedCabin(b.o).isMixed ? 1 : 0;
       if (aMixed !== bMixed) return aMixed - bMixed;
+      // Priority 3: manual order — if user has dragged either order, honor that
+      // first. Order with manualOrder set comes before one without (since
+      // user explicitly put it somewhere). Two manually-ordered items sort
+      // by their numeric position.
+      const aMan = a.o.manualOrder;
+      const bMan = b.o.manualOrder;
+      if (aMan != null && bMan != null) return aMan - bMan;
+      if (aMan != null && bMan == null) return -1;  // manual wins
+      if (aMan == null && bMan != null) return 1;
       // Default: smallest USD first
       return getOrderUsd(a) - getOrderUsd(b);
     });
@@ -9111,12 +9846,30 @@ function renderAirlineUsdPanel(orders) {
         row.style.background = '#f5f5f5';
       }
       const imminentBadge = buildImminentDepartureHTML(o);
+      // Repeat-customer badge — check first passenger only (simple heuristic
+      // since most orders are single-pax or group of same family). Skip
+      // entirely if no DOB on the first pax (matching requires identity
+      // verification).
+      const firstPax = (o.passengers || [])[0];
+      const historyBadge = firstPax
+        ? buildPassengerHistoryBadge(firstPax.name, firstPax.dob, firstPax.passportNo, o.id)
+        : '';
+      // Manual-order indicator on drag handle — if user has dragged this row
+      // before, show a small dot accent on the handle so they know it's in
+      // a user-pinned position.
+      const handleTitle = o.manualOrder != null
+        ? '此订单已手动排序 · 拖动调整位置 · 双击重置为自动排序'
+        : '拖动调整顺序';
+      const handleStyle = o.manualOrder != null
+        ? 'color:var(--accent-deep); opacity:0.7;'
+        : '';
       row.innerHTML = `
+        <span class="usd-row-drag" data-row-idx="${originalIdx}" title="${handleTitle}" style="${handleStyle}">⋮⋮</span>
         <span class="order-num">#${displayIdx + 1}</span>
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
         <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? '表'+escapeHtml(o.tableLabel) : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -9129,6 +9882,8 @@ function renderAirlineUsdPanel(orders) {
           title="${o.noAvailability ? '取消暂时无位，恢复正常' : '标记为暂时无位（价格消失，等待重新刷到）'}">⏸</button>
         <button class="usd-row-delete" onclick="event.stopPropagation(); quickDeleteOrder(${originalIdx}, '${escapeAttr(paxText)}')" title="删除此订单">✕</button>
       `;
+      // Wire up drag handle (uses HTML5 DnD, only fires when drag starts ON the handle)
+      initRowDragHandle(row, originalIdx, al);
       grid.appendChild(row);
     });
   });
@@ -11369,13 +12124,18 @@ function exportBackupJSON() {
 // ═══════════════════════════════════════════════════════════════════════════════
 function openStatsDashboard() {
   const ticketed = settings.ticketed || [];
-  if (ticketed.length === 0) { toast('暂无已出票数据'); return; }
+  if (ticketed.length === 0) {
+    toast(CURRENT_LANG === 'en' ? 'No ticketed data yet' : '暂无已出票数据');
+    return;
+  }
 
   // Build monthly stats
   const monthly = {};
   for (const t of ticketed) {
     const d = t.ticketedAt ? new Date(t.ticketedAt) : null;
-    const key = d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` : '未知';
+    const key = d
+      ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
+      : (CURRENT_LANG === 'en' ? 'Unknown' : '未知');
     if (!monthly[key]) monthly[key] = { count: 0, revenue: 0, cost: 0, profit: 0, airlines: {} };
     monthly[key].count++;
     const rev = t.finalPrice || 0;
@@ -11383,7 +12143,7 @@ function openStatsDashboard() {
     monthly[key].revenue += rev;
     monthly[key].cost += st;
     monthly[key].profit += (rev - st);
-    const al = t.airline || '其他';
+    const al = t.airline || (CURRENT_LANG === 'en' ? 'Other' : '其他');
     monthly[key].airlines[al] = (monthly[key].airlines[al] || 0) + 1;
   }
 
@@ -11404,7 +12164,10 @@ function openStatsDashboard() {
       const ch = cardholders.find(c => c.id === id);
       return { name: ch ? ch.name : id, ...s };
     })
-    .sort((a, b) => b.profit - a.profit)
+    // Sort by ticket COUNT (most active cardholders first). Profit is shown
+    // alongside but isn't the primary signal — historical orders often have
+    // missing finalPrice/settlementUsd so profit defaults to 0 for many.
+    .sort((a, b) => b.count - a.count || b.profit - a.profit)
     .slice(0, 10);
 
   const sortedMonths = Object.keys(monthly).sort();
@@ -11427,11 +12190,19 @@ function openStatsDashboard() {
 
   const chRows = chLeaderboard.map((c, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i+1}.`;
-    const profitColor = c.profit >= 0 ? 'var(--green)' : 'var(--red)';
+    // Count is the primary signal — bold, large, gold-tinted for top 3
+    const countColor = i < 3 ? 'var(--accent-deep)' : 'var(--ink)';
+    const countWeight = i < 3 ? '700' : '600';
+    // Profit shown but greyed if zero (common in historical data without
+    // populated finalPrice / settlementUsd fields)
+    const profitColor = c.profit > 0 ? 'var(--green)'
+                      : c.profit < 0 ? 'var(--red)'
+                      : 'var(--muted)';
+    const profitWeight = c.profit !== 0 ? '600' : '400';
     return `<tr style="border-bottom:1px solid #f0f0f0;">
       <td style="padding:8px 12px;">${medal} ${escapeHtml(c.name)}</td>
-      <td style="padding:8px 12px;text-align:center;">${c.count}</td>
-      <td style="padding:8px 12px;text-align:right;color:${profitColor};font-weight:600;">¥${Math.round(c.profit).toLocaleString()}</td>
+      <td style="padding:8px 12px;text-align:center;font-family:'JetBrains Mono',monospace;font-weight:${countWeight};color:${countColor};font-size:13px;">${c.count}<span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:3px;">单</span></td>
+      <td style="padding:8px 12px;text-align:right;color:${profitColor};font-weight:${profitWeight};">¥${Math.round(c.profit).toLocaleString()}</td>
     </tr>`;
   }).join('');
 
@@ -11446,25 +12217,25 @@ function openStatsDashboard() {
         <div style="position:absolute;top:-30px;right:-20px;width:160px;height:160px;background:radial-gradient(circle,rgba(200,160,74,0.22) 0%,transparent 70%);pointer-events:none;"></div>
         <div style="position:relative;z-index:1;">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.2em;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">analytics overview</div>
-          <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;letter-spacing:-0.01em;">数据统计仪表板</div>
-          <div style="font-size:12px;opacity:0.7;margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.04em;">${totalCount} 单已出票 · ${sortedMonths.length} 个月</div>
+          <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;letter-spacing:-0.01em;">${CURRENT_LANG === 'en' ? 'Analytics Dashboard' : '数据统计仪表板'}</div>
+          <div style="font-size:12px;opacity:0.7;margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.04em;">${CURRENT_LANG === 'en' ? `${totalCount} ticketed · ${sortedMonths.length} months` : `${totalCount} 单已出票 · ${sortedMonths.length} 个月`}</div>
         </div>
-        <button onclick="document.getElementById('statsOverlay').remove()" style="position:relative;z-index:1;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;border-radius:var(--r-sm);padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">✕ 关闭</button>
+        <button onclick="document.getElementById('statsOverlay').remove()" style="position:relative;z-index:1;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;border-radius:var(--r-sm);padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">✕ ${CURRENT_LANG === 'en' ? 'Close' : '关闭'}</button>
       </div>
 
       <!-- Summary cards: editorial style with Fraunces numbers -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:24px 28px 0;">
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">REVENUE 总收入</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">REVENUE ${CURRENT_LANG === 'en' ? 'Total' : '总收入'}</div>
           <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--green);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">¥${Math.round(totalRevenue).toLocaleString()}</div>
         </div>
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid ${profitOk ? 'var(--accent)' : 'var(--red)'};border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">PROFIT 累计利润</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">PROFIT ${CURRENT_LANG === 'en' ? 'Cumulative' : '累计利润'}</div>
           <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:${profitOk ? 'var(--accent-deep)' : 'var(--red)'};line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${profitOk ? '+' : ''}¥${Math.round(totalProfit).toLocaleString()}</div>
         </div>
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">VOLUME 出票总数</div>
-          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--blue);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${totalCount}<span style="font-size:14px;color:var(--muted);font-weight:400;margin-left:4px;">单</span></div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">VOLUME ${CURRENT_LANG === 'en' ? 'Tickets' : '出票总数'}</div>
+          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--blue);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${totalCount}<span style="font-size:14px;color:var(--muted);font-weight:400;margin-left:4px;">${CURRENT_LANG === 'en' ? 'orders' : '单'}</span></div>
         </div>
       </div>
 
@@ -11472,17 +12243,17 @@ function openStatsDashboard() {
       <div style="padding:24px 28px 0;">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.18em;color:var(--accent-deep);text-transform:uppercase;">MONTHLY</span>
-          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">按月明细</span>
+          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Monthly breakdown' : '按月明细'}</span>
           <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.04em;">${sortedMonths.length} months</span>
         </div>
         <div style="background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead><tr style="background:var(--cream);">
-              <th style="padding:10px 14px;text-align:left;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">月份</th>
-              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">单数</th>
-              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">收入</th>
-              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">利润</th>
-              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">主力航司</th>
+              <th style="padding:10px 14px;text-align:left;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Month' : '月份'}</th>
+              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Count' : '单数'}</th>
+              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Revenue' : '收入'}</th>
+              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Profit' : '利润'}</th>
+              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Top airline' : '主力航司'}</th>
             </tr></thead>
             <tbody>${monthRows}</tbody>
           </table>
@@ -11494,15 +12265,15 @@ function openStatsDashboard() {
       <div style="padding:24px 28px 0;">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.18em;color:var(--accent-deep);text-transform:uppercase;">LEADERBOARD</span>
-          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">卡主利润排行</span>
+          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Cardholder ticket ranking' : '卡主出票排行'}</span>
           <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.04em;">top ${chLeaderboard.length}</span>
         </div>
         <div style="background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;">
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead><tr style="background:var(--cream);">
-              <th style="padding:10px 14px;text-align:left;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">卡主</th>
-              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">单数</th>
-              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">利润贡献</th>
+              <th style="padding:10px 14px;text-align:left;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Cardholder' : '卡主'}</th>
+              <th style="padding:10px 14px;text-align:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Count' : '单数'}</th>
+              <th style="padding:10px 14px;text-align:right;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;">${CURRENT_LANG === 'en' ? 'Profit contribution' : '利润贡献'}</th>
             </tr></thead>
             <tbody>${chRows}</tbody>
           </table>
@@ -11648,6 +12419,149 @@ function initDragReorder(groupEl, stateIdx) {
     renderPendingList();
   });
 }
+
+// ─── Compact-row drag-to-reorder for the airline USD list ──────────────────
+// Lets the user drag rows within the same airline to manually set order
+// (e.g. "do this $7k order BEFORE that $5k one"). Writes a `manualOrder`
+// numeric position on each affected order so the sort comparator respects
+// the user's choice.
+//
+// Constraints:
+//   • Only the small ⋮⋮ handle is draggable, not the whole row (avoids
+//     accidental drags when clicking a card to expand)
+//   • Drag only allowed WITHIN the same airline group — dropping onto a
+//     different airline's row is ignored
+//   • Urgent / assigned / mixed-cabin status still wins over manual order
+//     (so dragging a normal order above an urgent one won't actually push
+//     past the urgent one — that's by design)
+//   • Double-click handle clears that row's manual order (back to auto)
+let _rowDragSrcIdx = null;
+let _rowDragSrcAirline = null;
+
+function initRowDragHandle(rowEl, originalIdx, airline) {
+  const handle = rowEl.querySelector('.usd-row-drag');
+  if (!handle) return;
+
+  // Track whether the user pressed-down on the handle. HTML5 drag fires
+  // `dragstart` from whatever element under the cursor when the user starts
+  // dragging, regardless of whether they grabbed the handle or the row body.
+  // We track mousedown source and check it in dragstart to gate the action.
+  let pressedHandle = false;
+  handle.addEventListener('mousedown', (e) => {
+    pressedHandle = true;
+    e.stopPropagation();
+  });
+  // Reset on any global mouseup
+  document.addEventListener('mouseup', () => { pressedHandle = false; });
+
+  // Row must be draggable from the start — the old try-to-flip-draggable-on-
+  // mousedown trick was unreliable (timing race with dragstart). We gate by
+  // checking the originating element in dragstart instead.
+  rowEl.draggable = true;
+
+  // Double-click handle = clear manual order on this row
+  handle.addEventListener('dblclick', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const o = STATE.orders[originalIdx];
+    if (!o || o.manualOrder == null) return;
+    o.manualOrder = null;
+    await persistOrdersNow();
+    renderAirlineUsdPanel();
+    toast('✓ 已恢复自动排序');
+  });
+
+  rowEl.addEventListener('dragstart', (e) => {
+    // Only initiate reorder if user grabbed the handle, not the row body
+    if (!pressedHandle) {
+      e.preventDefault();
+      return;
+    }
+    _rowDragSrcIdx = originalIdx;
+    _rowDragSrcAirline = airline;
+    e.dataTransfer.effectAllowed = 'move';
+    // setData required by Firefox for drag to actually work
+    try { e.dataTransfer.setData('text/plain', String(originalIdx)); } catch(_) {}
+    rowEl.classList.add('row-dragging');
+  });
+  rowEl.addEventListener('dragend', () => {
+    pressedHandle = false;
+    rowEl.classList.remove('row-dragging');
+    document.querySelectorAll('.airline-usd-row.row-drop-target')
+      .forEach(el => el.classList.remove('row-drop-target'));
+  });
+
+  rowEl.addEventListener('dragover', (e) => {
+    if (_rowDragSrcIdx === null || _rowDragSrcIdx === originalIdx) return;
+    // Only allow drop within same airline
+    if (_rowDragSrcAirline !== airline) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    rowEl.classList.add('row-drop-target');
+  });
+  rowEl.addEventListener('dragleave', () => rowEl.classList.remove('row-drop-target'));
+
+  rowEl.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    rowEl.classList.remove('row-drop-target');
+    if (_rowDragSrcIdx === null || _rowDragSrcIdx === originalIdx) return;
+    if (_rowDragSrcAirline !== airline) return;
+
+    // Strategy: assign manualOrder values to all rows in the *same status
+    // rank* as the dragged pair. We compute each row's status rank (same
+    // logic as the sort comparator) and only renumber peers — so dragging a
+    // normal/unassigned row only reshuffles other normal/unassigned rows,
+    // not assigned ones above them. This prevents the user from being
+    // confused when a drag "appears to do nothing" because urgent/assigned
+    // priority outranked it.
+    const statusRank = (o) => {
+      if (o.urgent) return 0;
+      if (o.cardholderId) return 1;
+      if (detectMixedCabin(o).isMixed) return 9;
+      return 5;  // normal/unassigned (and the cases we want to reorder)
+    };
+    const sourceRank = statusRank(sourceOrder);
+    const targetRank = statusRank(targetOrder);
+    // If dragging across different status ranks, abort + explain
+    if (sourceRank !== targetRank) {
+      _rowDragSrcIdx = null;
+      _rowDragSrcAirline = null;
+      toast('✗ 无法跨状态拖动 — 加急/已分配卡主等优先级会先生效');
+      return;
+    }
+
+    // Collect ALL rows in same airline + same status rank, in current visual order
+    const allRowsInAirline = Array.from(document.querySelectorAll(`.airline-usd-row`))
+      .filter(r => {
+        const h = r.querySelector('.usd-row-drag');
+        if (!h) return false;
+        const idx = parseInt(h.getAttribute('data-row-idx'), 10);
+        const o = STATE.orders[idx];
+        if (!o || (o.airline || '') !== airline) return false;
+        return statusRank(o) === sourceRank;
+      });
+    const orderedIdxs = allRowsInAirline
+      .map(r => parseInt(r.querySelector('.usd-row-drag').getAttribute('data-row-idx'), 10));
+    const fromPos = orderedIdxs.indexOf(_rowDragSrcIdx);
+    let toPos = orderedIdxs.indexOf(originalIdx);
+    if (fromPos < 0 || toPos < 0) return;
+    orderedIdxs.splice(fromPos, 1);
+    orderedIdxs.splice(toPos, 0, _rowDragSrcIdx);
+
+    // Assign manualOrder values 100, 200, 300, …
+    orderedIdxs.forEach((idx, i) => {
+      const o = STATE.orders[idx];
+      if (o) o.manualOrder = (i + 1) * 100;
+    });
+
+    _rowDragSrcIdx = null;
+    _rowDragSrcAirline = null;
+    await persistOrdersNow();
+    renderAirlineUsdPanel();
+    toast('✓ 顺序已更新');
+  });
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEXT-STEP GUIDANCE — highlight what to fill after cardholder is assigned
@@ -12600,6 +13514,7 @@ const I18N_DICT = {
   'tab.team':         { zh: '👥 全员',      en: '👥 TEAM' },
   'tab.ticketed':     { zh: '✓ 已出票',     en: '✓ TICKETED' },
   'tab.actions':      { zh: '⚠ 处理',       en: '⚠ ACTIONS' },
+  'tab.speed':        { zh: '📥 收单建议',    en: '📥 INTAKE GUIDE' },
   'tab.cardholders':  { zh: '💳 卡主',      en: '💳 CARDHOLDERS' },
   'tab.settings':     { zh: '⚙ 设置',       en: '⚙ SETTINGS' },
 
@@ -12660,7 +13575,7 @@ const I18N_DICT = {
   'stats.totalProfit':    { zh: 'PROFIT 累计利润',        en: 'PROFIT Cumulative' },
   'stats.totalVolume':    { zh: 'VOLUME 出票总数',        en: 'VOLUME Tickets' },
   'stats.monthly':        { zh: '按月明细',               en: 'Monthly breakdown' },
-  'stats.leaderboard':    { zh: '卡主利润排行',           en: 'Cardholder leaderboard' },
+  'stats.leaderboard':    { zh: '卡主出票排行',           en: 'Cardholder ticket ranking' },
   'stats.col.month':      { zh: '月份', en: 'MONTH' },
   'stats.col.count':      { zh: '单数', en: 'COUNT' },
   'stats.col.revenue':    { zh: '收入', en: 'REVENUE' },
@@ -12675,12 +13590,197 @@ const I18N_DICT = {
   'misc.empty.noResults': { zh: '没有符合筛选条件的订单', en: 'No orders match the filter' },
   'misc.empty.go':        { zh: '✈ 去录入订单',         en: '✈ Add an order' },
   'misc.unit.orders':     { zh: '单', en: 'orders' },
-  'misc.unit.day':        { zh: '天', en: 'days' },
-  'misc.unit.hour':       { zh: '小时', en: 'hours' },
-  'misc.unit.minute':     { zh: '分钟', en: 'minutes' },
+  'misc.unit.day':        { zh: '天', en: 'd' },
+  'misc.unit.hour':       { zh: '小时', en: 'h' },
+  'misc.unit.minute':     { zh: '分钟', en: 'min' },
   'misc.about':           { zh: '约', en: '~' },
   'misc.searchPlaceholder': { zh: '🔍 搜索姓名/航班/PNR...', en: '🔍 Search name / flight / PNR...' },
+
+  // View / Focus mode toggles
+  'mode.list':            { zh: '☰ 列表', en: '☰ List' },
+  'mode.gradient':        { zh: '▦ 梯度', en: '▦ Bands' },
+  'focus.single':         { zh: '◉ 单展开', en: '◉ Focus' },
+  'focus.multi':          { zh: '◎ 多展开', en: '◎ Multi' },
+
+  // Section titles (more)
+  'sec.entryForm':        { zh: '填写订单信息',       en: 'Fill in order info' },
+  'sec.preview':          { zh: '订单预览',           en: 'Order preview' },
+  'sec.pendingMgmt':      { zh: '待出票订单管理',     en: 'Pending orders' },
+  'sec.ticketedHistory':  { zh: '已出票历史记录',     en: 'Ticketing history' },
+  'sec.cardholderMgmt':   { zh: '卡主管理',           en: 'Cardholder management' },
+  'sec.settings':         { zh: '系统设置',           en: 'System settings' },
+
+  // Form labels (entry/edit panel)
+  'form.label':           { zh: '表', en: 'CATEGORY' },
+  'form.client':          { zh: '客户', en: 'CLIENT' },
+  'form.agent':           { zh: '代理', en: 'AGENT' },
+  'form.cardholder':      { zh: '卡主', en: 'CARDHOLDER' },
+  'form.cardholderSearch': { zh: '搜索卡主...', en: 'Search cardholder...' },
+  'form.airline':         { zh: '航司', en: 'AIRLINE' },
+  'form.cabin':           { zh: '舱位', en: 'CABIN' },
+  'form.channel':         { zh: '渠道', en: 'CHANNEL' },
+  'form.type':            { zh: '积分方式', en: 'TYPE' },
+  'form.pnr':             { zh: '编码 PNR', en: 'PNR' },
+  'form.ticket':          { zh: '票号 TKT', en: 'TKT' },
+  'form.choose':          { zh: '*二选一', en: '*either one' },
+  'form.notProvided':     { zh: '暂未提供', en: 'Not yet provided' },
+  'form.optional':        { zh: '(选填)', en: '(optional)' },
+  'form.passengers':      { zh: '乘客信息', en: 'PASSENGERS' },
+  'form.price':           { zh: '售价', en: 'PRICE' },
+  'form.cost':            { zh: '成本', en: 'COST' },
+  'form.discount':        { zh: '优惠', en: 'DISCOUNT' },
+  'form.revenue':         { zh: '收入', en: 'REVENUE' },
+  'form.profit':          { zh: '利润', en: 'PROFIT' },
+  'form.fare':            { zh: '运价', en: 'FARE' },
+  'form.basePrice':       { zh: '基础价', en: 'BASE PRICE' },
+  'form.perPax':          { zh: '人均', en: 'PER PAX' },
+  'form.total':           { zh: '合计', en: 'TOTAL' },
+  'form.markdown':        { zh: '直接折扣', en: 'Direct discount' },
+  'form.directSettle':    { zh: '直接结算', en: 'Direct settlement' },
+  'form.specialDiscount': { zh: '特殊折扣', en: 'Special discount' },
+  'form.miles':           { zh: '里程', en: 'Miles' },
+  'form.points':          { zh: '积分', en: 'Points' },
+  'form.rmb':             { zh: '人民币', en: 'RMB' },
+  'form.usd':             { zh: '美金', en: 'USD' },
+  'form.fxRate':          { zh: '汇率', en: 'FX rate' },
+  'form.unassigned':      { zh: '未分配', en: 'Unassigned' },
+  'form.unspecifiedAgent': { zh: '未指定代理', en: 'No agent' },
+  'form.uncategorized':   { zh: '未分类', en: 'Uncategorized' },
+
+  // Status badges
+  'status.releaseHold':   { zh: '🔒 放位', en: '🔒 On hold' },
+  'status.noAvailability': { zh: '⏸ 无位', en: '⏸ No avail' },
+  'status.mixed':         { zh: '⚠ 混舱', en: '⚠ Mixed cabin' },
+  'status.urgent':        { zh: '💣 加急', en: '💣 Urgent' },
+  'status.completed':     { zh: '已完成', en: 'Done' },
+  'status.canceled':      { zh: '取消', en: 'Canceled' },
+  'status.missingFare':   { zh: '⚠ 缺运价', en: '⚠ Missing fare' },
+
+  // Cabin classes — display layer only, data still stored in Chinese
+  'cabin.economy':        { zh: '经济舱', en: 'Economy' },
+  'cabin.premiumEconomy': { zh: '超级经济舱', en: 'Premium Economy' },
+  'cabin.business':       { zh: '商务舱', en: 'Business' },
+  'cabin.first':          { zh: '头等舱', en: 'First' },
+
+  // Pax types
+  'pax.adult':            { zh: '大人', en: 'Adult' },
+  'pax.child':            { zh: '儿童', en: 'Child' },
+  'pax.infant':           { zh: '婴儿', en: 'Infant' },
+  'pax.male':             { zh: '男', en: 'Male' },
+  'pax.female':           { zh: '女', en: 'Female' },
+  'pax.person':           { zh: '人', en: 'pax' },
+
+  // Order actions
+  'action.assign':        { zh: '分配卡主', en: 'Assign cardholder' },
+  'action.markTicketed':  { zh: '✓ 已出票', en: '✓ Mark ticketed' },
+  'action.markUrgent':    { zh: '标记加急', en: 'Mark urgent' },
+  'action.unmarkUrgent':  { zh: '取消加急', en: 'Unmark urgent' },
+  'action.markNoAvail':   { zh: '暂时无位', en: 'No availability' },
+  'action.releaseHold':   { zh: '放位', en: 'On hold' },
+  'action.linkOrders':    { zh: '关联订单', en: 'Link orders' },
+  'action.fullEdit':      { zh: '完整编辑', en: 'Full edit' },
+  'action.copyContact':   { zh: '复制客服信息', en: 'Copy contact info' },
+  'action.copyPaxInfo':   { zh: '复制乘客信息', en: 'Copy passenger info' },
+  'action.recordLog':     { zh: '记录员报表', en: 'Recorder log' },
+  'action.agentReport':   { zh: '代理商报表', en: 'Agent report' },
+  'action.officialCheck': { zh: '官网校验', en: 'Official check' },
+  'action.protect':       { zh: '加护照', en: 'Add passport' },
+
+  // Trip type
+  'trip.oneWay':          { zh: 'ONE WAY', en: 'ONE WAY' },
+  'trip.roundTrip':       { zh: 'ROUND TRIP', en: 'ROUND TRIP' },
+
+  // OFAC
+  'ofac.noRisk':          { zh: '本订单无制裁风险', en: 'No sanctions risk' },
+  'ofac.checked':         { zh: '名已通过 OFAC 名单比对', en: 'cleared by OFAC' },
+  'ofac.confirmed':       { zh: '名匹配后已人工确认', en: 'manually confirmed' },
+  'ofac.skipped':         { zh: '名姓名过短未查询', en: 'name too short to query' },
+  'ofac.blockHigh':       { zh: '🚨 出票拦截 — OFAC 制裁名单疑似匹配',
+                            en: '🚨 Ticketing blocked — possible OFAC SDN match' },
+  'ofac.blockLow':        { zh: '⚠ OFAC 名单可能匹配 — 建议核实',
+                            en: '⚠ Possible OFAC list match — verification advised' },
+  'ofac.verify':          { zh: '🔎 官网核验', en: '🔎 Verify on OFAC.gov' },
+  'ofac.confirmAll':      { zh: '✓ 已核实', en: '✓ Verified' },
+  'ofac.chipMatch':       { zh: '名单N条匹配', en: 'N matches' },
+  'ofac.chipMaybe':       { zh: '名单N条相似', en: 'N similar' },
+  'ofac.chipClear':       { zh: '✓ OFAC', en: '✓ OFAC' },
+
+  // Settings (tab)
+  'set.team':             { zh: '团队管理', en: 'Team' },
+  'set.agents':           { zh: '代理列表', en: 'Agents' },
+  'set.cabins':           { zh: '舱位列表', en: 'Cabins' },
+  'set.channels':         { zh: '渠道列表', en: 'Channels' },
+  'set.types':            { zh: '积分方式', en: 'Point types' },
+  'set.fxRate':           { zh: '汇率设置', en: 'Exchange rate' },
+  'set.cardholders':      { zh: '卡主名单', en: 'Cardholder list' },
+  'set.dataBackup':       { zh: '数据备份', en: 'Data backup' },
+  'set.cloudSync':        { zh: '云端同步', en: 'Cloud sync' },
+  'set.add':              { zh: '+ 添加', en: '+ Add' },
+  'set.import':           { zh: '导入', en: 'Import' },
+  'set.export':           { zh: '导出', en: 'Export' },
+  'set.reset':            { zh: '重置', en: 'Reset' },
+  'set.pause':            { zh: '⏸ 暂停', en: '⏸ Pause' },
+  'set.resume':           { zh: '恢复', en: 'Resume' },
+
+  // Delete modal
+  'delete.title':         { zh: '⚠ 删除订单', en: '⚠ Delete order' },
+  'delete.warning':       { zh: '此操作不可撤销', en: 'This action cannot be undone' },
+  'delete.confirm':       { zh: '永久删除', en: 'Delete permanently' },
+  'delete.type':          { zh: '请输入以下字段确认', en: 'Type the following to confirm' },
+  'delete.typedLabel':    { zh: '键入乘客姓氏', en: 'Type passenger last name' },
+
+  // Scoreboard
+  'sb.aheadOf':           { zh: '今日 vs 同期', en: 'Today vs baseline' },
+  'sb.tied':              { zh: '持平', en: 'on pace' },
+
+  // Misc UI words
+  'word.urgent':          { zh: '加急', en: 'Urgent' },
+  'word.pending':         { zh: '待出票', en: 'Pending' },
+  'word.ticketed':        { zh: '已出票', en: 'Ticketed' },
+  'word.copy':            { zh: '复制', en: 'Copy' },
+  'word.copied':          { zh: '已复制', en: 'Copied' },
+  'word.edit':            { zh: '编辑', en: 'Edit' },
+  'word.add':             { zh: '添加', en: 'Add' },
+  'word.remove':          { zh: '移除', en: 'Remove' },
+  'word.retry':           { zh: '重试', en: 'Retry' },
+  'word.refresh':         { zh: '刷新', en: 'Refresh' },
+  'word.print':           { zh: '打印', en: 'Print' },
+  'word.download':        { zh: '下载', en: 'Download' },
+  'word.upload':          { zh: '上传', en: 'Upload' },
+  'word.search':          { zh: '搜索', en: 'Search' },
+  'word.filter':          { zh: '筛选', en: 'Filter' },
+  'word.sort':            { zh: '排序', en: 'Sort' },
+  'word.options':         { zh: '选项', en: 'Options' },
+  'word.preview':         { zh: '预览', en: 'Preview' },
+  'word.summary':         { zh: '小计', en: 'Subtotal' },
+  'word.total':           { zh: '合计', en: 'Total' },
+  'word.note':            { zh: '备注', en: 'Note' },
+  'word.entry':           { zh: '录入', en: 'Entry' },
+  'word.dropImage':       { zh: '添加截图', en: 'Drop image' },
+  'word.proposal':        { zh: '方案', en: 'Option' },
 };
+
+// Display helper: turn stored cabin (always Chinese) into the user's
+// preferred language at render time. Data on disk stays in Chinese; UI
+// presentation changes per CURRENT_LANG.
+function displayCabin(zhCabin) {
+  if (CURRENT_LANG !== 'en' || !zhCabin) return zhCabin || '';
+  const map = {
+    '经济舱': 'Economy', '经济': 'Economy', '普通经济': 'Economy',
+    '超级经济舱': 'Premium Eco', '超级经济': 'Premium Eco', '超经': 'Premium Eco',
+    '商务舱': 'Business', '商务': 'Business', '公务舱': 'Business', '公务': 'Business',
+    '头等舱': 'First', '头等': 'First',
+  };
+  return map[zhCabin] || zhCabin;
+}
+
+// Display helper: agent name. Agents are user-entered Chinese names like "东莞"
+// (city names) or "罗" (surname). These are business data — we keep them as-is
+// even in English mode since the user explicitly said "business data保持中文".
+// Just exposed as a helper for consistency.
+function displayAgent(agent) {
+  return agent || '';
+}
 
 let CURRENT_LANG = 'zh';
 function loadLang() {
@@ -12701,6 +13801,189 @@ function t(key) {
 
 // Apply translations to all elements marked with data-i18n.
 // Also updates the toggle button label and sets html[data-lang].
+// Static Chinese → English phrases used in many JS-generated spots.
+// Applied via a DOM scrubber pass when switching to English. We scrub TEXT NODES
+// only (not HTML), so structure is preserved.
+const I18N_AUTO_PHRASES = {
+  // Statuses & badges
+  '已分配': 'Assigned',
+  '未分配': 'Unassigned',
+  '待分配': 'Pending',
+  '未指定': 'Unspecified',
+  '未指定代理': 'No agent',
+  '未分类': 'Uncategorized',
+  '暂时无位': 'No availability',
+  '混舱': 'Mixed cabin',
+  '混舱订单': 'Mixed cabin order',
+  '等待放位': 'On hold',
+  '放位': 'On hold',
+  '加急': 'Urgent',
+  '完成': 'Done',
+  '已完成': 'Completed',
+  '未完成': 'Pending',
+  '已出票': 'Ticketed',
+  '待出票': 'Pending',
+  '已取消': 'Canceled',
+  '取消': 'Cancel',
+  '保存': 'Save',
+  '确定': 'Confirm',
+  '关闭': 'Close',
+  '删除': 'Delete',
+  '编辑': 'Edit',
+  '添加': 'Add',
+  '移除': 'Remove',
+  '导出': 'Export',
+  '导入': 'Import',
+  '复制': 'Copy',
+  '查看报表': 'View report',
+  '加入处理': 'Add to actions',
+  '已有处理记录': 'In actions',
+  '转到处理': 'To actions',
+  '恢复': 'Restore',
+  '清除筛选': 'Clear filter',
+  '清空': 'Clear',
+  '里程': 'Miles',
+  '应付': 'Payable',
+  '已结清': 'Settled',
+  '待付': 'Owing',
+  '订单': 'Orders',
+  '人': 'pax',
+  '单': 'orders',
+  '不计报表': 'Excluded from report',
+  '无乘客': 'No passenger',
+  '代理': 'Agent',
+  '卡主': 'Cardholder',
+  '航司': 'Airline',
+  '舱位': 'Cabin',
+  '渠道': 'Channel',
+  '售价': 'Price',
+  '成本': 'Cost',
+  '利润': 'Profit',
+  '收入': 'Revenue',
+  '运价': 'Fare',
+  '票号': 'Ticket #',
+  '汇率': 'FX',
+  '美金': 'USD',
+  '人民币': 'RMB',
+  '美元': 'USD',
+  '乘客': 'Passengers',
+  '方案': 'Option',
+  '婴儿': 'Infant',
+  '儿童': 'Child',
+  '大人': 'Adult',
+  '直接结算': 'Direct settle',
+  '直接折扣': 'Direct discount',
+  '特殊折扣': 'Special discount',
+  '折扣': 'Discount',
+  '优惠': 'Discount',
+  '每位': 'each',
+  '合计': 'Total',
+  '小时': 'h',
+  '分钟': 'min',
+  '天': 'd',
+  '暂未提供': 'Not provided',
+  '缺运价': 'Missing fare',
+  '多人份': 'Multi-pax',
+  '多人不同价': 'Multi-pax (different)',
+  '多人价': 'Multi-pax',
+  '排序方式': 'Sort by',
+  '不影响已分配卡主的订单始终置顶': 'Assigned-cardholder orders always stay on top',
+  '此订单未填运价': 'This order has no fare entered',
+  '此订单曾于': 'This order was previously on',
+  '被临时绕过出票': 'temporarily ticketed despite agent pause',
+  '已被暂停出票': 'is currently paused for ticketing',
+  '恢复此代理的出票权限': 'Resume this agent',
+  '恢复出票': 'Resume',
+  '原因': 'Reason',
+  '未填写': 'Not specified',
+  '暂停于': 'Paused at',
+  '点击查看': 'click to view',
+  '点击跳转到订单': 'click to jump to order',
+  '点击换卡主或取消分配': 'click to change cardholder',
+  '点击分配卡主': 'click to assign cardholder',
+  '需要客服人工处理': 'manual handling required',
+  '代理公司尚未释放座位': 'Agent has not released the seat yet',
+  '全部': 'All',
+  '还没有': 'No ',
+  '还没有待出票订单': 'No pending orders yet',
+  '还没有已出票记录': 'No ticketing history yet',
+  '还没有卡主': 'No cardholders yet',
+  '还没有处理记录': 'No action records yet',
+  '没有符合筛选条件的订单': 'No orders match the filter',
+  '没有符合搜索条件的已出票记录': 'No ticketed history matches search',
+  '没有匹配的卡主': 'No matching cardholders',
+  '出票时或下面表单添加': 'Add via ticketing or the form below',
+  '暂无已出票数据': 'No ticketed data yet',
+  '出票': 'Ticketed',
+  '处理': 'Actions',
+  '搜索': 'Search',
+  '客户': 'Client',
+};
+
+// Walk the DOM and replace text nodes matching the phrases above.
+// Skips <script>, <style>, <input>, <textarea> and elements with data-i18n-skip.
+function scrubChineseTextNodes(root) {
+  if (CURRENT_LANG !== 'en') return;
+  root = root || document.body;
+  if (!root) return;
+  const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'INPUT', 'TEXTAREA', 'OPTION']);
+  function walk(node) {
+    if (!node) return;
+    if (node.nodeType === 1) {
+      if (SKIP_TAGS.has(node.tagName)) return;
+      if (node.hasAttribute && node.hasAttribute('data-i18n-skip')) return;
+      // Don't touch elements marked with class="zh" — those are already hidden by CSS
+      if (node.classList && node.classList.contains('zh')) return;
+      for (let i = 0; i < node.childNodes.length; i++) walk(node.childNodes[i]);
+    } else if (node.nodeType === 3) {  // TEXT_NODE
+      let text = node.nodeValue;
+      if (!text || !/[\u4e00-\u9fa5]/.test(text)) return;
+      let changed = false;
+      for (const [zh, en] of Object.entries(I18N_AUTO_PHRASES)) {
+        if (text.includes(zh)) {
+          text = text.split(zh).join(en);
+          changed = true;
+        }
+      }
+      if (changed) node.nodeValue = text;
+    }
+  }
+  walk(root);
+}
+
+// Set up a lightweight observer to auto-scrub newly-added DOM when in EN mode.
+// Debounced so frequent renders don't cause CPU spike.
+let _i18nObserver = null;
+let _i18nScrubTimer = null;
+function startI18nObserver() {
+  if (_i18nObserver) return;
+  if (typeof MutationObserver === 'undefined') return;
+  _i18nObserver = new MutationObserver((mutations) => {
+    if (CURRENT_LANG !== 'en') return;
+    // Debounce: collect mutations, scrub once after 80ms of quiet
+    if (_i18nScrubTimer) clearTimeout(_i18nScrubTimer);
+    _i18nScrubTimer = setTimeout(() => {
+      // Scrub each mutated subtree (cheaper than full document)
+      const seen = new Set();
+      mutations.forEach(m => {
+        m.addedNodes.forEach(n => {
+          if (seen.has(n)) return;
+          seen.add(n);
+          scrubChineseTextNodes(n);
+        });
+        if (m.type === 'characterData' && m.target) scrubChineseTextNodes(m.target.parentNode);
+      });
+    }, 80);
+  });
+  _i18nObserver.observe(document.body, {
+    childList: true, subtree: true, characterData: true,
+  });
+}
+function stopI18nObserver() {
+  if (_i18nObserver) { _i18nObserver.disconnect(); _i18nObserver = null; }
+  if (_i18nScrubTimer) { clearTimeout(_i18nScrubTimer); _i18nScrubTimer = null; }
+}
+
 function applyI18n() {
   document.documentElement.setAttribute('data-lang', CURRENT_LANG);
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -12742,6 +14025,31 @@ function toggleLanguage() {
   CURRENT_LANG = (CURRENT_LANG === 'zh') ? 'en' : 'zh';
   saveLang();
   applyI18n();
+  // Re-render all dynamic UI so JS-generated text picks up the new language.
+  // Wrapped in try/catch because some render funcs may not be loaded yet on
+  // initial toggle (rare).
+  try { if (typeof renderOrderTabs === 'function') renderOrderTabs(); } catch(_) {}
+  try { if (typeof renderPreview === 'function') renderPreview(); } catch(_) {}
+  try { if (typeof renderPassengers === 'function') renderPassengers(); } catch(_) {}
+  try { if (typeof renderPendingBanner === 'function') renderPendingBanner(); } catch(_) {}
+  try {
+    const meaningful = (STATE.orders || []).filter(o => isMeaningfulOrder(o) && o.tableLabel !== 'G');
+    if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
+  } catch(_) {}
+  try { if (typeof renderPendingList === 'function') renderPendingList(); } catch(_) {}
+  try { if (typeof renderChasePanel === 'function') renderChasePanel(); } catch(_) {}
+  try { if (typeof renderTicketed === 'function') renderTicketed(); } catch(_) {}
+  try { if (typeof renderActionsList === 'function') renderActionsList(); } catch(_) {}
+  try { if (typeof renderCardholders === 'function') renderCardholders(); } catch(_) {}
+  // Final pass: scrub any remaining hardcoded Chinese in dynamic UI using
+  // the auto-translate phrase map. Runs after all renders so the DOM is
+  // populated when we walk it. Also start/stop the observer.
+  if (CURRENT_LANG === 'en') {
+    try { setTimeout(scrubChineseTextNodes, 30); } catch(_) {}
+    try { startI18nObserver(); } catch(_) {}
+  } else {
+    try { stopI18nObserver(); } catch(_) {}
+  }
   toast(CURRENT_LANG === 'en' ? '✓ Switched to English' : '✓ 已切换到中文');
 }
 
@@ -13092,6 +14400,320 @@ function loadOFACConfirmations() {
 
 // Build the warning bar HTML shown beneath a passenger name input.
 // Returns '' if nothing needs displaying (idle or clear).
+// ═══════════════════════════════════════════════════════════════════════════
+// PASSENGER HISTORY — detect repeat customers
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Identifies returning passengers by matching English name + date of birth
+// across `settings.ticketed` history and current `STATE.orders`. Used to:
+//   - Show a banner on the entry form ("this passenger has flown 4 times")
+//   - Badge repeat customers on the compact USD row and ticket card
+//   - Could later auto-fill historical info (passport, gender, etc.) — but
+//     for now we just surface the count + financial value
+//
+// Matching strategy:
+//   • Primary key: normalized English name + DOB (both must match)
+//   • Fallback: passport number (only if both records have it)
+//   • Without DOB, name alone is too noisy ("LI/JIAN" matches dozens)
+//     so we skip name-only matches to avoid false positives
+//
+// Performance: cached per-render to avoid recomputing for every row.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Normalize a passenger name for comparison (strip courtesy titles, collapse spaces)
+function _normalizePaxKey(name) {
+  if (!name) return '';
+  return name.toUpperCase()
+    .replace(/\s+(MR|MRS|MS|MISS|DR|MSTR|CHD|INF)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Parse "LAST/FIRST MIDDLE" → { last, first } where first is only the first
+// given name (ignores middle names so "WANG/MEI" matches "WANG/MEI MIN").
+// Returns null if not parseable as LAST/FIRST.
+function _splitPaxName(name) {
+  const norm = _normalizePaxKey(name);
+  if (!norm.includes('/')) return null;
+  const parts = norm.split('/');
+  const last = parts[0].trim();
+  const first = (parts[1] || '').trim().split(/\s+/)[0];  // first token only
+  if (!last || !first) return null;
+  return { last, first };
+}
+
+// Find historical ticketed + current pending orders matching this passenger.
+// Returns { count, ticketedCount, pendingCount, totalUsd, firstSeen, lastSeen,
+//           orders: [...] } where orders is sorted newest first.
+//
+// `currentOrderId` (optional) — exclude this order from results (so the
+// passenger doesn't match themselves when displayed on their own card).
+function findPassengerHistory(paxName, paxDob, paxPassport, currentOrderId) {
+  const parts = _splitPaxName(paxName);
+  if (!parts) return null;
+
+  // Need either DOB or passport to do reliable matching (name alone is noisy)
+  const hasDob = !!(paxDob && paxDob.length >= 5);
+  const hasPassport = !!(paxPassport && paxPassport.length >= 5);
+  if (!hasDob && !hasPassport) return null;
+
+  const normPassport = hasPassport ? paxPassport.toUpperCase().replace(/\s/g, '') : null;
+  const normDob = hasDob ? paxDob.toUpperCase() : null;
+
+  // Match function — returns true if any passenger on the order matches
+  // by (last name + first name + dob) or (passport number).
+  function paxMatches(passengers) {
+    if (!Array.isArray(passengers)) return false;
+    return passengers.some(p => {
+      const pParts = _splitPaxName(p.name);
+      if (!pParts) return false;
+      const nameMatches = pParts.last === parts.last && pParts.first === parts.first;
+      const pDob = (p.dob || '').toUpperCase();
+      const pPassport = (p.passportNo || '').toUpperCase().replace(/\s/g, '');
+      // Passport-based match is strong on its own
+      if (normPassport && pPassport && normPassport === pPassport) return true;
+      // Name + DOB match
+      if (nameMatches && normDob && pDob && normDob === pDob) return true;
+      return false;
+    });
+  }
+
+  const matches = [];
+
+  // Search ticketed history
+  (settings.ticketed || []).forEach(t => {
+    if (currentOrderId && t.id === currentOrderId) return;
+    if (paxMatches(t.passengers)) {
+      matches.push({ ...t, _source: 'ticketed' });
+    }
+  });
+
+  // Search current pending orders (exclude empty drafts + current order)
+  (STATE.orders || []).forEach(o => {
+    if (currentOrderId && o.id === currentOrderId) return;
+    if (!isMeaningfulOrder(o)) return;
+    if (paxMatches(o.passengers)) {
+      matches.push({ ...o, _source: 'pending' });
+    }
+  });
+
+  if (matches.length === 0) return null;
+
+  // Calculate financial totals (USD revenue)
+  const rate = settings.rate || 7.2;
+  let totalUsd = 0;
+  matches.forEach(m => {
+    const hasPP = Array.isArray(m.paxPrices) && m.paxPrices.length > 0;
+    const paxCount = (m.passengers || []).length || 1;
+    const fareRmb = hasPP
+      ? m.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
+      : (m.basePrice || 0) * paxCount;
+    if (fareRmb > 0) totalUsd += fareRmb / (m.rate || rate);
+  });
+
+  // Sort newest first by the most relevant timestamp
+  matches.sort((a, b) => {
+    const ta = a.ticketedAt || a.createdAt || 0;
+    const tb = b.ticketedAt || b.createdAt || 0;
+    return tb - ta;
+  });
+
+  const ticketedCount = matches.filter(m => m._source === 'ticketed').length;
+  const pendingCount = matches.filter(m => m._source === 'pending').length;
+  const earliestTime = matches.reduce((min, m) => {
+    const t = m.ticketedAt || m.createdAt || Date.now();
+    return t < min ? t : min;
+  }, Date.now());
+  const latestTime = matches.reduce((max, m) => {
+    const t = m.ticketedAt || m.createdAt || 0;
+    return t > max ? t : max;
+  }, 0);
+
+  return {
+    count: matches.length,
+    ticketedCount,
+    pendingCount,
+    totalUsd,
+    firstSeen: earliestTime,
+    lastSeen: latestTime,
+    orders: matches,
+  };
+}
+
+// Categorize tier based on count. Returns object with tier name + display info.
+function _historyTier(count) {
+  if (count >= 10) return { tier: 'vip', label: 'VIP', icon: '🌟', color: '#c8a04a' };
+  if (count >= 4) return { tier: 'regular', label: '常客', icon: '⭐', color: 'var(--accent-deep)' };
+  if (count >= 1) return { tier: 'returning', label: '回头', icon: '↻', color: 'var(--blue)' };
+  return { tier: 'new', label: '', icon: '', color: '' };
+}
+
+// Format ms → relative time string ("3天前", "2周前", "5个月前")
+function _relativeTime(ms) {
+  const delta = Date.now() - ms;
+  if (delta < 0) return '刚刚';
+  const days = delta / 86400_000;
+  if (days < 1) return '今天';
+  if (days < 7) return Math.floor(days) + '天前';
+  if (days < 30) return Math.floor(days / 7) + '周前';
+  if (days < 365) return Math.floor(days / 30) + '个月前';
+  return Math.floor(days / 365) + '年前';
+}
+
+// Build banner HTML for entry form. Returns '' if no history or not enough info.
+function buildPassengerHistoryHTML(paxName, paxDob, paxPassport, currentOrderId, paxIdx) {
+  const history = findPassengerHistory(paxName, paxDob, paxPassport, currentOrderId);
+  if (!history) return '';
+
+  const num = history.count + 1;   // this order is the (count+1)th time
+  const tier = _historyTier(history.count);
+  const lastSeenStr = history.lastSeen > 0 ? _relativeTime(history.lastSeen) : '—';
+
+  // Big number badge — same style as the compact row badge but larger
+  let bgStyle, ringStyle, bannerBg, bannerBorder;
+  if (tier.tier === 'vip') {
+    bgStyle = 'background:linear-gradient(135deg, #d4af5e, #b88a3a); color:#fff;';
+    ringStyle = 'box-shadow: 0 0 0 2px rgba(255,255,255,0.6), 0 0 10px rgba(200,160,74,0.5);';
+    bannerBg = 'linear-gradient(90deg, rgba(200,160,74,0.20), rgba(200,160,74,0.05))';
+    bannerBorder = '#c8a04a';
+  } else if (tier.tier === 'regular') {
+    bgStyle = 'background:var(--accent); color:#fff;';
+    ringStyle = '';
+    bannerBg = 'rgba(200,160,74,0.10)';
+    bannerBorder = 'var(--accent-deep)';
+  } else {
+    bgStyle = 'background:rgba(43,76,126,0.9); color:#fff;';
+    ringStyle = '';
+    bannerBg = 'rgba(43,76,126,0.06)';
+    bannerBorder = 'var(--blue)';
+  }
+
+  const detailBits = [];
+  detailBits.push(`已出 <strong>${history.ticketedCount}</strong> 单`);
+  if (history.pendingCount > 0) detailBits.push(`待出 <strong>${history.pendingCount}</strong> 单`);
+  if (history.totalUsd > 0) detailBits.push(`累计 <strong>$${Math.round(history.totalUsd).toLocaleString()}</strong>`);
+  detailBits.push(`上次 ${lastSeenStr}`);
+
+  return `<div class="pax-history-banner" style="margin-top:6px; padding:10px 14px; background:${bannerBg}; border:1px solid ${bannerBorder === 'var(--blue)' ? 'rgba(43,76,126,0.25)' : 'rgba(200,160,74,0.35)'}; border-left:3px solid ${bannerBorder}; border-radius:var(--r-sm); font-size:12px; color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div style="display:inline-flex; align-items:center; gap:12px; min-width:0;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:34px; height:34px; padding:0 9px; border-radius:17px; ${bgStyle} ${ringStyle} font-family:'JetBrains Mono',monospace; font-size:17px; font-weight:800; line-height:1; flex-shrink:0;">${num}</span>
+      <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+        <div style="font-size:12.5px; color:var(--ink); font-weight:600; line-height:1.2;">第 <strong style="color:${bannerBorder === 'var(--blue)' ? 'var(--blue)' : 'var(--accent-deep)'};">${num}</strong> 次出票 ${tier.tier === 'vip' ? '· <span style="color:#b88a3a; font-weight:700;">VIP 客户</span>' : tier.tier === 'regular' ? '· <span style="color:var(--accent-deep); font-weight:700;">常客</span>' : ''}</div>
+        <div style="font-size:11px; color:var(--muted); line-height:1.4;">${detailBits.join(' · ')}</div>
+      </div>
+    </div>
+    <button onclick="event.stopPropagation(); openPassengerHistoryModal('${escapeAttr(paxName)}', '${escapeAttr(paxDob || '')}', '${escapeAttr(paxPassport || '')}')" style="border:1px solid ${bannerBorder === 'var(--blue)' ? 'rgba(43,76,126,0.35)' : 'rgba(200,160,74,0.45)'}; background:#fff; color:${bannerBorder === 'var(--blue)' ? 'var(--blue)' : 'var(--accent-deep)'}; padding:5px 12px; border-radius:var(--r-sm); font-size:11px; cursor:pointer; font-family:inherit; font-weight:600; flex-shrink:0;">查看历史 →</button>
+  </div>`;
+}
+
+// Compact badge for use in row listings — a prominent count number.
+// "history.count + 1" because the current order is the (count+1)th time.
+// Color escalates: 1st time = no badge (new customer, returns ''),
+// 2-3 = blue (returning), 4-9 = gold (regular), 10+ = deep gold/glow (VIP)
+function buildPassengerHistoryBadge(paxName, paxDob, paxPassport, currentOrderId) {
+  const history = findPassengerHistory(paxName, paxDob, paxPassport, currentOrderId);
+  if (!history) return '';
+  // The current order counts as occurrence #(history.count + 1)
+  const num = history.count + 1;
+  const tier = _historyTier(history.count);
+  const title = `第 ${num} 次 · 已出 ${history.ticketedCount} 单${history.pendingCount > 0 ? ' · 待出 ' + history.pendingCount + ' 单' : ''} · 累计 $${Math.round(history.totalUsd).toLocaleString()} · 上次 ${_relativeTime(history.lastSeen)}`;
+  // Render as a prominent circular number badge
+  let bgStyle, fgColor, ringStyle;
+  if (tier.tier === 'vip') {
+    bgStyle = 'background:linear-gradient(135deg, #d4af5e, #b88a3a); color:#fff;';
+    ringStyle = 'box-shadow: 0 0 0 1.5px rgba(255,255,255,0.6), 0 0 6px rgba(200,160,74,0.4);';
+  } else if (tier.tier === 'regular') {
+    bgStyle = 'background:var(--accent); color:#fff;';
+    ringStyle = '';
+  } else {
+    bgStyle = 'background:rgba(43,76,126,0.85); color:#fff;';
+    ringStyle = '';
+  }
+  return `<span class="pax-repeat-badge" style="display:inline-flex; align-items:center; justify-content:center; min-width:18px; height:18px; padding:0 5px; border-radius:9px; ${bgStyle} ${ringStyle} font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:800; letter-spacing:0; line-height:1; cursor:help; flex-shrink:0;" title="${escapeAttr(title)}">${num}</span>`;
+}
+
+// Modal that lists all historical orders for this passenger
+function openPassengerHistoryModal(paxName, paxDob, paxPassport) {
+  const history = findPassengerHistory(paxName, paxDob, paxPassport, null);
+  if (!history) return;
+  const tier = _historyTier(history.count);
+
+  const orderRows = history.orders.map(o => {
+    const isTicketed = o._source === 'ticketed';
+    const dt = isTicketed ? o.ticketedAt : (o.createdAt || 0);
+    const dtStr = dt > 0 ? new Date(dt).toLocaleDateString('zh-CN', {year:'numeric', month:'numeric', day:'numeric'}) : '—';
+    const route = (o.segments || []).map(s => s.from + '→' + s.to).join(' / ') || '—';
+    const flight = (o.segments || []).map(s => s.flight).filter(Boolean).join(', ') || '—';
+    const rate = o.rate || settings.rate || 7.2;
+    const hasPP = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
+    const paxCount = (o.passengers || []).length || 1;
+    const fareRmb = hasPP
+      ? o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
+      : (o.basePrice || 0) * paxCount;
+    const usd = fareRmb > 0 ? Math.round(fareRmb / rate) : 0;
+    const statusBadge = isTicketed
+      ? '<span style="background:var(--green); color:#fff; padding:1px 7px; border-radius:8px; font-size:9.5px; font-weight:700;">已出</span>'
+      : '<span style="background:var(--accent); color:#fff; padding:1px 7px; border-radius:8px; font-size:9.5px; font-weight:700;">待出</span>';
+    return `<tr style="border-top:1px solid var(--line);">
+      <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--muted);">${dtStr}</td>
+      <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--ink);">${escapeHtml(o.airline || '—')}</td>
+      <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--ink-2);">${escapeHtml(flight)}</td>
+      <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">${escapeHtml(route)}</td>
+      <td style="padding:8px 10px; text-align:right; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--ink);">$${usd.toLocaleString()}</td>
+      <td style="padding:8px 10px; text-align:center;">${statusBadge}</td>
+    </tr>`;
+  }).join('');
+
+  const modalHtml = `
+    <div id="paxHistoryOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.65); z-index:9000; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target.id==='paxHistoryOverlay')document.getElementById('paxHistoryOverlay').remove()">
+      <div style="background:var(--paper); border-radius:var(--r-lg); max-width:900px; width:100%; max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
+        <div style="padding:20px 28px; background:linear-gradient(135deg, var(--ink), var(--ink-2)); color:#fff; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent); font-weight:600; margin-bottom:4px;">PASSENGER HISTORY</div>
+            <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600;">${escapeHtml(paxName)} ${paxDob ? '<span style="font-size:13px; opacity:0.6; margin-left:8px; font-family:\'JetBrains Mono\',monospace;">' + escapeHtml(paxDob) + '</span>' : ''}</div>
+            <div style="font-size:12px; opacity:0.75; margin-top:4px;">
+              <span style="margin-right:14px;">${tier.icon} <strong style="color:${tier.color === 'var(--blue)' ? '#5b8bbd' : tier.color === 'var(--accent-deep)' ? '#e2b878' : '#fff'};">${tier.label || '回头客户'}</strong></span>
+              <span style="margin-right:14px;">已出票 ${history.ticketedCount} 单</span>
+              ${history.pendingCount > 0 ? `<span style="margin-right:14px;">待出票 ${history.pendingCount} 单</span>` : ''}
+              <span>累计 $${Math.round(history.totalUsd).toLocaleString()}</span>
+            </div>
+          </div>
+          <button onclick="document.getElementById('paxHistoryOverlay').remove()" style="background:rgba(255,255,255,0.1); color:#fff; border:1px solid rgba(255,255,255,0.2); padding:8px 14px; border-radius:var(--r-sm); cursor:pointer; font-size:12px;">✕ 关闭</button>
+        </div>
+        <div style="overflow:auto; padding:24px 28px;">
+          <table style="width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--line); border-radius:var(--r-md);">
+            <thead><tr style="background:var(--cream);">
+              <th style="padding:9px 10px; text-align:left; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">日期</th>
+              <th style="padding:9px 10px; text-align:left; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">航司</th>
+              <th style="padding:9px 10px; text-align:left; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">航班</th>
+              <th style="padding:9px 10px; text-align:left; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">航段</th>
+              <th style="padding:9px 10px; text-align:right; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">金额</th>
+              <th style="padding:9px 10px; text-align:center; font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:700;">状态</th>
+            </tr></thead>
+            <tbody>${orderRows}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  // Append modal to body
+  const c = document.createElement('div');
+  c.innerHTML = modalHtml;
+  document.body.appendChild(c.firstElementChild);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Targeted update of history banner — doesn't re-render the whole passenger
+// row, just swaps the banner HTML for this index. Called from name/DOB input
+// handlers.
+function updatePaxHistoryBanner(i) {
+  const bar = document.getElementById('pax-history-bar-' + i);
+  if (!bar) return;
+  const p = curr().passengers[i];
+  if (!p) return;
+  bar.innerHTML = buildPassengerHistoryHTML(p.name, p.dob, p.passportNo, curr().id, i);
+}
+
 function buildOFACWarningHTML(rawName, paxIdx) {
   const status = getOFACStatus(rawName);
   if (!status.key || status.state === 'idle') return '';
@@ -13259,30 +14881,37 @@ function buildOrderOFACBannerHTML(o) {
     // High-confidence match if ANY blocker is severity 'match' (high score);
     // otherwise treat as low-confidence advisory.
     const isHigh = gate.blockers.some(b => b.severity === 'match');
-    // Build "verify on OFAC website" button — copies first blocker's name to
-    // clipboard and opens OFAC's official search tool. If multiple blockers,
-    // a dropdown isn't worth it — user can use the per-passenger button.
     const firstBlocker = gate.blockers[0];
     const firstNormName = firstBlocker ? normalizePaxName(firstBlocker.name) : '';
+    const verifyLabel = CURRENT_LANG === 'en' ? '🔎 Verify on OFAC.gov' : '🔎 官网核验';
+    const verifyTip   = CURRENT_LANG === 'en'
+      ? `Copy ${firstBlocker ? firstBlocker.name : ''} and open OFAC official site in new tab`
+      : `复制 ${firstBlocker ? firstBlocker.name : ''} 到剪贴板并在新标签页打开 OFAC 官网`;
     const verifyBtn = firstNormName
-      ? `<button onclick="event.stopPropagation(); openOFACVerification('${escapeAttr(firstNormName)}')" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:var(--ink); color:#fff; border:none; border-radius:var(--r-sm); font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; letter-spacing:0.02em; white-space:nowrap; flex-shrink:0; transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='brightness(1)'" title="复制 ${escapeAttr(firstBlocker.name)} 到剪贴板并在新标签页打开 OFAC 官网">🔎 官网核验</button>`
+      ? `<button onclick="event.stopPropagation(); openOFACVerification('${escapeAttr(firstNormName)}')" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:var(--ink); color:#fff; border:none; border-radius:var(--r-sm); font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; letter-spacing:0.02em; white-space:nowrap; flex-shrink:0; transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='brightness(1)'" title="${escapeAttr(verifyTip)}">${verifyLabel}</button>`
       : '';
-    // Build "已核实" confirm button — marks ALL flagged passengers in this
-    // order as non-sanctioned individuals so the warning clears immediately.
-    // Pops a strict confirm() to prevent accidental clicks (this is a
-    // security-relevant action).
     const blockerNormNames = gate.blockers
       .map(b => normalizePaxName(b.name))
       .filter(Boolean);
     const confirmAllPayload = encodeURIComponent(JSON.stringify(blockerNormNames));
+    const confirmLabel = CURRENT_LANG === 'en' ? '✓ Verified' : '✓ 已核实';
+    const confirmTip   = CURRENT_LANG === 'en'
+      ? `Confirm passengers in this order are not on the sanctions list (${blockerNormNames.length} pax)`
+      : `确认此订单的乘客非制裁名单中的同名人员（${blockerNormNames.length} 名）`;
     const confirmBtn = blockerNormNames.length
-      ? `<button onclick="event.stopPropagation(); confirmOFACForOrder('${confirmAllPayload}', '${escapeAttr(o.id)}')" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:var(--green); color:#fff; border:none; border-radius:var(--r-sm); font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; letter-spacing:0.02em; white-space:nowrap; flex-shrink:0; transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='brightness(1)'" title="确认此订单的乘客非制裁名单中的同名人员（${blockerNormNames.length} 名）">✓ 已核实</button>`
+      ? `<button onclick="event.stopPropagation(); confirmOFACForOrder('${confirmAllPayload}', '${escapeAttr(o.id)}')" style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; background:var(--green); color:#fff; border:none; border-radius:var(--r-sm); font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; letter-spacing:0.02em; white-space:nowrap; flex-shrink:0; transition:filter 0.15s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='brightness(1)'" title="${escapeAttr(confirmTip)}">${confirmLabel}</button>`
       : '';
     if (isHigh) {
+      const titleHi = CURRENT_LANG === 'en'
+        ? '🚨 Ticketing blocked — possible OFAC SDN match'
+        : '🚨 出票拦截 — OFAC 制裁名单疑似匹配';
+      const bodyHi = CURRENT_LANG === 'en'
+        ? `Passenger(s) ${blockerNames} matched the sanctions list. Click "Verify on OFAC.gov" to compare, then "Verified" once confirmed as a different person.`
+        : `乘客 ${blockerNames} 与制裁名单匹配。请先「🔎 官网核验」对比，确认非同一人后点「✓ 已核实」。`;
       return `<div style="background:linear-gradient(90deg, rgba(184,60,44,0.13), rgba(184,60,44,0.05)); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); font-size:12px; color:var(--ink); box-shadow:0 1px 4px rgba(184,60,44,0.15); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
         <div style="flex:1; min-width:0;">
-          <strong style="color:var(--red);">🚨 出票拦截 — OFAC 制裁名单疑似匹配</strong><br>
-          <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">乘客 ${blockerNames} 与制裁名单匹配。请先「🔎 官网核验」对比，确认非同一人后点「✓ 已核实」。</span>
+          <strong style="color:var(--red);">${titleHi}</strong><br>
+          <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">${bodyHi}</span>
         </div>
         <div style="display:flex; gap:6px; flex-shrink:0;">
           ${verifyBtn}
@@ -13291,10 +14920,16 @@ function buildOrderOFACBannerHTML(o) {
       </div>`;
     }
     // Low-confidence only — orange warning, still gates ticketing
+    const titleLo = CURRENT_LANG === 'en'
+      ? '⚠ Possible OFAC list match — verification advised'
+      : '⚠ OFAC 名单可能匹配 — 建议核实';
+    const bodyLo = CURRENT_LANG === 'en'
+      ? `Passenger(s) ${blockerNames} partially resembled the sanctions list (homophone/same-surname may also trigger). Click "Verify on OFAC.gov", then "Verified" if not the same person.`
+      : `乘客 ${blockerNames} 与制裁名单部分相似（同音/同姓异人也可能触发）。先「🔎 官网核验」，若非同一人点「✓ 已核实」即可出票。`;
     return `<div style="background:linear-gradient(90deg, rgba(194,133,61,0.13), rgba(194,133,61,0.04)); border-left:4px solid var(--warning); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); font-size:12px; color:var(--ink); box-shadow:0 1px 4px rgba(194,133,61,0.12); display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
       <div style="flex:1; min-width:0;">
-        <strong style="color:var(--warning-deep);">⚠ OFAC 名单可能匹配 — 建议核实</strong><br>
-        <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">乘客 ${blockerNames} 与制裁名单部分相似（同音/同姓异人也可能触发）。先「🔎 官网核验」，若非同一人点「✓ 已核实」即可出票。</span>
+        <strong style="color:var(--warning-deep);">${titleLo}</strong><br>
+        <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">${bodyLo}</span>
       </div>
       <div style="display:flex; gap:6px; flex-shrink:0;">
         ${verifyBtn}
@@ -13328,17 +14963,22 @@ function buildOrderOFACBannerHTML(o) {
   if (pendingCount > 0 || totalAssessable === 0) return '';
 
   const detailParts = [];
-  if (clearCount > 0) detailParts.push(`${clearCount} 名已通过 OFAC 名单比对`);
-  if (confirmedCount > 0) detailParts.push(`${confirmedCount} 名匹配后已人工确认`);
+  if (clearCount > 0) detailParts.push(CURRENT_LANG === 'en'
+    ? `${clearCount} cleared by OFAC list`
+    : `${clearCount} 名已通过 OFAC 名单比对`);
+  if (confirmedCount > 0) detailParts.push(CURRENT_LANG === 'en'
+    ? `${confirmedCount} manually confirmed`
+    : `${confirmedCount} 名匹配后已人工确认`);
   const subtitle = detailParts.join(' · ');
   const skippedNote = skippedCount > 0
-    ? `<span style="color:var(--muted); font-size:10px; margin-left:6px;">(${skippedCount} 名姓名过短未查询)</span>`
+    ? `<span style="color:var(--muted); font-size:10px; margin-left:6px;">(${CURRENT_LANG === 'en' ? skippedCount + ' name(s) too short to query' : skippedCount + ' 名姓名过短未查询'})</span>`
     : '';
 
+  const noRiskLabel = CURRENT_LANG === 'en' ? 'No sanctions risk' : '本订单无制裁风险';
   return `<div style="background:linear-gradient(90deg, rgba(46,125,82,0.10), rgba(46,125,82,0.03)); border-left:3px solid var(--green); padding:7px 12px; margin-bottom:10px; border-radius:var(--r-sm); font-size:11.5px; color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:8px;">
     <span style="display:inline-flex; align-items:center; gap:6px;">
       <span style="color:var(--green); font-weight:700; font-size:13px;">✓</span>
-      <strong style="color:var(--green); font-weight:700; letter-spacing:0.02em;">本订单无制裁风险</strong>
+      <strong style="color:var(--green); font-weight:700; letter-spacing:0.02em;">${noRiskLabel}</strong>
       <span style="color:var(--muted); font-size:11px;">— ${subtitle}</span>
       ${skippedNote}
     </span>
@@ -14140,7 +15780,7 @@ function buildCardHTML(o, idx) {
       <div class="segment-connector">
         ${dateBadge ? `<div class="seg-date-badge">${escapeHtml(dateBadge)}</div>` : ''}
         <div class="plane" style="font-size:20px; color:var(--accent); filter:drop-shadow(0 2px 4px rgba(200,160,74,0.35));">✈</div>
-        ${s.flight ? `<div style="font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:800; color:var(--ink); letter-spacing:0.08em; margin-top:3px; background:var(--cream); padding:2px 10px; border-radius:var(--r-sm); display:inline-block;">${escapeHtml(s.flight)}</div>` : ''}
+        ${s.flight ? `<div class="flight-num-tile">${escapeHtml(s.flight)}</div>` : ''}
         ${s.cls ? (() => {
           const airlineCls = (settings.fareClassByAirline && settings.fareClassByAirline[o.airline])
                           || (STATE.fareClassByAirline && STATE.fareClassByAirline[o.airline]);
@@ -16323,7 +17963,9 @@ function renderPendingBanner() {
     if (unassigned) labelParts.push(`<span style="color:var(--accent);">⏳ ${unassigned}</span>`);
     if (parked)     labelParts.push(`<span style="color:rgba(255,255,255,0.55);">⏸ ${parked}</span>`);
     label.innerHTML = labelParts.join('  ·  ');
-    prog.title = `已分配 ${assigned} / 待分配 ${unassigned}${parked ? ' / 暂时无位 ' + parked : ''} （共 ${total} 单）`;
+    prog.title = CURRENT_LANG === 'en'
+      ? `Assigned ${assigned} / Unassigned ${unassigned}${parked ? ' / No avail ' + parked : ''} (${total} total)`
+      : `已分配 ${assigned} / 待分配 ${unassigned}${parked ? ' / 暂时无位 ' + parked : ''} （共 ${total} 单）`;
   }
 
   // ETA: predict when the active (non-parked) pending orders will all be ticketed,
@@ -16341,20 +17983,43 @@ function renderPendingBanner() {
       etaLabelEl.textContent = CURRENT_LANG === 'en'
         ? `ETA · ${rateStr}/h`
         : `预计完成 · ${rateStr}单/h`;
-      const durationStr = est.etaMs != null ? formatETADuration(est.etaMs) : '超出预测范围';
+      const durationStr = est.etaMs != null ? formatETADuration(est.etaMs)
+        : (CURRENT_LANG === 'en' ? 'beyond forecast range' : '超出预测范围');
       const activeHoursStr = est.activeHours.length > 0
         ? est.activeHours[0] + ':00 ~ ' + (est.activeHours[est.activeHours.length-1]+1) + ':00'
-        : '(未识别)';
-      etaStat.title =
-        `📊 出票时间预估\n\n` +
-        `剩余: ${activeQueue} 单 (已排除暂时无位)\n` +
-        `预计耗时: ${durationStr}\n` +
-        `预计完成: ${est.etaText}\n\n` +
-        `── 计算依据 ──\n` +
-        `数据样本: 近 ${est.sampleDays} 天 ${est.sampleCount} 单出票记录\n` +
-        `工作时段: ${activeHoursStr} (识别为活跃时段)\n` +
-        `团队速度: ${rateStr} 单/活跃小时\n\n` +
-        `※ 预测会跳过夜间/休息时段，工作时段越规律越准确`;
+        : (CURRENT_LANG === 'en' ? '(not identified)' : '(未识别)');
+      // Find the most recent ticketed timestamp for the tooltip — gives the
+      // user a way to verify the data is actually fresh (not stale cache)
+      const lastTicketTs = (settings.ticketed || [])
+        .filter(t => t.ticketedAt)
+        .reduce((max, t) => Math.max(max, t.ticketedAt), 0);
+      const lastTicketLocale = CURRENT_LANG === 'en' ? 'en-US' : 'zh-CN';
+      const lastTicketStr = lastTicketTs > 0
+        ? new Date(lastTicketTs).toLocaleString(lastTicketLocale, {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})
+        : (CURRENT_LANG === 'en' ? '(none)' : '(无)');
+      etaStat.title = CURRENT_LANG === 'en'
+        ? `📊 Ticketing time forecast\n\n` +
+          `Remaining: ${activeQueue} orders (no-availability excluded)\n` +
+          `Estimated duration: ${durationStr}\n` +
+          `ETA: ${est.etaText}\n\n` +
+          `── How this is calculated ──\n` +
+          `Sample: last ${est.sampleDays} days, ${est.sampleCount} ticketed orders\n` +
+          `Last ticket: ${lastTicketStr}\n` +
+          `Active hours: ${activeHoursStr}\n` +
+          `Team rate: ${rateStr} orders/active hour\n` +
+          `※ Recent days weighted higher (half-life 4 days) — current pace reflected\n\n` +
+          `※ Forecast skips overnight hours; more accurate with consistent work schedule`
+        : `📊 出票时间预估\n\n` +
+          `剩余: ${activeQueue} 单 (已排除暂时无位)\n` +
+          `预计耗时: ${durationStr}\n` +
+          `预计完成: ${est.etaText}\n\n` +
+          `── 计算依据 ──\n` +
+          `数据样本: 近 ${est.sampleDays} 天 ${est.sampleCount} 单出票记录\n` +
+          `最近一单: ${lastTicketStr}\n` +
+          `工作时段: ${activeHoursStr} (识别为活跃时段)\n` +
+          `团队速度: ${rateStr} 单/活跃小时\n` +
+          `※ 算法已对近期权重 ×2（半衰期 4 天）— 当日出票速度变化会体现\n\n` +
+          `※ 预测会跳过夜间/休息时段，工作时段越规律越准确`;
     } else {
       etaStat.style.display = 'none';
     }
@@ -16381,6 +18046,11 @@ function renderPendingBanner() {
       sbStat.style.display = 'none';
     }
   }
+
+  // ─── New-order wait time chip (in the PNR paste section) ──
+  // Refreshed each time the banner updates, so the chip always reflects
+  // the current queue depth + team throughput.
+  try { renderNewOrderEta(); } catch(_) {}
 }
 
 // Compute today's accumulated revenue (from ticketed orders) vs same weekday
@@ -16419,7 +18089,7 @@ function computeTodayVsBaseline() {
 
   // If baseline is essentially zero, fall back to 7-day average for same hour-of-day window
   let baselineRev = lastWeekRev;
-  let baselineLabel = '上周同期';
+  let baselineLabel = CURRENT_LANG === 'en' ? 'last week' : '上周同期';
   if (lastWeekRev < 100 && lastWeekCount === 0) {
     // Compute 7-day rolling average for "day-up-to-now" window
     let totalRev = 0, daysCounted = 0;
@@ -16438,7 +18108,9 @@ function computeTodayVsBaseline() {
     }
     if (daysCounted === 0) return null;  // truly no history
     baselineRev = totalRev / daysCounted;
-    baselineLabel = `近 ${daysCounted} 天均值`;
+    baselineLabel = CURRENT_LANG === 'en'
+      ? `${daysCounted}-day avg`
+      : `近 ${daysCounted} 天均值`;
   }
 
   if (baselineRev < 1 && todayRev < 1) return null;  // nothing to show
@@ -16457,25 +18129,35 @@ function computeTodayVsBaseline() {
   }
 
   let tone = 'neutral';
-  let subtitle = `今日 vs ${baselineLabel}`;
+  let subtitle = CURRENT_LANG === 'en'
+    ? `Today vs ${baselineLabel}`
+    : `今日 vs ${baselineLabel}`;
   if (Math.abs(delta) >= 100) {
     if (deltaPct >= 5) tone = 'ahead';
     else if (deltaPct <= -5) tone = 'behind';
   }
 
   const fmtCny = (n) => `¥${Math.round(n).toLocaleString()}`;
-  const weekdays = ['周日','周一','周二','周三','周四','周五','周六'];
-  const wd = weekdays[now.getDay()];
+  const weekdaysZh = ['周日','周一','周二','周三','周四','周五','周六'];
+  const weekdaysEn = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const wd = (CURRENT_LANG === 'en' ? weekdaysEn : weekdaysZh)[now.getDay()];
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
-  const tooltip =
-    `📈 今日 vs ${baselineLabel}\n\n` +
-    `今日 (${wd} ${hh}:${mm}前): ${fmtCny(todayRev)} (${todayCount} 单)\n` +
-    `${baselineLabel}同时段: ${fmtCny(baselineRev)}${lastWeekCount > 0 ? ' (' + lastWeekCount + ' 单)' : ''}\n\n` +
-    `差额: ${delta >= 0 ? '+' : '−'}${fmtCny(Math.abs(delta))} (${delta >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%)\n` +
-    (tone === 'ahead' ? '✨ 今日表现优于历史同期' :
-     tone === 'behind' ? '⚠ 今日落后于历史同期' :
-     '➡ 与历史同期相当');
+  const tooltip = CURRENT_LANG === 'en'
+    ? `📈 Today vs ${baselineLabel}\n\n` +
+      `Today (by ${wd} ${hh}:${mm}): ${fmtCny(todayRev)} (${todayCount} tickets)\n` +
+      `${baselineLabel} same time: ${fmtCny(baselineRev)}${lastWeekCount > 0 ? ' (' + lastWeekCount + ' tickets)' : ''}\n\n` +
+      `Delta: ${delta >= 0 ? '+' : '−'}${fmtCny(Math.abs(delta))} (${delta >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%)\n` +
+      (tone === 'ahead' ? '✨ Today is ahead of historical pace' :
+       tone === 'behind' ? '⚠ Today is behind historical pace' :
+       '➡ On pace with historical')
+    : `📈 今日 vs ${baselineLabel}\n\n` +
+      `今日 (${wd} ${hh}:${mm}前): ${fmtCny(todayRev)} (${todayCount} 单)\n` +
+      `${baselineLabel}同时段: ${fmtCny(baselineRev)}${lastWeekCount > 0 ? ' (' + lastWeekCount + ' 单)' : ''}\n\n` +
+      `差额: ${delta >= 0 ? '+' : '−'}${fmtCny(Math.abs(delta))} (${delta >= 0 ? '+' : ''}${deltaPct.toFixed(0)}%)\n` +
+      (tone === 'ahead' ? '✨ 今日表现优于历史同期' :
+       tone === 'behind' ? '⚠ 今日落后于历史同期' :
+       '➡ 与历史同期相当');
 
   return { deltaText, subtitle, tone, tooltip, todayRev, baselineRev, deltaPct };
 }
@@ -19137,6 +20819,18 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+// Bilingual toast: pass an object {zh, en} or two strings, picks based on
+// CURRENT_LANG. Falls back to zh when en missing.
+function tt(zhOrObj, en) {
+  let msg;
+  if (typeof zhOrObj === 'object' && zhOrObj !== null) {
+    msg = zhOrObj[CURRENT_LANG] || zhOrObj.zh || zhOrObj.en || '';
+  } else {
+    msg = CURRENT_LANG === 'en' ? (en || zhOrObj) : zhOrObj;
+  }
+  toast(msg);
+}
+
 // ============================================
 // ORDER PERSISTENCE
 // ============================================
@@ -19922,6 +21616,12 @@ async function mergeImportData(event) {
   loadOFACConfirmations();
   loadLang();
   applyI18n();
+  // If user's saved language is English, start the auto-scrub observer so
+  // dynamically-rendered Chinese phrases get translated on the fly.
+  if (CURRENT_LANG === 'en') {
+    try { setTimeout(() => scrubChineseTextNodes(), 50); } catch(_) {}
+    try { startI18nObserver(); } catch(_) {}
+  }
   loadTeamConfig();
   _loadCollapsedOrders();
   initKeyboardShortcuts();
