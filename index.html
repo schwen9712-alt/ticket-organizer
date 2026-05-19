@@ -1045,7 +1045,7 @@ textarea.raw-input:focus {
 
   /* ── USD airline row — simplified grid ── */
   .airline-usd-row {
-    grid-template-columns: 28px auto 1fr auto auto auto !important;
+    grid-template-columns: 12px auto 1fr auto auto auto !important;
     font-size: 11.5px;
     padding: 8px 10px;
     gap: 4px;
@@ -2595,6 +2595,93 @@ html[data-lang="en"] .zh {
   font-size: 13px;
   font-weight: 800;
 }
+
+/* 表 Y count chip in the pending banner header — same pill geometry as
+   .pb-urgent but in deep golden tone. Calm, informational, no pulse. */
+.pb-tabley {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-left: 8px;
+  padding: 3px 10px;
+  background: rgba(200, 160, 74, 0.16);
+  color: var(--accent);
+  border: 1px solid rgba(200, 160, 74, 0.32);
+  border-radius: 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.18s, transform 0.15s, border-color 0.18s;
+}
+.pb-tabley:hover {
+  background: rgba(200, 160, 74, 0.24);
+  border-color: rgba(200, 160, 74, 0.5);
+  transform: scale(1.04);
+}
+.pb-tabley .y-count {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.pb-tabley .y-label {
+  opacity: 0.72;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+/* ── Collapsible form sections ─────────────────────────────────────────
+   Auto-populated fields (segments, pricing, settlement) stay collapsed
+   to reduce form-scrolling. Header shows one-line summary. */
+.collapsible-section[data-collapsed="true"] {
+  padding-bottom: 14px;
+}
+.collapsible-section[data-collapsed="true"] .section-title {
+  margin-bottom: 0;
+}
+.collapsible-header {
+  user-select: none;
+  transition: background 0.15s;
+  margin: -4px -8px 0;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
+}
+.collapsible-header:hover {
+  background: rgba(200, 160, 74, 0.06);
+}
+.collapsible-header:hover .collapsible-toggle {
+  border-color: var(--accent-deep);
+  color: var(--accent-deep);
+}
+.collapsible-toggle {
+  transition: border-color 0.15s, color 0.15s;
+}
+.collapsible-section[data-collapsed="false"] .collapsible-toggle {
+  background: var(--accent-deep) !important;
+  color: #fff !important;
+  border-color: var(--accent-deep) !important;
+}
+/* When section is expanded, dim the summary line — it duplicates info now visible below */
+.collapsible-section[data-collapsed="false"] .collapsible-summary {
+  opacity: 0.35;
+}
+
+/* Inline-editable discount cell on the ticket card price row.
+   Dashed underline-style hint on hover; click swaps in a number input. */
+.discount-editable:hover {
+  background: rgba(200, 160, 74, 0.12);
+  border-color: var(--accent-deep) !important;
+}
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(16px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+@keyframes tableYBreathe {
+  0%, 100% { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.7), 0 0 6px rgba(200,160,74,0.55), 0 1px 2px rgba(184,138,58,0.4); transform: scale(1); }
+  50%       { box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 12px rgba(200,160,74,0.85), 0 2px 6px rgba(184,138,58,0.5); transform: scale(1.12); }
+}
 @keyframes urgentChipPulse {
   0%, 100% { box-shadow: 0 0 12px rgba(184,60,44,0.5); }
   50%      { box-shadow: 0 0 18px rgba(184,60,44,0.8); }
@@ -2632,6 +2719,7 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
+      <span style="font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--muted); margin-left:8px; opacity:0.6; letter-spacing:0.05em;" title="构建版本号 · 看不到最新功能时检查是否匹配">build 26.05.18</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -2660,6 +2748,7 @@ html[data-lang="en"] .zh {
       </div>
     </div>
     <button class="btn ghost small" onclick="refreshAllOrders()" title="用最新逻辑重跑所有订单：重新解析价格/舱位/儿童/航段，并补全乘客信息" data-i18n="header.refreshLogic">🔄 用最新逻辑重跑</button>
+    <span id="syncIndicator" style="margin-left:8px;"></span>
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
@@ -2714,6 +2803,7 @@ SUN/KAILAI MS 女 28SEP08
       <button class="btn" onclick="parsePNR()">⚡ 解析 Parse</button>
       <button class="btn ghost" onclick="clearRaw()">清空</button>
       <button class="btn ghost" onclick="loadSample()">加载示例</button>
+      <button id="parseDebugToggle" class="btn ghost" onclick="toggleParseDebug()" title="显示每一行的解析过程，帮助排查为什么某段文字没被识别" style="font-size:11px; padding:5px 10px; opacity:0.7;">🔍 调试</button>
 
       <!-- New-order wait time indicator. Tells the user (or member entering)
            how long a NEW order paste-and-parsed here would wait before
@@ -2742,6 +2832,15 @@ SUN/KAILAI MS 女 28SEP08
     </div>
     <div class="hint">支持 Sabre / Amadeus / Galileo / TravelSky 等格式。解析后每单独立编辑/复制/出票。<br>
       <strong>🎁 特殊折扣</strong>：勾选后填一个折扣，<u>解析此 PNR 时套用到所有解析出的订单</u>，覆盖默认折扣。</div>
+
+    <!-- Parse debug panel — hidden by default, shown when debug mode is on -->
+    <div id="parseDebugPanel" style="display:none; margin-top:10px; background:var(--ink); color:#e8e8e8; border-radius:var(--r-md); padding:12px 14px; font-family:'JetBrains Mono',monospace; font-size:11.5px; line-height:1.7; max-height:320px; overflow-y:auto;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:var(--accent);">
+        <span style="font-weight:700; letter-spacing:0.08em; font-size:10px;">PARSE DEBUG LOG</span>
+        <button onclick="document.getElementById('parseDebugPanel').style.display='none'; document.getElementById('parseDebugToggle').style.opacity='0.7'; _parseDebugMode=false;" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:12px;">✕</button>
+      </div>
+      <div id="parseDebugContent" style="white-space:pre-wrap;"></div>
+    </div>
   </div>
 
   <!-- Current order selector (mini) -->
@@ -2765,7 +2864,7 @@ SUN/KAILAI MS 女 28SEP08
       </div>
       <div class="field">
         <label>表 Label <span style="color:var(--red); font-weight:700;" title="必填">*</span></label>
-        <select id="f-tableLabel" onchange="syncDOMToOrder(); renderPreview();">
+        <select id="f-tableLabel" onchange="syncDOMToOrder(); toggleTableYVisibility(); renderPreview();">
           <option value="">— 选择 —</option>
           <option value="A">表 A</option>
           <option value="B">表 B</option>
@@ -2773,6 +2872,13 @@ SUN/KAILAI MS 女 28SEP08
           <option value="D">表 D</option>
           <option value="G">表 G</option>
         </select>
+      </div>
+      <div class="field" id="f-tableY-field" style="display:none;">
+        <label title="表 Y 是表 A 的特殊变体：享 9 折优惠且优先出票。仅表 A 可勾选。">表 Y 优惠</label>
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px 10px; background:linear-gradient(135deg, rgba(200,160,74,0.10), rgba(200,160,74,0.02)); border:1px solid rgba(200,160,74,0.35); border-radius:var(--r-sm); font-size:12px;">
+          <input type="checkbox" id="f-isTableY" onchange="syncDOMToOrder(); renderPreview(); if(typeof renderPendingList==='function')renderPendingList(); if(typeof renderPendingBanner==='function')renderPendingBanner(); if(typeof renderAirlineUsdPanel==='function'){const m=STATE.orders.filter(o=>isMeaningfulOrder(o)&&o.tableLabel!=='G');renderAirlineUsdPanel(m);}" style="margin:0; accent-color:var(--accent-deep);">
+          <span style="font-weight:600; color:var(--accent-deep);">⚡ 表 Y · 9 折 · 优先</span>
+        </label>
       </div>
       <div class="field mono">
         <label>航司 Airline</label>
@@ -2813,6 +2919,43 @@ SUN/KAILAI MS 女 28SEP08
   <!-- Passengers -->
   <div class="section">
     <div class="section-title"><span class="num">2</span>PASSENGERS <span class="zh">乘客</span></div>
+
+    <!-- AI image upload — passport + itinerary -->
+    <div id="aiParseZone" style="display:none; margin-bottom:12px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <!-- Passport upload -->
+        <label id="passportDropZone" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:16px 10px; background:rgba(124,58,237,0.04); border:1.5px dashed rgba(124,58,237,0.35); border-radius:var(--r-md); cursor:pointer; transition:background 0.15s, border-color 0.15s; text-align:center;"
+          ondragover="event.preventDefault(); this.style.background='rgba(124,58,237,0.10)'; this.style.borderColor='rgba(124,58,237,0.7)';"
+          ondragleave="this.style.background=''; this.style.borderColor='';"
+          ondrop="event.preventDefault(); this.style.background=''; this.style.borderColor=''; handleAiImageDrop(event.dataTransfer.files[0], 'passport')"
+          onmouseover="this.style.background='rgba(124,58,237,0.07)'"
+          onmouseout="this.style.background='rgba(124,58,237,0.04)'">
+          <input type="file" accept="image/*" style="display:none;" onchange="handleAiImageDrop(this.files[0], 'passport')">
+          <span style="font-size:22px;">🛂</span>
+          <span style="font-size:11.5px; font-weight:700; color:#7c3aed;">护照图片</span>
+          <span style="font-size:10px; color:var(--muted);">拍照 / 截图 / 拖入</span>
+        </label>
+        <!-- Itinerary upload -->
+        <label id="itinDropZone" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:16px 10px; background:rgba(30,120,220,0.04); border:1.5px dashed rgba(30,120,220,0.35); border-radius:var(--r-md); cursor:pointer; transition:background 0.15s, border-color 0.15s; text-align:center;"
+          ondragover="event.preventDefault(); this.style.background='rgba(30,120,220,0.10)'; this.style.borderColor='rgba(30,120,220,0.7)';"
+          ondragleave="this.style.background=''; this.style.borderColor='';"
+          ondrop="event.preventDefault(); this.style.background=''; this.style.borderColor=''; handleAiImageDrop(event.dataTransfer.files[0], 'itinerary')"
+          onmouseover="this.style.background='rgba(30,120,220,0.07)'"
+          onmouseout="this.style.background='rgba(30,120,220,0.04)'">
+          <input type="file" accept="image/*" style="display:none;" onchange="handleAiImageDrop(this.files[0], 'itinerary')">
+          <span style="font-size:22px;">✈</span>
+          <span style="font-size:11.5px; font-weight:700; color:#1a70d6;">行程图片</span>
+          <span style="font-size:10px; color:var(--muted);">截图 / 拍照 / 拖入</span>
+        </label>
+      </div>
+      <div id="aiParseStatus" style="display:none; padding:10px 14px; background:var(--cream); border-radius:var(--r-sm); font-size:12px; color:var(--ink); font-family:'JetBrains Mono',monospace;"></div>
+    </div>
+    <!-- Show AI zone only when key is configured; otherwise show hint to configure -->
+    <div id="aiParseNoKey" style="margin-bottom:10px; padding:8px 12px; background:rgba(124,58,237,0.04); border:1px solid rgba(124,58,237,0.18); border-radius:var(--r-sm); font-size:11.5px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; gap:8px;">
+      <span>🤖 配置 Anthropic API Key 后可上传图片自动识别护照/行程</span>
+      <button onclick="switchTab('settings')" style="padding:3px 10px; font-size:11px; background:none; border:1px solid rgba(124,58,237,0.4); color:#7c3aed; border-radius:var(--r-sm); cursor:pointer; white-space:nowrap;">前往设置 →</button>
+    </div>
+
     <div class="mrz-paste-zone" style="background:#fff8e7; border:1px dashed var(--accent); border-radius:4px; padding:10px 12px; margin-bottom:10px;">
       <div style="font-size:12px; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
         <span>📷 <strong>护照机读码 MRZ</strong> · 粘贴护照底部那两行黑字（含 &lt; 符号）</span>
@@ -2827,75 +2970,98 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <button class="btn ghost small" onclick="addPassenger()">＋ 添加乘客</button>
   </div>
 
+  <!-- Auto-fields toolbar: global expand/collapse for sections 3-5 -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin:14px 0 6px; padding:6px 4px;">
+    <span style="font-size:10px; color:var(--muted); letter-spacing:0.12em; font-family:'JetBrains Mono',monospace; font-weight:700;">AUTO-FIELDS · 解析填充的字段</span>
+    <button id="collapsibleGlobalToggle" onclick="toggleAllSections()" style="font-family:'JetBrains Mono',monospace; font-size:10.5px; padding:3px 10px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff; color:var(--accent-deep); cursor:pointer; font-weight:700; letter-spacing:0.04em;" title="一键展开或收起航段、售价、结算三块">全部展开 ▾</button>
+  </div>
+
   <!-- Segments -->
-  <div class="section">
-    <div class="section-title"><span class="num">3</span>SEGMENTS <span class="zh">航段</span></div>
-    <div id="segList"></div>
-    <button class="btn ghost small" onclick="addSegment()">＋ 添加航段</button>
-    <div class="row" style="grid-template-columns: 1fr 1fr; margin-top:10px;">
-      <div class="field mono">
-        <label>PNR 订座号</label>
-        <input type="text" id="f-pnr" placeholder="NDPYKN" style="text-transform:uppercase" oninput="syncDOMToOrder(); renderPreview();">
-      </div>
-      <div class="field mono">
-        <label>TKT 票号</label>
-        <input type="text" id="f-tkt" placeholder="暂未提供" oninput="syncDOMToOrder(); renderPreview();">
-      </div>
+  <div class="section collapsible-section" data-collapsed="true" data-section-key="segments">
+    <div class="section-title collapsible-header" onclick="toggleSection('segments')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+      <span><span class="num">3</span>SEGMENTS <span class="zh">航段</span></span>
+      <span class="collapsible-summary" id="summary-segments" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
-    <div class="hint">票号留空时复制显示"暂未提供"</div>
+    <div class="collapsible-body" style="display:none;">
+      <div id="segList"></div>
+      <button class="btn ghost small" onclick="addSegment()">＋ 添加航段</button>
+      <div class="row" style="grid-template-columns: 1fr 1fr; margin-top:10px;">
+        <div class="field mono">
+          <label>PNR 订座号</label>
+          <input type="text" id="f-pnr" placeholder="NDPYKN" style="text-transform:uppercase" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+        <div class="field mono">
+          <label>TKT 票号</label>
+          <input type="text" id="f-tkt" placeholder="暂未提供" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+      </div>
+      <div class="hint">票号留空时复制显示"暂未提供"</div>
+    </div>
   </div>
 
   <!-- Price -->
-  <div class="section">
-    <div class="section-title"><span class="num">4</span>PRICING <span class="zh">售价公式</span></div>
-    <div class="row" style="grid-template-columns: 1fr 100px 1fr;">
-      <div class="field mono">
-        <label>原价 ¥ Base</label>
-        <input type="number" id="f-basePrice" step="0.01" placeholder="8920" oninput="syncDOMToOrder(); renderPreview();">
-      </div>
-      <div class="field mono">
-        <label>折扣 %</label>
-        <input type="number" id="f-discount" step="1" placeholder="88" oninput="syncDOMToOrder(); renderPreview();">
-      </div>
-      <div class="field mono">
-        <label>= 最终售价</label>
-        <input type="text" id="f-finalPrice" readonly style="background:var(--cream); font-weight:600;" placeholder="¥ —">
-      </div>
+  <div class="section collapsible-section" data-collapsed="true" data-section-key="pricing">
+    <div class="section-title collapsible-header" onclick="toggleSection('pricing')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+      <span><span class="num">4</span>PRICING <span class="zh">售价公式</span></span>
+      <span class="collapsible-summary" id="summary-pricing" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
-
-    <div class="hint" id="priceFormula" style="font-family:'JetBrains Mono',monospace; margin-top:8px; color:var(--accent-deep); font-weight:600;"></div>
+    <div class="collapsible-body" style="display:none;">
+      <div class="row" style="grid-template-columns: 1fr 100px 1fr;">
+        <div class="field mono">
+          <label>原价 ¥ Base</label>
+          <input type="number" id="f-basePrice" step="0.01" placeholder="8920" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+        <div class="field mono">
+          <label>折扣 %</label>
+          <input type="number" id="f-discount" step="1" placeholder="88" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+        <div class="field mono">
+          <label>= 最终售价</label>
+          <input type="text" id="f-finalPrice" readonly style="background:var(--cream); font-weight:600;" placeholder="¥ —">
+        </div>
+      </div>
+      <div class="hint" id="priceFormula" style="font-family:'JetBrains Mono',monospace; margin-top:8px; color:var(--accent-deep); font-weight:600;"></div>
+    </div>
   </div>
 
   <!-- Settlement (for internal copy + cardholder) -->
-  <div class="section">
-    <div class="section-title"><span class="num">5</span>SETTLEMENT <span class="zh">开票 & 结算（内部）</span></div>
-    <div class="row">
-      <div class="field">
-        <label>开票人 Issuer</label>
-        <input type="text" id="f-issuer" placeholder="WHAT'S APP-BEN B / …" oninput="syncDOMToOrder(); renderPreview();">
-      </div>
+  <div class="section collapsible-section" data-collapsed="true" data-section-key="settlement">
+    <div class="section-title collapsible-header" onclick="toggleSection('settlement')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+      <span><span class="num">5</span>SETTLEMENT <span class="zh">开票 & 结算（内部）</span></span>
+      <span class="collapsible-summary" id="summary-settlement" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
-    <div class="row" style="grid-template-columns: 1.2fr 1fr 1fr;">
-      <div class="field mono">
-        <label>里程 Miles</label>
-        <input type="number" id="f-miles" step="1" placeholder="131193" oninput="syncDOMToOrder(); renderPreview();">
+    <div class="collapsible-body" style="display:none;">
+      <div class="row">
+        <div class="field">
+          <label>开票人 Issuer</label>
+          <input type="text" id="f-issuer" placeholder="WHAT'S APP-BEN B / …" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
       </div>
-      <div class="field mono">
-        <label>单价 Rate</label>
-        <input type="number" id="f-cpmRate" step="0.01" placeholder="0.65" oninput="syncDOMToOrder(); renderPreview();">
+      <div class="row" style="grid-template-columns: 1.2fr 1fr 1fr;">
+        <div class="field mono">
+          <label>里程 Miles</label>
+          <input type="number" id="f-miles" step="1" placeholder="131193" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+        <div class="field mono">
+          <label>单价 Rate</label>
+          <input type="number" id="f-cpmRate" step="0.01" placeholder="0.65" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
+        <div class="field mono">
+          <label>汇率 Exch</label>
+          <input type="number" id="f-cpmExchange" step="0.0001" placeholder="0.0130" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+        </div>
       </div>
-      <div class="field mono">
-        <label>汇率 Exch</label>
-        <input type="number" id="f-cpmExchange" step="0.0001" placeholder="0.0130" oninput="syncDOMToOrder(); renderPreview();">
+      <div class="row" style="grid-template-columns: 1fr;">
+        <div class="field mono">
+          <label>结算金额 = 里程 × 单价 × 汇率</label>
+          <input type="text" id="f-settlement" readonly style="background:var(--cream); font-weight:600;" placeholder="¥ —（即给卡主的钱）">
+        </div>
       </div>
+      <div class="hint">这里算出的结算金额 = 卡主费，自动计入卡主的"欠款"</div>
     </div>
-    <div class="row" style="grid-template-columns: 1fr;">
-      <div class="field mono">
-        <label>结算金额 = 里程 × 单价 × 汇率</label>
-        <input type="text" id="f-settlement" readonly style="background:var(--cream); font-weight:600;" placeholder="¥ —（即给卡主的钱）">
-      </div>
-    </div>
-    <div class="hint">这里算出的结算金额 = 卡主费，自动计入卡主的"欠款"</div>
   </div>
 
   <!-- Current order preview + actions -->
@@ -2929,6 +3095,10 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         onclick="document.getElementById('pendingArea').scrollIntoView({behavior:'smooth', block:'start'})">
         <span>💣</span><span id="pbUrgentCount">0</span><span style="opacity:0.7; margin-left:2px;">加急</span>
       </span>
+      <span class="pb-tabley" id="pbTableY" style="display:none;" title="表 Y · 9 折优惠 · 最高优先级出票"
+        onclick="document.getElementById('pendingArea').scrollIntoView({behavior:'smooth', block:'start'})">
+        <span class="y-count" id="pbTableYCount">0</span><span class="y-label">Y · 9折</span>
+      </span>
     </div>
     <div class="pb-right">
       <div class="pb-stat"><span class="v" id="pbRevenue">¥0</span><span class="l" data-i18n="pb.label.revenue">预计售价</span></div>
@@ -2961,7 +3131,39 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <div class="airline-usd-panel" id="airlineUsdPanel" style="display:none;">
     <div class="airline-usd-header">
       <span class="title">💳 各订单美金金额</span>
-      <span class="hint">无色 = 未分配卡主 · 蓝色 = 已分配 · 点击订单号跳转</span>
+      <span style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <div style="position:relative;display:flex;align-items:center;">
+          <input type="text" id="usdPanelSearchInput"
+            placeholder="🔍 快速搜索…"
+            oninput="filterPendingOrders(this.value); const main=document.getElementById('pendingSearchInput'); if(main) main.value=this.value;"
+            onkeydown="if(event.key==='Escape'){this.value='';filterPendingOrders('');this.blur();const main=document.getElementById('pendingSearchInput'); if(main) main.value='';}"
+            style="padding:5px 32px 5px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11.5px;width:180px;outline:none;background:#fff;font-family:inherit;"
+            onfocus="this.style.borderColor='var(--accent-deep)'" onblur="this.style.borderColor='var(--line)'">
+          <button onclick="this.previousElementSibling.value='';filterPendingOrders('');const main=document.getElementById('pendingSearchInput'); if(main) main.value='';this.previousElementSibling.focus()"
+            style="position:absolute;right:2px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;" title="清除（Esc）">✕</button>
+        </div>
+        <button id="bulkModeToggle" onclick="toggleBulkMode()"
+          title="进入批量操作模式：勾选多个订单后一次性撤单"
+          style="padding:5px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11.5px;background:#fff;color:var(--ink);cursor:pointer;font-family:inherit;font-weight:600;">📋 批量</button>
+        <span class="hint" style="font-size:10.5px;">点击订单号跳转</span>
+      </span>
+    </div>
+    <div id="bulkActionBar" style="display:none; background:linear-gradient(90deg, rgba(184,60,44,0.08), rgba(184,60,44,0.02)); border:1px solid rgba(184,60,44,0.25); border-left:3px solid var(--red); border-radius:var(--r-sm); padding:8px 14px; margin-bottom:10px; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span style="font-size:12.5px; color:var(--ink); font-weight:600; white-space:nowrap;">📋 批量 · 已选 <strong id="bulkSelectCount" style="color:var(--red); font-family:'JetBrains Mono',monospace; font-size:13px;">0</strong></span>
+      <span style="height:14px; width:1px; background:var(--line-strong); opacity:0.6; margin:0 2px;"></span>
+      <button onclick="bulkSelectAll()" style="padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11px;background:#fff;color:var(--ink);cursor:pointer;font-family:inherit;">全选可见</button>
+      <button onclick="bulkClearSelection()" style="padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11px;background:#fff;color:var(--muted);cursor:pointer;font-family:inherit;">清空</button>
+      <span style="flex:1;"></span>
+      <button id="bulkSetYBtn" onclick="openBulkSetTableYModal(true)" disabled
+        title="把选中的订单设为表 Y（9 折 · 最高优先级）。已是 Y 的会被跳过。"
+        style="padding:4px 12px;border:1px solid var(--accent-deep);border-radius:var(--r-sm);font-size:11.5px;background:linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a);color:#fff;cursor:not-allowed;font-family:inherit;font-weight:800;letter-spacing:0.03em;opacity:0.45;box-shadow:0 0 0 1px rgba(255,255,255,0.5);">⚡ 设为表 Y</button>
+      <button id="bulkUnsetYBtn" onclick="openBulkSetTableYModal(false)" disabled
+        title="取消选中订单的表 Y 标记，恢复原折扣。"
+        style="padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11px;background:#fff;color:var(--accent-deep);cursor:not-allowed;font-family:inherit;font-weight:700;opacity:0.45;">取消 Y</button>
+      <span style="height:14px; width:1px; background:var(--line-strong); opacity:0.6; margin:0 2px;"></span>
+      <button id="bulkCancelBtn" onclick="openBulkCancelModal()" disabled
+        style="padding:4px 12px;border:1px solid var(--red);border-radius:var(--r-sm);font-size:11.5px;background:var(--red);color:#fff;cursor:not-allowed;font-family:inherit;font-weight:700;opacity:0.45;">✕ 撤单</button>
+      <button onclick="toggleBulkMode()" title="退出批量模式" style="padding:4px 10px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11px;background:#fff;color:var(--muted);cursor:pointer;font-family:inherit;">退出</button>
     </div>
     <div id="airlineSummaryBar" style="margin-bottom:8px;"></div>
     <div id="agentSummaryBar" style="margin-bottom:12px;"></div>
@@ -2972,11 +3174,17 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
       <span style="display:flex;align-items:center;gap:8px;"><span class="num" style="background:var(--ink);">📋</span><span style="font-size:13px;font-weight:700;letter-spacing:0.1em;">PENDING ORDERS</span> <span class="zh" style="font-size:12px;font-weight:400;color:var(--muted);">待出票订单</span></span>
       <div style="display:flex;align-items:center;gap:6px;">
-        <input type="text" id="pendingSearchInput" placeholder="🔍 搜索姓名/航班/PNR…" data-i18n-placeholder="misc.searchPlaceholder" oninput="filterPendingOrders(this.value)"
-          style="padding:6px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);font-size:12px;width:190px;outline:none;transition:border-color 0.15s;font-family:inherit;"
-          onfocus="this.style.borderColor='var(--accent-deep)'" onblur="this.style.borderColor='var(--line)'">
-        <button onclick="document.getElementById('pendingSearchInput').value='';filterPendingOrders('')"
-          style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
+        <div style="position:relative;display:flex;align-items:center;">
+          <input type="text" id="pendingSearchInput" placeholder="🔍 搜索姓名/航班/PNR/航司…" data-i18n-placeholder="misc.searchPlaceholder"
+            title="搜索姓名、航司、航班号、PNR、卡主名、代理名… (快捷键: / 或 Ctrl+K · Esc 清除)"
+            oninput="filterPendingOrders(this.value)"
+            onkeydown="if(event.key==='Escape'){this.value='';filterPendingOrders('');this.blur();}"
+            style="padding:6px 56px 6px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);font-size:12px;width:240px;outline:none;transition:border-color 0.15s;font-family:inherit;"
+            onfocus="this.style.borderColor='var(--accent-deep)'" onblur="this.style.borderColor='var(--line)'">
+          <span id="pendingSearchBadge" style="position:absolute;right:24px;display:none;font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:700;color:var(--accent-deep);background:var(--cream);padding:1px 6px;border-radius:8px;letter-spacing:0.02em;pointer-events:none;"></span>
+          <button onclick="document.getElementById('pendingSearchInput').value='';filterPendingOrders('');document.getElementById('pendingSearchInput').focus()"
+            style="position:absolute;right:4px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;line-height:1;" title="清除搜索（Esc）">✕</button>
+        </div>
       </div>
     </div>
     <div class="preview-area" id="pendingArea">
@@ -3147,6 +3355,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <button class="btn ghost small" onclick="exportBackupJSON()">📥 导出 JSON</button>
     </div>
     <div class="setting-row">
+      <div><div class="label">📂 导入备份</div><div class="desc">从 JSON 文件恢复数据 · 可覆盖或合并</div></div>
+      <div style="display:flex; gap:6px;">
+        <input type="file" id="quickImportFile" accept=".json,application/json" style="display:none" onchange="importAllData(event)">
+        <input type="file" id="quickMergeFile" accept=".json,application/json" style="display:none" onchange="mergeImportData(event)">
+        <button class="btn ghost small" onclick="document.getElementById('quickMergeFile').click()" title="把文件里的订单追加到现有数据后面（不覆盖）">🔀 合并</button>
+        <button class="btn ghost small" onclick="if(confirm('⚠ 覆盖导入会替换当前所有数据。\\n\\n建议先「导出 JSON」做备份再操作。\\n\\n继续？'))document.getElementById('quickImportFile').click()" title="用文件里的数据完全覆盖当前数据" style="border-color:rgba(184,60,44,0.3); color:var(--red);">↻ 覆盖</button>
+      </div>
+    </div>
+    <div class="setting-row">
       <div><div class="label">📊 统计仪表板</div><div class="desc">月度收入、卡主出票排行</div></div>
       <button class="btn ghost small" onclick="openStatsDashboard()">📊 打开</button>
     </div>
@@ -3203,6 +3420,29 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         <div class="desc">停止自动推送，数据只保留在本地</div>
       </div>
       <button class="btn small ghost" onclick="disableCloudSync()">✕ 断开</button>
+    </div>
+  </div>
+
+  <div class="section" style="border-left: 3px solid #7c3aed;">
+    <div class="section-title"><span class="num" style="background:#7c3aed;">🤖</span>AI 图片识别 <span class="zh">自动解析行程图片和护照</span></div>
+    <div class="hint" style="margin-bottom:12px;">
+      配置 Anthropic API Key 后，可直接上传<strong>行程截图</strong>或<strong>护照照片</strong>，AI 自动识别并填入表单。<br>
+      Key 只保存在本设备的浏览器里，<strong>不会进入云同步</strong>。<br>
+      获取 Key：前往 <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c3aed;">console.anthropic.com</a> → API Keys → Create Key
+    </div>
+    <div id="aiKeyStatus" style="padding:10px 12px; background:var(--cream); border-radius:3px; margin-bottom:12px; font-family:'JetBrains Mono',monospace; font-size:12px;">
+      <span id="aiKeyStatusText">未配置</span>
+    </div>
+    <div class="setting-row">
+      <div>
+        <div class="label">Anthropic API Key</div>
+        <div class="desc">格式：sk-ant-api03-…（只存本地，不同步到云端）</div>
+      </div>
+      <div style="display:flex; gap:4px;">
+        <input type="password" id="s-anthropicKey" placeholder="sk-ant-api03-..." style="width:240px; font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 8px;" autocomplete="off">
+        <button class="btn small" onclick="saveAnthropicKey()" style="background:#7c3aed; border-color:#7c3aed; color:#fff;">保存</button>
+        <button class="btn small ghost" onclick="clearAnthropicKey()">清除</button>
+      </div>
     </div>
   </div>
 
@@ -3774,7 +4014,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .airline-usd-row {
   display: grid;
-  grid-template-columns: 16px 36px 12px 62px 40px 1fr 40px 80px 90px 110px 24px 24px 24px;
+  grid-template-columns: 8px 36px 12px 62px 40px 1fr 40px 80px 90px 110px 24px 24px 24px;
   gap: 8px;
   align-items: center;
   padding: 9px 14px;
@@ -3788,33 +4028,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   cursor: pointer;
 }
 
-/* Drag handle — leftmost column, only fully visible on hover */
-.usd-row-drag {
-  cursor: grab;
-  color: var(--muted);
-  font-size: 14px;
-  text-align: center;
-  line-height: 1;
-  opacity: 0.25;
-  user-select: none;
-  transition: opacity 0.15s, color 0.15s;
-  /* Increase tappable area on touch without changing visual */
-  padding: 6px 0;
-  margin: -6px 0;
-}
-.airline-usd-row:hover .usd-row-drag { opacity: 0.8; color: var(--ink); }
-.usd-row-drag:hover { opacity: 1 !important; color: var(--accent-deep) !important; cursor: grab; }
-.usd-row-drag:active { cursor: grabbing; }
-.airline-usd-row.row-dragging {
-  opacity: 0.4;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-  transform: scale(1.01);
-  z-index: 100;
-}
-.airline-usd-row.row-drop-target {
-  border-top: 2px solid var(--accent-deep) !important;
-  margin-top: -2px;
-}
 .airline-usd-row:hover {
   background: var(--paper-2);
   border-left-width: 5px;
@@ -5097,6 +5310,16 @@ function newOrder(init = {}) {
     id: 'o-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     createdAt: init.createdAt || Date.now(),
     tableLabel: init.tableLabel || '',
+    // 表 Y is a special branch of 表 A — locks discount to 90% (unless manually
+    // overridden) and grants top-priority sorting + Y badge in待出票.
+    // Only meaningful when tableLabel === 'A'.
+    isTableY: !!init.isTableY,
+    // Previous discount stashed when toggling Y on (so toggling Y off restores it).
+    _preY_discount: init._preY_discount != null ? init._preY_discount : null,
+    // Permanent flag: if true, the discount has been manually edited and beats
+    // both the 表 Y 90% rule and any auto agent-rule match. Option A semantics:
+    // survives Y on/off toggles until user explicitly resets via ✕.
+    discountManuallyOverridden: !!init.discountManuallyOverridden,
     client: init.client || '',
     cabin: init.cabin || '经济舱',
     agent: init.agent || '',
@@ -5122,11 +5345,11 @@ function newOrder(init = {}) {
     // order header. Persisted to cloud sync.
     urgent: init.urgent || false,
     urgentSetAt: init.urgentSetAt || null,
-    // Manual sort position (number) — user-controlled order within the same
-    // status rank. Lower number = earlier in list. Null = no manual override,
-    // use automatic sort. Set by dragging rows in the pending list.
-    manualOrder: init.manualOrder != null ? init.manualOrder : null,
-    linkedOrderIds: init.linkedOrderIds || [],   // IDs of related orders
+    // Manual sort position (deprecated — drag-to-reorder feature was removed,
+    // sort is now fully automatic). Field stays null on new orders; legacy
+    // values on older orders are simply ignored by the sort comparator.
+    linkedOrderIds: init.linkedOrderIds || [],      // IDs of manually-linked orders
+    autoLinkedOrderIds: init.autoLinkedOrderIds || [], // IDs auto-linked by passenger match
     ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
     enteredBy: init.enteredBy || '',
     operator: init.operator || '',
@@ -6085,9 +6308,18 @@ function renderSpeedAnalysis() {
     </div>
   `;
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // CURRENT QUEUE ANALYSIS — "当前出票分析"
+  // Snapshot of right-now pending state: who's piled up, what's old, what's
+  // small/big. Renders above the recommendation cards so the user sees the
+  // queue's overall health first.
+  // ═══════════════════════════════════════════════════════════════════════
+  const queueAnalysisHtml = buildCurrentQueueAnalysis(pending);
+
   // ─── Final assembly ───
   area.innerHTML = `
     ${statsHtml}
+    ${queueAnalysisHtml}
     ${recommendHtml}
     ${avoidHtml}
     ${messageHtml}
@@ -6095,6 +6327,200 @@ function renderSpeedAnalysis() {
   `;
 }
 // ═══════════════════════════════════════════════════════════════════════════
+
+// Build the "当前出票分析" block — snapshot of the pending queue's state.
+// Returns HTML string (empty if no pending orders).
+function buildCurrentQueueAnalysis(pending) {
+  if (!pending || pending.length === 0) {
+    return `
+      <div style="background:#fff; border:1px solid var(--line); border-left:3px solid var(--green); border-radius:var(--r-md); padding:14px 18px; margin-bottom:14px; display:flex; align-items:center; gap:12px;">
+        <span style="font-size:20px;">✨</span>
+        <div>
+          <div style="font-size:13px; font-weight:700; color:var(--green);">队列清空</div>
+          <div style="font-size:11px; color:var(--muted); margin-top:2px;">当前没有待出票订单，可以放心让代理多收单。</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const now = Date.now();
+  const rate = settings.rate || 7.2;
+
+  // ── Compute aggregates ────────────────────────────────────────────────
+  let totalUsd = 0;
+  let totalAgeMs = 0;
+  let oldestAgeMs = 0;
+  const byAgent = {};      // {agent: {count, usd, oldestAgeMs}}
+  const byBand = {};       // {bandKey: count}
+  const ageBuckets = { '0-6h': 0, '6-24h': 0, '24-48h': 0, '48h+': 0 };
+  let urgentCount = 0;
+  let pausedCount = 0;     // 暂时无位 — they're meaningful but excluded earlier
+
+  pending.forEach(o => {
+    const usd = _orderUsd(o, o.rate || rate);
+    const band = _bandFor(usd);
+    const agent = (o.agent || '未分代理').trim() || '未分代理';
+    const ageMs = o.createdAt ? Math.max(0, now - o.createdAt) : 0;
+
+    totalUsd += usd;
+    totalAgeMs += ageMs;
+    if (ageMs > oldestAgeMs) oldestAgeMs = ageMs;
+    if (o.urgent) urgentCount++;
+    if (o.noAvailability) pausedCount++;
+
+    if (!byAgent[agent]) byAgent[agent] = { count: 0, usd: 0, oldestAgeMs: 0 };
+    byAgent[agent].count++;
+    byAgent[agent].usd += usd;
+    if (ageMs > byAgent[agent].oldestAgeMs) byAgent[agent].oldestAgeMs = ageMs;
+
+    byBand[band] = (byBand[band] || 0) + 1;
+
+    const ageH = ageMs / 3600_000;
+    if (ageH < 6) ageBuckets['0-6h']++;
+    else if (ageH < 24) ageBuckets['6-24h']++;
+    else if (ageH < 48) ageBuckets['24-48h']++;
+    else ageBuckets['48h+']++;
+  });
+
+  const avgAgeMs = totalAgeMs / pending.length;
+
+  // ── Predicted clear time (uses throughput-based ETA already in this app) ──
+  let clearETA = null;
+  try {
+    if (typeof computeTicketingETA === 'function') {
+      clearETA = computeTicketingETA(pending.length);
+    }
+  } catch (e) { /* ignore */ }
+  const clearETAStr = clearETA && clearETA.etaText
+    ? clearETA.etaText
+    : '—';
+  const clearRateStr = clearETA && clearETA.rate
+    ? clearETA.rate.toFixed(1) + ' 单/活跃小时'
+    : '速度数据不足';
+
+  // ── Agent breakdown — sorted by count desc, top 5 ──
+  const agentRows = Object.entries(byAgent)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+  const maxAgentCount = agentRows.length > 0 ? agentRows[0][1].count : 1;
+
+  // ── Band breakdown ──
+  const bandRows = USD_BANDS.map(b => ({
+    key: b.key, label: b.label, count: byBand[b.key] || 0,
+  }));
+  const maxBandCount = Math.max(1, ...bandRows.map(r => r.count));
+
+  // ── Age bucket colors (older = redder) ──
+  const ageColors = {
+    '0-6h':   'var(--green)',
+    '6-24h':  'var(--accent-deep)',
+    '24-48h': 'var(--warning-deep)',
+    '48h+':   'var(--red)',
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────
+  const top = `
+    <div style="background:#fff; border:1px solid var(--line); border-radius:var(--r-md); padding:16px 18px; margin-bottom:14px;">
+      <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
+        <div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent-deep); font-weight:700;">CURRENT QUEUE ANALYSIS</div>
+          <div style="font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--ink); margin-top:2px;">📊 当前出票分析</div>
+        </div>
+        <div style="text-align:right; font-size:11px; color:var(--muted); line-height:1.5;">
+          基于当前 <strong style="color:var(--ink); font-family:'JetBrains Mono',monospace;">${pending.length}</strong> 单待出票<br>
+          ${urgentCount > 0 ? `<span style="color:var(--red); font-weight:700;">🔥 ${urgentCount} 单加急</span>` : ''}
+        </div>
+      </div>
+
+      <!-- 4-cell top stat row -->
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:18px;">
+        <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
+          <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">待出总额</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">$${Math.round(totalUsd).toLocaleString()}</div>
+        </div>
+        <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
+          <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">平均等候</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">${_humanDuration(avgAgeMs)}</div>
+        </div>
+        <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
+          <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">最久等待</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:${oldestAgeMs > 48*3600_000 ? 'var(--red)' : oldestAgeMs > 24*3600_000 ? 'var(--warning-deep)' : 'var(--ink)'}; margin-top:2px;">${_humanDuration(oldestAgeMs)}</div>
+        </div>
+        <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);" title="基于团队近期出票节奏估算">
+          <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">预计清空</div>
+          <div style="font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--accent-deep); margin-top:2px;">${escapeHtml(clearETAStr)}</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">${escapeHtml(clearRateStr)}</div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+        <!-- 按代理积压 -->
+        <div>
+          <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.06em; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">按代理积压 (TOP 5)</div>
+          ${agentRows.map(([agent, data]) => {
+            const pct = (data.count / maxAgentCount) * 100;
+            const isOld = data.oldestAgeMs > 24 * 3600_000;
+            return `
+              <div style="display:grid; grid-template-columns:80px 1fr auto auto; gap:8px; align-items:center; padding:5px 0; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+                <span style="color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(displayAgent(agent))}</span>
+                <span style="position:relative; height:14px; background:#f0eada; border-radius:3px; overflow:hidden;">
+                  <span style="position:absolute; left:0; top:0; height:100%; width:${pct}%; background:linear-gradient(90deg, var(--accent), var(--accent-deep)); border-radius:3px;"></span>
+                </span>
+                <span style="color:var(--ink); font-weight:700; min-width:32px; text-align:right;">${data.count} 单</span>
+                ${isOld ? `<span style="color:var(--red); font-size:10px; font-weight:600;" title="该代理最老订单 ${_humanDuration(data.oldestAgeMs)}">⚠ 老</span>` : '<span></span>'}
+              </div>
+            `;
+          }).join('')}
+          ${Object.keys(byAgent).length > 5 ? `<div style="font-size:10.5px; color:var(--muted); margin-top:6px;">+ ${Object.keys(byAgent).length - 5} 个其他代理</div>` : ''}
+        </div>
+
+        <!-- 按金额段分布 + 按订单年龄 -->
+        <div>
+          <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.06em; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">按金额段分布</div>
+          ${bandRows.map(r => {
+            if (r.count === 0) return '';
+            const pct = (r.count / maxBandCount) * 100;
+            return `
+              <div style="display:grid; grid-template-columns:62px 1fr auto; gap:8px; align-items:center; padding:4px 0; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+                <span style="color:var(--muted);">${r.label}</span>
+                <span style="position:relative; height:12px; background:#f0eada; border-radius:3px; overflow:hidden;">
+                  <span style="position:absolute; left:0; top:0; height:100%; width:${pct}%; background:linear-gradient(90deg, var(--blue), #4a7cb8); border-radius:3px;"></span>
+                </span>
+                <span style="color:var(--ink); font-weight:700; min-width:30px; text-align:right;">${r.count} 单</span>
+              </div>
+            `;
+          }).filter(Boolean).join('')}
+
+          <div style="font-size:11px; color:var(--muted); font-weight:700; letter-spacing:0.06em; margin-top:14px; margin-bottom:8px; font-family:'JetBrains Mono',monospace;">按等待时长</div>
+          ${Object.entries(ageBuckets).map(([label, count]) => {
+            if (count === 0) return '';
+            const pct = (count / pending.length) * 100;
+            return `
+              <div style="display:grid; grid-template-columns:62px 1fr auto; gap:8px; align-items:center; padding:4px 0; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+                <span style="color:${ageColors[label]}; font-weight:600;">${label}</span>
+                <span style="position:relative; height:12px; background:#f0eada; border-radius:3px; overflow:hidden;">
+                  <span style="position:absolute; left:0; top:0; height:100%; width:${pct}%; background:${ageColors[label]}; border-radius:3px; opacity:0.75;"></span>
+                </span>
+                <span style="color:var(--ink); font-weight:700; min-width:30px; text-align:right;">${count} 单</span>
+              </div>
+            `;
+          }).filter(Boolean).join('')}
+        </div>
+      </div>
+
+      ${ageBuckets['48h+'] > 0 ? `
+        <div style="margin-top:14px; padding:10px 14px; background:rgba(184,60,44,0.06); border:1px solid rgba(184,60,44,0.25); border-left:3px solid var(--red); border-radius:var(--r-sm); font-size:12px; color:var(--ink); display:flex; align-items:center; gap:10px;">
+          <span style="font-size:18px;">⚠</span>
+          <div>
+            <strong style="color:var(--red);">${ageBuckets['48h+']} 单超过 48 小时未出票</strong>
+            <span style="color:var(--muted); font-size:11px;"> · 建议优先处理或与客户沟通</span>
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  return top;
+}
 
 // Format the predicted finish time. Examples:
 //   today 14:30   → 今天 14:30
@@ -6475,6 +6901,17 @@ function isUSOrigin(order) {
 //    Supports matching by: agent, airline, cabin, tableLabel, originRegion ('US' / 'any'), fareClass
 function matchDiscountRule(agentOrOrder, airline, cabin) {
   const rules = (settings.discountRules || []);
+
+  // ─── 表 Y override ─────────────────────────────────────────────────────
+  // 表 Y always returns exactly 90% — the customer pays 90% of standard price
+  // in exchange for top priority ticketing. This overrides any other rule
+  // (including agent-specific discounts that might be even lower).
+  if (typeof agentOrOrder === 'object' && agentOrOrder !== null
+      && agentOrOrder.isTableY
+      && (agentOrOrder.tableLabel || '').toUpperCase() === 'A') {
+    return 90;
+  }
+
   if (rules.length === 0) return null;
 
   // Build context from input
@@ -6767,6 +7204,426 @@ async function removeOrder(idx) {
   openDeleteOrderModal(idx);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BULK CANCEL — multi-select & delete several pending orders at once
+//
+// Workflow:
+//   1. User clicks "📋 批量" toggle in the USD panel header → enter bulk mode
+//   2. Each row gains a checkbox (replaces the drag handle icon)
+//   3. Selected rows highlight; action bar shows "已选 N 单" + buttons
+//   4. User clicks "撤单" → confirmation modal lists each selected order
+//   5. Type the token (e.g. "撤" + count) to confirm → all deleted in one pass
+//
+// Why we track by order.id (not index): STATE.orders.splice shifts indices.
+// Tracking by stable IDs lets us delete safely in any order.
+// ═══════════════════════════════════════════════════════════════════════════
+
+let _bulkMode = false;
+// Parse debug mode — when true, parseSingleBooking emits a line-by-line log
+// into #parseDebugPanel so the user can see exactly which rule matched (or
+// didn't) for every input line. Activated via the 🔍 调试 button.
+let _parseDebugMode = false;
+let _parseDebugLog = [];
+
+function toggleParseDebug() {
+  _parseDebugMode = !_parseDebugMode;
+  const btn = document.getElementById('parseDebugToggle');
+  const panel = document.getElementById('parseDebugPanel');
+  if (_parseDebugMode) {
+    if (btn) { btn.style.opacity = '1'; btn.style.color = 'var(--accent-deep)'; btn.style.borderColor = 'var(--accent-deep)'; }
+    if (panel) panel.style.display = 'block';
+    document.getElementById('parseDebugContent').textContent = '↑ 点击「⚡ 解析」查看日志';
+    toast('🔍 调试模式已开启 · 下次解析时显示详细日志');
+  } else {
+    if (btn) { btn.style.opacity = '0.7'; btn.style.color = ''; btn.style.borderColor = ''; }
+    if (panel) panel.style.display = 'none';
+  }
+}
+const _bulkSelected = new Set();   // set of order IDs
+
+function toggleBulkMode() {
+  _bulkMode = !_bulkMode;
+  _bulkSelected.clear();
+  // Update toggle button appearance
+  const btn = document.getElementById('bulkModeToggle');
+  if (btn) {
+    if (_bulkMode) {
+      btn.style.background = 'var(--accent-deep)';
+      btn.style.color = '#fff';
+      btn.style.borderColor = 'var(--accent-deep)';
+      btn.textContent = '✓ 批量中';
+    } else {
+      btn.style.background = '#fff';
+      btn.style.color = 'var(--ink)';
+      btn.style.borderColor = 'var(--line)';
+      btn.textContent = '📋 批量';
+    }
+  }
+  renderAirlineUsdPanel();
+  renderPendingList();
+  updateBulkActionBar();
+}
+
+function toggleBulkSelect(orderId) {
+  if (_bulkSelected.has(orderId)) {
+    _bulkSelected.delete(orderId);
+  } else {
+    _bulkSelected.add(orderId);
+  }
+  // Targeted DOM update — flip the checkbox + highlight on just this row
+  const row = document.querySelector(`[data-bulk-row="${orderId}"]`);
+  if (row) {
+    const checked = _bulkSelected.has(orderId);
+    row.classList.toggle('bulk-selected', checked);
+    const cb = row.querySelector('.bulk-checkbox');
+    if (cb) cb.checked = checked;
+  }
+  updateBulkActionBar();
+}
+
+function bulkSelectAll() {
+  // Select every currently-visible meaningful order (respects current filters)
+  const meaningful = STATE.orders.filter(o =>
+    isMeaningfulOrder(o) && o.tableLabel !== 'G' &&
+    (!_pendingSearchQ || orderMatchesSearch(o, _pendingSearchQ))
+  );
+  meaningful.forEach(o => _bulkSelected.add(o.id));
+  renderAirlineUsdPanel();
+  renderPendingList();
+  updateBulkActionBar();
+}
+
+function bulkClearSelection() {
+  _bulkSelected.clear();
+  renderAirlineUsdPanel();
+  renderPendingList();
+  updateBulkActionBar();
+}
+
+function updateBulkActionBar() {
+  const bar = document.getElementById('bulkActionBar');
+  if (!bar) return;
+  if (!_bulkMode) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  const countEl = document.getElementById('bulkSelectCount');
+  if (countEl) countEl.textContent = _bulkSelected.size;
+
+  // Count selected orders by their current Y state. The "set Y" button is
+  // enabled when there's at least one non-Y selected; "unset Y" is enabled
+  // when there's at least one Y selected.
+  let nonYCount = 0, yCount = 0;
+  _bulkSelected.forEach(id => {
+    const o = STATE.orders.find(x => x.id === id);
+    if (!o) return;
+    if (o.isTableY) yCount++; else nonYCount++;
+  });
+
+  const setEnabled = (btnId, enabled, activeBgKeep) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.style.opacity = enabled ? '1' : '0.45';
+    btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+  };
+  setEnabled('bulkCancelBtn', _bulkSelected.size > 0);
+  setEnabled('bulkSetYBtn', nonYCount > 0);
+  setEnabled('bulkUnsetYBtn', yCount > 0);
+}
+
+// Confirm + execute bulk cancellation. Shows a modal listing every selected
+// order with its passenger/airline/amount for sanity check, then requires
+// typing a short token to proceed (mirrors the single-delete modal flow).
+function openBulkCancelModal() {
+  if (_bulkSelected.size === 0) return;
+  const selected = Array.from(_bulkSelected)
+    .map(id => STATE.orders.find(o => o.id === id))
+    .filter(Boolean);
+  if (selected.length === 0) return;
+
+  // Compute total USD lost so user sees the financial impact
+  let totalUsd = 0;
+  const rate = settings.rate || 7.2;
+  const rows = selected.map(o => {
+    const paxName = (o.passengers || [])[0]?.name || '—';
+    const paxCount = (o.passengers || []).length || 1;
+    const usd = _orderUsd(o, o.rate || rate);
+    totalUsd += usd;
+    const route = (o.segments || []).map(s => s.from + '→' + s.to).join('/') || '—';
+    const flight = (o.segments || []).map(s => s.flight).filter(Boolean).join(',') || '';
+    const agentDisp = displayAgent ? displayAgent(o.agent || '') : (o.agent || '');
+    return { id: o.id, paxName, paxCount, route, flight, usd, airline: o.airline || '—', agent: agentDisp };
+  });
+
+  // Group by agent for clearer review (agents usually batch their cancels)
+  const byAgent = {};
+  rows.forEach(r => {
+    if (!byAgent[r.agent]) byAgent[r.agent] = [];
+    byAgent[r.agent].push(r);
+  });
+
+  // Generate confirm token: "撤" + count (e.g. "撤5")
+  const token = '撤' + selected.length;
+
+  const groupsHtml = Object.entries(byAgent).map(([agent, list]) => {
+    const groupTotal = list.reduce((s, r) => s + r.usd, 0);
+    const rowsHtml = list.map(r => `
+      <div style="display:grid; grid-template-columns:auto 1fr auto auto; gap:10px; padding:6px 0; border-top:1px dashed var(--line); align-items:baseline; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+        <span style="color:var(--muted); min-width:32px;">${escapeHtml(r.airline)}</span>
+        <span style="color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.paxName)} <span style="color:var(--muted); font-size:10.5px;">(${r.paxCount}人)</span></span>
+        <span style="color:var(--muted); font-size:10.5px;">${escapeHtml(r.flight || r.route)}</span>
+        <span style="color:var(--ink); font-weight:700; min-width:60px; text-align:right;">$${Math.round(r.usd).toLocaleString()}</span>
+      </div>
+    `).join('');
+    return `
+      <div style="margin-bottom:14px; background:var(--cream); border-radius:var(--r-sm); padding:10px 14px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; font-size:11px; margin-bottom:2px;">
+          <strong style="color:var(--accent-deep); letter-spacing:0.02em;">${escapeHtml(agent || '—')}</strong>
+          <span style="color:var(--muted); font-family:'JetBrains Mono',monospace;">${list.length} 单 · $${Math.round(groupTotal).toLocaleString()}</span>
+        </div>
+        ${rowsHtml}
+      </div>
+    `;
+  }).join('');
+
+  const html = `
+    <div id="bulkCancelOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.55); z-index:9200; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target.id==='bulkCancelOverlay')document.getElementById('bulkCancelOverlay').remove()">
+      <div style="background:var(--paper); border-radius:var(--r-lg); width:min(640px, 95vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
+        <div style="padding:18px 24px; background:linear-gradient(135deg, var(--red), #8b3a2d); color:#fff;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.85; font-weight:600; margin-bottom:4px;">BULK CANCEL</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">批量撤单 · ${selected.length} 单</div>
+          <div style="font-size:12px; opacity:0.85; margin-top:4px;">合计 $${Math.round(totalUsd).toLocaleString()} · 此操作不可撤销</div>
+        </div>
+        <div style="padding:18px 24px; overflow:auto;">
+          ${groupsHtml}
+          <div style="margin-top:14px; padding:12px 14px; background:rgba(184,60,44,0.06); border:1px solid rgba(184,60,44,0.25); border-left:3px solid var(--red); border-radius:var(--r-sm); font-size:12px; line-height:1.6;">
+            <strong style="color:var(--red);">⚠ 删除后无法恢复。</strong>
+            <span style="color:var(--muted);">为确认操作，请在下方输入 <strong style="color:var(--ink); font-family:'JetBrains Mono',monospace; background:#fff; padding:1px 6px; border-radius:3px;">${token}</strong></span>
+          </div>
+          <input type="text" id="bulkCancelToken" autocomplete="off"
+            oninput="document.getElementById('bulkCancelDoIt').disabled = (this.value.trim() !== '${token}'); document.getElementById('bulkCancelDoIt').style.opacity = this.value.trim() === '${token}' ? '1' : '0.45';"
+            style="width:100%; margin-top:10px; padding:10px 14px; border:1.5px solid var(--line); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:14px; outline:none;"
+            placeholder="在此输入 ${token}">
+          <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+            <button onclick="document.getElementById('bulkCancelOverlay').remove()" style="padding:9px 16px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:var(--r-sm); cursor:pointer; font-size:12.5px;">取消</button>
+            <button id="bulkCancelDoIt" disabled style="padding:9px 16px; border:1px solid var(--red); background:var(--red); color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12.5px; font-weight:700; opacity:0.45;"
+              onclick="executeBulkCancel()">删除 ${selected.length} 单</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const c = document.createElement('div');
+  c.innerHTML = html;
+  document.body.appendChild(c.firstElementChild);
+  setTimeout(() => document.getElementById('bulkCancelToken')?.focus(), 50);
+}
+
+async function executeBulkCancel() {
+  const ids = Array.from(_bulkSelected);
+  // Resolve IDs → current indices; sort DESCENDING so splice doesn't shift
+  // remaining indices we still need to use
+  const idxList = ids.map(id => STATE.orders.findIndex(o => o.id === id))
+    .filter(i => i >= 0)
+    .sort((a, b) => b - a);
+  // Capture passenger names for the recovery toast
+  const removed = idxList.map(i => {
+    const o = STATE.orders[i];
+    return o ? ((o.passengers || [])[0]?.name || o.id) : '';
+  }).filter(Boolean);
+  // Splice in reverse-index order. Each splice removes one row; remaining
+  // larger indices in our list are still valid because we go high→low.
+  idxList.forEach(i => {
+    if (i < STATE.orders.length) STATE.orders.splice(i, 1);
+  });
+  ensureDraft();
+  loadCurrToDOM();
+  renderOrderTabs();
+  renderPreview();
+  await persistOrdersNow();
+  renderAirlineUsdPanel();
+  renderPendingList();
+  renderChasePanel();
+  renderPendingBanner();
+  _bulkSelected.clear();
+  // Exit bulk mode after a successful bulk action — most users just want one pass
+  _bulkMode = false;
+  updateBulkActionBar();
+  document.getElementById('bulkCancelOverlay')?.remove();
+  toast(`✓ 已撤销 ${removed.length} 单`);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BULK 表 Y — set or unset 表 Y status on multiple selected orders at once.
+//
+// `setY = true`  → mark all selected as 表 Y (9折 + 最高优先级). Skips:
+//                    • orders already Y (no change needed)
+//                    • orders on table G (Y is A-branch only — Chase has own logic)
+//                  Non-A orders are auto-converted to A (after user confirmation).
+//
+// `setY = false` → remove Y from all selected orders. Restores stashed
+//                  pre-Y discount when available.
+// ═══════════════════════════════════════════════════════════════════════════
+function openBulkSetTableYModal(setY) {
+  if (_bulkSelected.size === 0) return;
+  const all = Array.from(_bulkSelected)
+    .map(id => STATE.orders.find(o => o.id === id))
+    .filter(Boolean);
+  if (all.length === 0) return;
+
+  // Filter to orders this action would actually change.
+  const affected = setY
+    ? all.filter(o => !o.isTableY && o.tableLabel !== 'G')
+    : all.filter(o => o.isTableY);
+
+  if (affected.length === 0) {
+    toast(setY ? '所选订单都已经是表 Y，无需操作' : '所选订单中没有表 Y 单');
+    return;
+  }
+
+  // For setY: count orders that need label conversion (non-A → A)
+  const needsConvert = setY ? affected.filter(o => o.tableLabel !== 'A') : [];
+
+  // Group by agent for review
+  const byAgent = {};
+  affected.forEach(o => {
+    const a = (o.agent || '未分代理').trim() || '未分代理';
+    if (!byAgent[a]) byAgent[a] = [];
+    byAgent[a].push(o);
+  });
+
+  const rate = settings.rate || 7.2;
+  const rowFor = (o) => {
+    const paxName = (o.passengers || [])[0]?.name || '—';
+    const paxCount = (o.passengers || []).length || 1;
+    const usd = _orderUsd(o, o.rate || rate);
+    const curDisc = o.discount != null ? o.discount : '—';
+    const newDisc = setY ? 90 : (o._preY_discount != null ? o._preY_discount : '原始');
+    return {
+      paxName, paxCount, usd, airline: o.airline || '—',
+      curDisc, newDisc, tableLabel: o.tableLabel || '?',
+    };
+  };
+
+  const groupsHtml = Object.entries(byAgent).map(([agent, list]) => {
+    const rowsHtml = list.map(o => {
+      const r = rowFor(o);
+      return `
+        <div style="display:grid; grid-template-columns:auto 1fr auto auto auto; gap:10px; padding:6px 0; border-top:1px dashed var(--line); align-items:baseline; font-family:'JetBrains Mono',monospace; font-size:11.5px;">
+          <span style="color:var(--muted); min-width:32px;">${escapeHtml(r.airline)}</span>
+          <span style="color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.paxName)} <span style="color:var(--muted); font-size:10.5px;">(${r.paxCount}人)</span></span>
+          <span style="color:${r.tableLabel === 'A' ? 'var(--muted)' : 'var(--warning-deep)'}; font-size:10.5px;">表${escapeHtml(r.tableLabel)}</span>
+          <span style="color:var(--muted); font-size:10.5px;">${r.curDisc}% → <strong style="color:var(--accent-deep);">${r.newDisc}${typeof r.newDisc === 'number' ? '%' : ''}</strong></span>
+          <span style="color:var(--ink); font-weight:700; min-width:60px; text-align:right;">$${Math.round(r.usd).toLocaleString()}</span>
+        </div>`;
+    }).join('');
+    return `
+      <div style="margin-bottom:14px; background:var(--cream); border-radius:var(--r-sm); padding:10px 14px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; font-size:11px; margin-bottom:2px;">
+          <strong style="color:var(--accent-deep); letter-spacing:0.02em;">${escapeHtml(agent || '—')}</strong>
+          <span style="color:var(--muted); font-family:'JetBrains Mono',monospace;">${list.length} 单</span>
+        </div>
+        ${rowsHtml}
+      </div>`;
+  }).join('');
+
+  const skippedCount = all.length - affected.length;
+  const skippedNote = skippedCount > 0
+    ? `<div style="font-size:10.5px; color:var(--muted); margin-top:6px;">已自动跳过 ${skippedCount} 单（${setY ? '已是表 Y 或表 G' : '本来就不是表 Y'}）</div>`
+    : '';
+
+  const convertNote = needsConvert.length > 0
+    ? `<div style="margin-top:10px; padding:8px 12px; background:rgba(194,133,61,0.08); border-left:3px solid var(--warning); border-radius:var(--r-sm); font-size:11.5px; color:var(--ink);">
+        ⚠ 其中 <strong>${needsConvert.length} 单</strong> 当前不是表 A（${needsConvert.map(o => `表${o.tableLabel}`).join('、')}），将自动转为表 A · Y。
+      </div>`
+    : '';
+
+  const token = setY ? `Y${affected.length}` : `撤Y${affected.length}`;
+  const accentColor = setY ? 'var(--accent-deep)' : 'var(--ink)';
+  const headerBg = setY
+    ? 'linear-gradient(135deg, #c8a04a, #8b6914)'
+    : 'linear-gradient(135deg, var(--ink), var(--ink-2))';
+  const actionLabel = setY ? `设为表 Y · ${affected.length} 单` : `取消表 Y · ${affected.length} 单`;
+  const titleText = setY ? '⚡ 批量设为表 Y' : '○ 批量取消表 Y';
+  const subtitleText = setY
+    ? '所有选中订单将设为 9 折、获得最高优先级出票'
+    : '所有选中的表 Y 订单恢复为普通表 A（折扣还原）';
+
+  const html = `
+    <div id="bulkSetYOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.55); z-index:9200; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target.id==='bulkSetYOverlay')document.getElementById('bulkSetYOverlay').remove()">
+      <div style="background:var(--paper); border-radius:var(--r-lg); width:min(640px, 95vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
+        <div style="padding:18px 24px; background:${headerBg}; color:#fff;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.85; font-weight:600; margin-bottom:4px;">BULK ${setY ? 'SET' : 'UNSET'} TABLE Y</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">${titleText}</div>
+          <div style="font-size:12px; opacity:0.85; margin-top:4px;">${subtitleText}</div>
+        </div>
+        <div style="padding:18px 24px; overflow:auto;">
+          ${groupsHtml}
+          ${skippedNote}
+          ${convertNote}
+          <div style="margin-top:14px; padding:12px 14px; background:rgba(${setY ? '200,160,74' : '12,27,42'},0.08); border:1px solid rgba(${setY ? '200,160,74' : '12,27,42'},0.25); border-left:3px solid ${accentColor}; border-radius:var(--r-sm); font-size:12px; line-height:1.6;">
+            <span style="color:var(--muted);">为确认操作，请在下方输入 <strong style="color:var(--ink); font-family:'JetBrains Mono',monospace; background:#fff; padding:1px 6px; border-radius:3px;">${token}</strong></span>
+          </div>
+          <input type="text" id="bulkSetYToken" autocomplete="off"
+            oninput="document.getElementById('bulkSetYDoIt').disabled = (this.value.trim() !== '${token}'); document.getElementById('bulkSetYDoIt').style.opacity = this.value.trim() === '${token}' ? '1' : '0.45';"
+            style="width:100%; margin-top:10px; padding:10px 14px; border:1.5px solid var(--line); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:14px; outline:none;"
+            placeholder="在此输入 ${token}">
+          <div style="margin-top:14px; display:flex; gap:8px; justify-content:flex-end;">
+            <button onclick="document.getElementById('bulkSetYOverlay').remove()" style="padding:9px 16px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:var(--r-sm); cursor:pointer; font-size:12.5px;">取消</button>
+            <button id="bulkSetYDoIt" disabled style="padding:9px 16px; border:1px solid ${accentColor}; background:${setY ? 'linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a)' : 'var(--ink)'}; color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12.5px; font-weight:700; opacity:0.45;"
+              onclick="executeBulkSetTableY(${setY})">${actionLabel}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const c = document.createElement('div');
+  c.innerHTML = html;
+  document.body.appendChild(c.firstElementChild);
+  setTimeout(() => document.getElementById('bulkSetYToken')?.focus(), 50);
+}
+
+async function executeBulkSetTableY(setY) {
+  const ids = Array.from(_bulkSelected);
+  let changed = 0;
+  ids.forEach(id => {
+    const o = STATE.orders.find(x => x.id === id);
+    if (!o) return;
+    if (setY) {
+      if (o.isTableY || o.tableLabel === 'G') return;
+      if (o.tableLabel !== 'A') o.tableLabel = 'A';
+      applyTableY(o);
+    } else {
+      if (!o.isTableY) return;
+      removeTableY(o);
+    }
+    const fp = computeFinalPrice(o);
+    const settle = computeSettlement(o);
+    o.rmb = fp != null ? fp / (o.passengers.length || 1) : null;
+    o.cardholderFee = settle;
+    changed++;
+  });
+
+  await persistOrdersNow();
+  renderAirlineUsdPanel();
+  renderPendingList();
+  renderChasePanel();
+  renderPendingBanner();
+  // If the user is viewing one of the affected orders in the entry form,
+  // refresh the form to show the new state.
+  if (typeof loadCurrToDOM === 'function' && STATE.orders[STATE.currentIdx]) {
+    loadCurrToDOM();
+  }
+  _bulkSelected.clear();
+  _bulkMode = false;
+  updateBulkActionBar();
+  document.getElementById('bulkSetYOverlay')?.remove();
+  toast(setY ? `⚡ 已将 ${changed} 单设为表 Y` : `✓ 已取消 ${changed} 单的表 Y 标记`);
+}
+// ═══════════════════════════════════════════════════════════════════════════
+
 // ─── Delete-order modal control ───────────────────────────────────────────
 // Two-stage confirmation. Stage 1: show order detail + risks. Stage 2:
 // type-to-confirm with a token derived from the passenger's last name (the
@@ -6963,10 +7820,50 @@ function renderOrderTabs() {
 // DOM <-> ORDER SYNC
 // ============================================
 
+// Show the "表 Y 优惠" checkbox field only when 表 A is selected. Y is a
+// branch of A — it makes no sense for other table labels.
+function toggleTableYVisibility() {
+  const field = document.getElementById('f-tableY-field');
+  if (!field) return;
+  const sel = document.getElementById('f-tableLabel');
+  const isA = sel && sel.value === 'A';
+  field.style.display = isA ? '' : 'none';
+  // If user changed away from A, clear the isTableY flag on this order
+  if (!isA) {
+    const isYEl = document.getElementById('f-isTableY');
+    if (isYEl && isYEl.checked) {
+      isYEl.checked = false;
+      const o = curr();
+      if (o && o.isTableY) removeTableY(o); // clears isTableY + restores discount
+    }
+  }
+}
+
 function syncDOMToOrder() {
   const o = curr();
   if (!o) return;
   o.tableLabel = document.getElementById('f-tableLabel').value;
+  // 表 Y is a special A-branch — only meaningful when tableLabel === 'A'
+  const isYEl = document.getElementById('f-isTableY');
+  const wasY = !!o.isTableY;
+  const isYNow = (o.tableLabel === 'A' && isYEl && isYEl.checked);
+  // ─── Y toggle side-effects on pricing ────────────────────────────────
+  // Delegate all Y field mutations to applyTableY / removeTableY.
+  // DOM form field updates (discount input) still happen here since
+  // they're UI work, not data work.
+  if (isYNow && !wasY) {
+    const result = applyTableY(o);
+    if (result === 'set-90') {
+      const discInput = document.getElementById('f-discount');
+      if (discInput) discInput.value = 90;
+    }
+  } else if (!isYNow && wasY) {
+    const result = removeTableY(o);
+    if (result === 'restored' && o.discount != null) {
+      const discInput = document.getElementById('f-discount');
+      if (discInput) discInput.value = o.discount;
+    }
+  }
   o.client = document.getElementById('f-client').value.trim();
   o.cabin = document.getElementById('f-cabin').value;
   o.agent = document.getElementById('f-agent').value.trim();
@@ -6979,7 +7876,18 @@ function syncDOMToOrder() {
   const basePrice = parseFloat(document.getElementById('f-basePrice').value);
   o.basePrice = isNaN(basePrice) ? null : basePrice;
   const discount = parseFloat(document.getElementById('f-discount').value);
-  o.discount = isNaN(discount) ? null : discount;
+  const newDiscount = isNaN(discount) ? null : discount;
+  // If user manually changed the discount (vs. it just being kept the same),
+  // record that as a manual override — this beats Y's 9折 rule.
+  if (newDiscount !== o.discount && newDiscount != null) {
+    // User typed a new value — mark manual override.
+    // Y default of 90 set by toggling Y on counts as "auto" not "manual",
+    // so we filter that case: only flag manual if not just-toggled-into-Y.
+    if (!(isYNow && !wasY && newDiscount === 90)) {
+      o.discountManuallyOverridden = true;
+    }
+  }
+  o.discount = newDiscount;
 
   o.issuer = document.getElementById('f-issuer').value.trim();
   const miles = parseFloat(document.getElementById('f-miles').value);
@@ -7001,10 +7909,153 @@ function syncDOMToOrder() {
   renderDerivedFields();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// COLLAPSIBLE FORM SECTIONS — 3 (Segments), 4 (Pricing), 5 (Settlement)
+// These fields are mostly auto-populated by PNR parsing. To reduce visual
+// clutter the sections default to collapsed and display a one-line summary.
+// User clicks the header to expand for manual editing.
+// ═══════════════════════════════════════════════════════════════════════════
+// Read user's saved section state from localStorage. Returns {segments, pricing, settlement}
+// where each value is 'collapsed' | 'expanded'. Default is collapsed.
+function _getSectionStates() {
+  try {
+    const raw = localStorage.getItem('ticket-organizer-section-states');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { segments: 'collapsed', pricing: 'collapsed', settlement: 'collapsed' };
+}
+function _saveSectionStates(states) {
+  try { localStorage.setItem('ticket-organizer-section-states', JSON.stringify(states)); } catch (e) {}
+}
+
+function toggleSection(key) {
+  const sec = document.querySelector(`.collapsible-section[data-section-key="${key}"]`);
+  if (!sec) return;
+  const collapsed = sec.getAttribute('data-collapsed') === 'true';
+  const willCollapse = !collapsed;
+  _applySectionState(key, willCollapse ? 'collapsed' : 'expanded');
+  // Persist
+  const states = _getSectionStates();
+  states[key] = willCollapse ? 'collapsed' : 'expanded';
+  _saveSectionStates(states);
+  // Update global toggle button label if it exists
+  _refreshGlobalToggleBtn();
+}
+
+// Apply a state to one section's DOM (without persisting)
+function _applySectionState(key, state) {
+  const sec = document.querySelector(`.collapsible-section[data-section-key="${key}"]`);
+  if (!sec) return;
+  const collapsed = state === 'collapsed';
+  sec.setAttribute('data-collapsed', collapsed ? 'true' : 'false');
+  const body = sec.querySelector('.collapsible-body');
+  const toggle = sec.querySelector('.collapsible-toggle');
+  if (body) body.style.display = collapsed ? 'none' : '';
+  if (toggle) toggle.textContent = collapsed ? '展开 ▾' : '收起 ▴';
+}
+
+// Apply all saved section states to the DOM. Called on init + when loading a new order.
+function applyAllSectionStates() {
+  const states = _getSectionStates();
+  Object.keys(states).forEach(key => _applySectionState(key, states[key]));
+  _refreshGlobalToggleBtn();
+}
+
+// Toggle ALL sections at once. If any are collapsed → expand all. If all expanded → collapse all.
+function toggleAllSections() {
+  const sections = ['segments', 'pricing', 'settlement'];
+  const states = _getSectionStates();
+  const anyCollapsed = sections.some(k => states[k] !== 'expanded');
+  const newState = anyCollapsed ? 'expanded' : 'collapsed';
+  sections.forEach(k => {
+    states[k] = newState;
+    _applySectionState(k, newState);
+  });
+  _saveSectionStates(states);
+  _refreshGlobalToggleBtn();
+}
+
+function _refreshGlobalToggleBtn() {
+  const btn = document.getElementById('collapsibleGlobalToggle');
+  if (!btn) return;
+  const states = _getSectionStates();
+  const anyCollapsed = ['segments', 'pricing', 'settlement'].some(k => states[k] !== 'expanded');
+  btn.textContent = anyCollapsed ? '全部展开 ▾' : '全部收起 ▴';
+}
+
+// Re-compute and write the one-line summary into the collapsed header for
+// each section. Called whenever order data changes.
+function updateCollapsibleSummaries() {
+  const o = curr();
+  if (!o) return;
+
+  // ─── 3. SEGMENTS summary ────────────────────────────────────────────────
+  const segEl = document.getElementById('summary-segments');
+  if (segEl) {
+    const segs = (o.segments || []).filter(s => s.from || s.to || s.flight);
+    if (segs.length === 0) {
+      segEl.textContent = '未填写';
+      segEl.style.color = 'var(--muted)';
+    } else {
+      const segText = segs.map(s => {
+        const route = (s.from || '?') + '→' + (s.to || '?');
+        return s.flight ? `${s.flight} ${route}` : route;
+      }).join(' · ');
+      const pnrPart = o.pnr ? ` · PNR ${o.pnr}` : '';
+      const tktPart = o.tkt ? ` · TKT ${o.tkt}` : '';
+      segEl.textContent = `${segs.length}段 · ${segText}${pnrPart}${tktPart}`;
+      segEl.style.color = 'var(--ink-2)';
+    }
+  }
+
+  // ─── 4. PRICING summary ─────────────────────────────────────────────────
+  const priceEl = document.getElementById('summary-pricing');
+  if (priceEl) {
+    const base = o.basePrice;
+    const disc = o.discount;
+    const paxCount = (o.passengers || []).length || 1;
+    if (!base || !disc) {
+      priceEl.textContent = '未填写';
+      priceEl.style.color = 'var(--muted)';
+    } else {
+      const total = base * (disc / 100) * paxCount;
+      const paxNote = paxCount > 1 ? ` × ${paxCount}` : '';
+      priceEl.textContent = `¥${Number(base).toLocaleString()} × ${disc}%${paxNote} = ¥${Math.round(total).toLocaleString()}`;
+      priceEl.style.color = 'var(--ink-2)';
+    }
+  }
+
+  // ─── 5. SETTLEMENT summary ──────────────────────────────────────────────
+  const settEl = document.getElementById('summary-settlement');
+  if (settEl) {
+    const m = o.miles, r = o.cpmRate, e = o.cpmExchange;
+    if (!m && !r && !e && !o.issuer) {
+      settEl.textContent = '未填写（出票后填）';
+      settEl.style.color = 'var(--muted)';
+    } else if (m && r && e) {
+      const total = m * r * e;
+      settEl.textContent = `${Number(m).toLocaleString()}mi × ${r} × ${e} = ¥${Math.round(total).toLocaleString()}`;
+      settEl.style.color = 'var(--ink-2)';
+    } else {
+      // Partial — show what's there
+      const parts = [];
+      if (o.issuer) parts.push(o.issuer);
+      if (m) parts.push(`${Number(m).toLocaleString()}mi`);
+      if (r) parts.push(`@${r}`);
+      settEl.textContent = parts.join(' · ') || '部分填写';
+      settEl.style.color = 'var(--warning-deep)';
+    }
+  }
+}
+
 function loadCurrToDOM() {
   const o = curr();
   if (!o) return;
   document.getElementById('f-tableLabel').value = o.tableLabel || '';
+  // Set 表 Y checkbox + show/hide its field row
+  const isYEl = document.getElementById('f-isTableY');
+  if (isYEl) isYEl.checked = !!o.isTableY;
+  toggleTableYVisibility();
   document.getElementById('f-client').value = o.client || '';
   renderClientDatalist();
   document.getElementById('f-cabin').value = o.cabin || '经济舱';
@@ -7023,6 +8074,7 @@ function loadCurrToDOM() {
   renderSegments();
   renderAgentChips();
   renderDerivedFields();
+  updateCollapsibleSummaries();  // Refresh collapsed-section summaries
   // Auto-trigger OFAC checks for all loaded passenger names (cached → instant return).
   (o.passengers || []).forEach((p, i) => {
     if (p.name) checkOFACDebounced(p.name, (key) => updateOFACBar(i));
@@ -7913,7 +8965,32 @@ function parseSingleBooking(raw) {
 
   let segCarry = null;  // carries partial segment (carrier+flight+cls+date) waiting for next line's route
 
-  for (const line of lines) {
+  // ── Pre-process: split lines that contain multiple segments or inline TOTAL.
+  // Common WeChat-pasted format glues 2 segments + total onto one line:
+  //   "7月15日 UA 1195 LAX-SFO 20:10-21:38 7月15日 UA 805 SFO-ICN 23:55-04:20+2 TOTAL CNY 24,986"
+  // We split on the position right BEFORE each "数字月数字日" marker (except the
+  // first) and before "TOTAL CNY/RMB/USD" so the rest of the parser sees them
+  // as separate lines.
+  const expandedLines = [];
+  for (const ln of lines) {
+    // Find boundaries: every "N月N日" after the first, and every "TOTAL <CUR>"
+    const splitRe = /(?=\d{1,2}月\d{1,2}日)|(?=\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b)/g;
+    const parts = ln.split(splitRe).filter(p => p && p.trim());
+    if (parts.length > 1) {
+      // Multiple segments on one line — split
+      parts.forEach(p => expandedLines.push(p));
+    } else {
+      expandedLines.push(ln);
+    }
+  }
+
+  // ── Debug log setup ──────────────────────────────────────────────────────
+  const _dbg = _parseDebugMode ? [] : null;
+  const _d = _parseDebugMode
+    ? (line, rule, detail='') => _dbg.push({ line, rule, detail })
+    : () => {};
+
+  for (const line of expandedLines) {
     // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
     const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
     if (!trimmed) continue;
@@ -8383,6 +9460,34 @@ function parseSingleBooking(raw) {
     // SEGMENT
     let matched = false;
 
+    // ── Chinese-date + English-IATA compact format (common in WeChat copy/paste):
+    //   "7月15日 UA 1195 LAX-SFO  20:10-21:38"
+    //   "7月15日 UA 805   SFO-ICN 23:55-04:20+2"
+    // Allowed variants:
+    //   - carrier glued to flight: "UA1195" (no space)
+    //   - extra spaces between fields
+    //   - route separator: "-" or "→"
+    //   - times optional; arrival can have "+1" "+2" day-offset
+    const cnDateEnSeg = trimmed.match(
+      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z]{2})\s*(\d{1,4})\s+([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*[-]\s*(\d{1,2}:\d{2})(?:\+\d+)?)?/
+    );
+    if (cnDateEnSeg) {
+      const date = cnDateToIATA(cnDateEnSeg[1], cnDateEnSeg[2]);
+      const carrier = cnDateEnSeg[3];
+      const flight = cnDateEnSeg[4];
+      const from = cnDateEnSeg[5];
+      const to = cnDateEnSeg[6];
+      const depTime = cnDateEnSeg[7] || '';
+      const arrTime = cnDateEnSeg[8] || '';
+      if (carrier && flight && from && to && date) {
+        segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime });
+        if (!airline) airline = carrier;
+        _d(trimmed, '✅ SEGMENT', `${carrier+flight} ${from}→${to} ${date}`);
+        matched = true;
+        continue;
+      }
+    }
+
     // ── Chinese format segment: "1. 联合航空UA771  06月04日  洛杉矶 - 北京首都  23:35出发  04:40+2到达"
     // Also: "1. UA771  06月04日  洛杉矶 - 北京首都" (no Chinese airline name)
     // Also 恒途: "1. AS1352  06月03日(星期三)  洛杉矶T6 - 圣何塞胡安　圣玛利亚M  16:40  23:33"
@@ -8594,13 +9699,15 @@ function parseSingleBooking(raw) {
     // PRICE
     // TOTAL line takes priority - "TOTAL CNY 49056" should override earlier "FARE CNY 46540"
     // Also handles: "CNYTOTAL12087", "RMBTOTAL5000" (currency prefix glued before TOTAL)
-    const pTotal = trimmed.match(/^\s*(?:(?:CNY|RMB|人民币|USD|美金|美元)\s*)?TOTAL\s*(?:(?:CNY|RMB|人民币|USD|美金|美元)\s*)?(\d+(?:\.\d+)?)\s*$/i);
+    // Accepts commas in number ("TOTAL CNY 24,986") which are common in
+    // hand-typed WeChat messages.
+    const pTotal = trimmed.match(/^\s*(?:(?:CNY|RMB|人民币|USD|美金|美元)\s*)?TOTAL\s*(?:(?:CNY|RMB|人民币|USD|美金|美元)\s*)?([\d,]+(?:\.\d+)?)\s*$/i);
     if (pTotal) {
-      const amt = parseFloat(pTotal[1]);
-      // Detect currency from the matched line
+      const amt = parseFloat(pTotal[1].replace(/,/g, ''));
       const isUsd = /USD|美金|美元/i.test(trimmed);
-      if (isUsd && amt > 10) usd = amt;  // overrides
-      else if (amt > 100) rmb = amt;     // overrides any earlier FARE-only value
+      if (isUsd && amt > 10) usd = amt;
+      else if (amt > 100) rmb = amt;
+      _d(trimmed, '💰 TOTAL', `${isUsd ? 'USD' : 'CNY'} ${amt}`);
       continue;
     }
     // FARE line is tax-exclusive — skip if we may see TOTAL later. Mark it as fallback.
@@ -8863,6 +9970,27 @@ function parseSingleBooking(raw) {
     } else if (pTravelSkyFare) {
       const amt = parseFloat(pTravelSkyFare[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+    } else {
+      // Nothing matched this line at all
+      _d(trimmed, '⬜ 未识别', '');
+    }
+  }
+
+  // ── Emit debug log if requested ─────────────────────────────────────────
+  if (_dbg) {
+    const el = document.getElementById('parseDebugContent');
+    const panel = document.getElementById('parseDebugPanel');
+    if (el && panel) {
+      panel.style.display = 'block';
+      el.innerHTML = `<span style="color:#888; font-size:10px;">输入 ${expandedLines.length} 行 → 航段 ${segs.length} 段，运价 ${rmb ? '¥'+rmb : '—'}，旅客 ${pax.length} 名</span>\n\n` +
+        _dbg.map(e => {
+          const color = e.rule.startsWith('✅') ? '#5ecc6b'
+            : e.rule.startsWith('🧑') ? '#7eb8f7'
+            : e.rule.startsWith('💰') ? '#f0c060'
+            : e.rule.startsWith('⬜') ? '#555'
+            : '#ccc';
+          return `<span style="color:${color}">${escapeHtml(e.rule.padEnd(14))}</span>  <span style="color:#ddd">${escapeHtml(e.line.slice(0,80))}</span>${e.detail ? ` <span style="color:#888">← ${escapeHtml(String(e.detail))}</span>` : ''}`;
+        }).join('\n');
     }
   }
 
@@ -9139,6 +10267,10 @@ async function parsePNR() {
   const sharedBranch = curr().branch;
   const sharedTableLabel = curr().tableLabel;
   const sharedClient = curr().client;
+  // Preserve 表 Y flag — if user pre-flagged the entry form as Y, all bookings
+  // from this paste inherit that. (Bug fix: previously dropped during parse,
+  // so the Y badge / 9折 / priority sorting never showed up post-parse.)
+  const sharedIsTableY = !!curr().isTableY && sharedTableLabel === 'A';
 
   // Build new orders. Each chunk from splitIntoBookings may contain multiple
   // itinerary proposals (方案1/方案2) — these stay in ONE order with all options
@@ -9222,12 +10354,15 @@ async function parsePNR() {
       branch: sharedBranch,
       tableLabel: sharedTableLabel,
       client: sharedClient,
+      isTableY: sharedIsTableY,  // inherit Y flag from entry form
       airline, trip,
       cabin: effectiveCabin,
       passengers: pax,
       segments: segs,
       basePrice: rmb || null,
-      discount: finalDiscount,
+      // 表 Y forces 90% (unless manually overridden later). Apply at creation
+      // so the order is born with the correct discount.
+      discount: sharedIsTableY ? 90 : finalDiscount,
       usd: usd || null,
       rmb: rmb || null,
       paxPrices: (paxPrices && paxPrices.length > 0) ? paxPrices.slice() : null,
@@ -9591,10 +10726,13 @@ function renderAirlineUsdPanel(orders) {
   const grid = document.getElementById('airlineUsdGrid');
   if (!panel || !grid) return;
 
-  // Show ALL meaningful orders except 表G (which only appears in CHASE TRAVEL tab)
+  // Show ALL meaningful orders except 表G (which only appears in CHASE TRAVEL tab).
+  // Apply pending search filter if active — keeps the compact USD panel in
+  // sync with the lower detail-card list so searching narrows BOTH views.
   const meaningful = STATE.orders
     .map((o, i) => ({ o, i }))
-    .filter(({o}) => isMeaningfulOrder(o) && o.tableLabel !== 'G');
+    .filter(({o}) => isMeaningfulOrder(o) && o.tableLabel !== 'G')
+    .filter(({o}) => !_pendingSearchQ || orderMatchesSearch(o, _pendingSearchQ));
 
   // Compute agent first-appearance order
   const agentFirstSeen = {};
@@ -9659,27 +10797,18 @@ function renderAirlineUsdPanel(orders) {
   };
   Object.values(byAirlineMap).forEach(group => {
     group.sort((a, b) => {
-      // Priority 0: urgent flag → bubble to absolute top of group
+      // Priority 0: 表 Y → absolute top. 表 Y customers paid for priority.
+      const aY = a.o.isTableY ? 1 : 0;
+      const bY = b.o.isTableY ? 1 : 0;
+      if (aY !== bY) return bY - aY;
+      // Priority 1: urgent flag → bubble up (just below 表 Y)
       const aUrgent = a.o.urgent ? 1 : 0;
       const bUrgent = b.o.urgent ? 1 : 0;
       if (aUrgent !== bUrgent) return bUrgent - aUrgent;
-      // Priority 1: already assigned cardholder → float to top
+      // Priority 2: already assigned cardholder → float to top
       const aAssigned = a.o.cardholderId ? 1 : 0;
       const bAssigned = b.o.cardholderId ? 1 : 0;
       if (aAssigned !== bAssigned) return bAssigned - aAssigned;
-      // Priority 2: mixed cabin warning → sink to bottom
-      const aMixed = detectMixedCabin(a.o).isMixed ? 1 : 0;
-      const bMixed = detectMixedCabin(b.o).isMixed ? 1 : 0;
-      if (aMixed !== bMixed) return aMixed - bMixed;
-      // Priority 3: manual order — if user has dragged either order, honor that
-      // first. Order with manualOrder set comes before one without (since
-      // user explicitly put it somewhere). Two manually-ordered items sort
-      // by their numeric position.
-      const aMan = a.o.manualOrder;
-      const bMan = b.o.manualOrder;
-      if (aMan != null && bMan != null) return aMan - bMan;
-      if (aMan != null && bMan == null) return -1;  // manual wins
-      if (aMan == null && bMan != null) return 1;
       // Default: smallest USD first
       return getOrderUsd(a) - getOrderUsd(b);
     });
@@ -9792,11 +10921,17 @@ function renderAirlineUsdPanel(orders) {
       if (bgColor) row.style.background = bgColor;
       if (!hasPrice) row.style.background = '#fff5f2';
       const mixed = detectMixedCabin(o);
-      if (mixed.isMixed && hasPrice) row.style.background = '#fff5f2';
+      // Mixed cabin no longer needs special row background — keep row neutral
+      // 表 Y rows get a subtle gold left-edge accent to draw the eye even before
+      // reading the badge.
+      if (o.isTableY) {
+        row.style.boxShadow = 'inset 4px 0 0 var(--accent-deep), inset 0 0 0 1px rgba(200,160,74,0.25)';
+        row.style.background = 'linear-gradient(90deg, rgba(200,160,74,0.10), rgba(200,160,74,0.02))';
+      }
       row.style.cursor = 'pointer';
       row.title = !hasPrice
         ? `⚠ 此订单未填运价 — 点击查看`
-        : (mixed.isMixed ? `⚠ 混舱订单 — ${mixed.tooltip}` : `点击跳转到订单 #${displayIdx + 1}`);
+        : (mixed.isMixed ? `混舱订单 · ${mixed.tooltip}` : `点击跳转到订单 #${displayIdx + 1}`);
       row.onclick = () => scrollToOrderById(o.id);
       const perPaxText = hasPaxPrices && paxCount > 1
         ? `<span style="color:var(--accent); font-weight:600;" title="多人不同价: ${o.paxPrices.map(p => '¥'+p).join(' + ')}">多人价</span>`
@@ -9822,7 +10957,7 @@ function renderAirlineUsdPanel(orders) {
         ? `<span class="amount" style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;"><span>$${totalUsd.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>${urLine}</span>`
         : `<span class="amount" style="color:var(--red); font-weight:700;">⚠ 缺运价</span>`;
       const mixedBadge = mixed.isMixed
-        ? `<span style="background:var(--red); color:#fff; padding:1px 6px; border-radius:2px; font-size:10px; font-weight:700; margin-left:4px;" title="${escapeAttr(mixed.tooltip)}">⚠ 混舱</span>`
+        ? `<span style="background:rgba(200,160,74,0.18); color:var(--accent-deep); padding:1px 6px; border-radius:8px; font-size:9.5px; font-weight:700; margin-left:4px;" title="${escapeAttr(mixed.tooltip)}">混舱</span>`
         : '';
       const releaseBadge = o.waitingForRelease
         ? `<span style="background:var(--warning); color:#fff; padding:1px 5px; border-radius:2px; font-size:10px; font-weight:700; margin-left:4px;" title="等待代理公司放位">🔒 放位</span>`
@@ -9831,14 +10966,31 @@ function renderAirlineUsdPanel(orders) {
         ? `<span style="background:#888; color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:6px; letter-spacing:0.05em;">⏸ 无位</span>`
         : '';
       const linkedBadge = (() => {
-        if (!o.ticketOrder && (!o.linkedOrderIds || o.linkedOrderIds.length === 0)) return '';
-        const seq = o.ticketOrder ? `第${o.ticketOrder}出` : '';
-        const linkedNames = (o.linkedOrderIds || []).map(lid => {
-          const lo = STATE.orders.find(x => x.id === lid);
-          return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
-        }).filter(Boolean);
-        const linkStr = linkedNames.length ? ` → ${linkedNames.join('+')}` : '';
-        return `<span style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="出票顺序关联 · 点击编辑">🔗 ${seq}${linkStr}</span>`;
+        const manualIds = o.linkedOrderIds || [];
+        const autoIds   = (o.autoLinkedOrderIds || []).filter(id => !manualIds.includes(id));
+        if (!o.ticketOrder && manualIds.length === 0 && autoIds.length === 0) return '';
+
+        let parts = '';
+        // Manual link — purple 🔗 (user-set ticket sequence)
+        if (o.ticketOrder || manualIds.length > 0) {
+          const seq = o.ticketOrder ? `第${o.ticketOrder}出` : '';
+          const names = manualIds.map(lid => {
+            const lo = STATE.orders.find(x => x.id === lid);
+            return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
+          }).filter(Boolean);
+          const linkStr = names.length ? ` → ${names.join('+')}` : '';
+          parts += `<span style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="出票顺序关联（手动）· 点击编辑">🔗 ${seq}${linkStr}</span>`;
+        }
+        // Auto-link — blue 👤 (same passenger detected)
+        if (autoIds.length > 0) {
+          const names = autoIds.map(lid => {
+            const lo = STATE.orders.find(x => x.id === lid);
+            return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
+          }).filter(Boolean);
+          const nameStr = names.slice(0,2).join('+') + (names.length > 2 ? `+${names.length-2}` : '');
+          parts += `<span style="background:rgba(30,120,220,0.15);color:#1a70d6;border:1px solid rgba(30,120,220,0.3);padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:4px;cursor:pointer;" onclick="event.stopPropagation();scrollToOrderById('${autoIds[0]}')" title="自动关联：检测到相同乘客\n${names.join(' · ')}\n点击跳转到关联订单">👤 ${nameStr}</span>`;
+        }
+        return parts;
       })();
       // Dim the row if no availability
       if (o.noAvailability) {
@@ -9854,22 +11006,31 @@ function renderAirlineUsdPanel(orders) {
       const historyBadge = firstPax
         ? buildPassengerHistoryBadge(firstPax.name, firstPax.dob, firstPax.passportNo, o.id)
         : '';
-      // Manual-order indicator on drag handle — if user has dragged this row
-      // before, show a small dot accent on the handle so they know it's in
-      // a user-pinned position.
-      const handleTitle = o.manualOrder != null
-        ? '此订单已手动排序 · 拖动调整位置 · 双击重置为自动排序'
-        : '拖动调整顺序';
-      const handleStyle = o.manualOrder != null
-        ? 'color:var(--accent-deep); opacity:0.7;'
+      // 表 Y badge — top-priority order. Compact symbol-only mark.
+      // "表 A·Y" already appears in the table-label cell to the left, so
+      // this badge just needs to draw the eye to the row. Bigger ⚡ + tighter
+      // pill = less horizontal real estate than "⚡ 表Y" did.
+      const tableYBadge = o.isTableY
+        ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; background:linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a); color:#fff; border-radius:50%; font-size:11px; font-weight:800; box-shadow:0 0 0 1.5px rgba(255,255,255,0.7), 0 0 6px rgba(200,160,74,0.55), 0 1px 2px rgba(184,138,58,0.4); text-shadow:0 1px 1px rgba(0,0,0,0.15); flex-shrink:0; line-height:1; animation:tableYBreathe 2.4s ease-in-out infinite;" title="表 Y · 9 折 · 最高优先级出票">⚡</span>`
         : '';
+      // In bulk mode, leadCell is a selection checkbox. Normal mode = empty
+      // (the manual drag-to-reorder feature was removed; sort is fully automatic).
+      const inBulk = _bulkMode;
+      const isSelected = inBulk && _bulkSelected.has(o.id);
+      const leadCell = inBulk
+        ? `<label class="usd-row-bulkbox" onclick="event.stopPropagation()" style="display:inline-flex; align-items:center; justify-content:center; cursor:pointer;">
+             <input type="checkbox" class="bulk-checkbox" ${isSelected ? 'checked' : ''}
+               onchange="toggleBulkSelect('${escapeAttr(o.id)}')"
+               style="width:15px; height:15px; cursor:pointer; accent-color:var(--accent-deep);">
+           </label>`
+        : `<span></span>`;
       row.innerHTML = `
-        <span class="usd-row-drag" data-row-idx="${originalIdx}" title="${handleTitle}" style="${handleStyle}">⋮⋮</span>
+        ${leadCell}
         <span class="order-num">#${displayIdx + 1}</span>
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
-        <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? '表'+escapeHtml(o.tableLabel) : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
+        <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:var(--accent-deep); font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -9882,8 +11043,22 @@ function renderAirlineUsdPanel(orders) {
           title="${o.noAvailability ? '取消暂时无位，恢复正常' : '标记为暂时无位（价格消失，等待重新刷到）'}">⏸</button>
         <button class="usd-row-delete" onclick="event.stopPropagation(); quickDeleteOrder(${originalIdx}, '${escapeAttr(paxText)}')" title="删除此订单">✕</button>
       `;
-      // Wire up drag handle (uses HTML5 DnD, only fires when drag starts ON the handle)
-      initRowDragHandle(row, originalIdx, al);
+      // Tag the row for bulk-select wiring + highlight selected
+      row.dataset.bulkRow = o.id;
+      if (isSelected) {
+        row.classList.add('bulk-selected');
+        row.style.background = 'rgba(184,60,44,0.10)';
+        row.style.borderColor = 'rgba(184,60,44,0.35)';
+      }
+      // In bulk mode, clicking anywhere on the row (except buttons) toggles selection
+      if (inBulk) {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', (ev) => {
+          // Ignore clicks on action buttons / checkbox itself
+          if (ev.target.closest('button, input, label, .usd-row-urgent, .usd-row-noavail, .usd-row-delete')) return;
+          toggleBulkSelect(o.id);
+        });
+      }
       grid.appendChild(row);
     });
   });
@@ -10450,9 +11625,88 @@ function renderPendingGradient(area, filtered, displayNumById) {
   area.appendChild(wrap);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-LINK BY PASSENGER
+//
+// Scans all pending (non-ticketed) orders and automatically sets
+// linkedOrderIds when the same passenger appears in multiple orders.
+//
+// "Same passenger" requires ALL four fields to match:
+//   LAST name  +  FIRST name  +  DOB  +  GENDER
+// (If gender is missing on either side it is ignored for that pair.)
+//
+// Only ADDS links — never removes manually-set ones. Idempotent: safe to
+// call on every render without side-effects.
+// ═══════════════════════════════════════════════════════════════════════════
+function autoLinkByPassenger() {
+  const pending = STATE.orders.filter(o => isMeaningfulOrder(o));
+  if (pending.length < 2) return;
+
+  const splitName = (name) => {
+    const raw = String(name || '').toUpperCase().trim();
+    const slash = raw.indexOf('/');
+    if (slash === -1) return { last: raw, first: '' };
+    return { last: raw.slice(0, slash).trim(), first: raw.slice(slash + 1).trim() };
+  };
+
+  const samePassenger = (a, b) => {
+    const an = splitName(a.name);
+    const bn = splitName(b.name);
+    if (!an.last || !bn.last) return false;
+    if (an.last !== bn.last) return false;
+    if (an.first && bn.first && an.first !== bn.first) return false;
+    const aDob = String(a.dob || '').toUpperCase().trim();
+    const bDob = String(b.dob || '').toUpperCase().trim();
+    if (!aDob || !bDob) return false; // require DOB on both sides
+    if (aDob !== bDob) return false;
+    const aG = String(a.gender || '').toUpperCase().trim();
+    const bG = String(b.gender || '').toUpperCase().trim();
+    if (aG && bG && aG !== bG) return false;
+    return true;
+  };
+
+  const ordersSharePax = (o1, o2) => {
+    for (const p1 of (o1.passengers || [])) {
+      for (const p2 of (o2.passengers || [])) {
+        if (samePassenger(p1, p2)) return true;
+      }
+    }
+    return false;
+  };
+
+  // First, reset all auto-links so stale links (after order deletion/edit) are cleared.
+  // Manual links (linkedOrderIds) are never touched.
+  pending.forEach(o => { o.autoLinkedOrderIds = []; });
+
+  let changed = false;
+
+  for (let i = 0; i < pending.length; i++) {
+    for (let j = i + 1; j < pending.length; j++) {
+      const oi = pending[i];
+      const oj = pending[j];
+      if (!ordersSharePax(oi, oj)) continue;
+
+      if (!oi.autoLinkedOrderIds.includes(oj.id)) {
+        oi.autoLinkedOrderIds.push(oj.id);
+        changed = true;
+      }
+      if (!oj.autoLinkedOrderIds.includes(oi.id)) {
+        oj.autoLinkedOrderIds.push(oi.id);
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) persistOrders();
+}
+
 function renderPendingList() {
   const area = document.getElementById('pendingArea');
   if (!area) return;
+
+  // Auto-detect same-passenger cross-order links before rendering
+  autoLinkByPassenger();
+
   const allMeaningful = STATE.orders
     .map((o, i) => ({ o, i }))
     .filter(({o}) => isMeaningfulOrder(o));
@@ -10855,7 +12109,12 @@ function renderPendingList() {
   };
   const direction = sortKey.endsWith('desc') ? 'desc' : 'asc';
   agentOrder.sort((a, b) => {
-    // ── Agent groups with ≥1 urgent order bubble to the top ──
+    // ── Agent groups with ≥1 表Y order bubble to the absolute top ──
+    const aHasY = (groupsByAgent[a] || []).some(it => it.o.isTableY);
+    const bHasY = (groupsByAgent[b] || []).some(it => it.o.isTableY);
+    if (aHasY && !bHasY) return -1;
+    if (!aHasY && bHasY) return 1;
+    // ── Then agent groups with ≥1 urgent order ──
     const aHasUrgent = (groupsByAgent[a] || []).some(it => it.o.urgent);
     const bHasUrgent = (groupsByAgent[b] || []).some(it => it.o.urgent);
     if (aHasUrgent && !bHasUrgent) return -1;
@@ -10871,10 +12130,13 @@ function renderPendingList() {
   Object.values(groupsByAgent).forEach(items => {
     items.sort((a, b) => {
       const ao = a.o, bo = b.o;
-      // ── Urgent flag wins over everything ──
-      // Marked-urgent orders always sort to the top of the group, regardless
-      // of status rank or user sort key. Within urgent orders, sort by most
-      // recently flagged first (so newly-flagged jumps to the top).
+      // ── 表 Y wins absolutely — paid privilege of priority ticketing ──
+      if (ao.isTableY && !bo.isTableY) return -1;
+      if (!ao.isTableY && bo.isTableY) return 1;
+      // ── Urgent flag wins over everything else ──
+      // Marked-urgent orders sort to the top of the group (after 表 Y),
+      // regardless of status rank or user sort key. Within urgent orders,
+      // sort by most recently flagged first.
       if (ao.urgent && !bo.urgent) return -1;
       if (!ao.urgent && bo.urgent) return 1;
       if (ao.urgent && bo.urgent) {
@@ -10882,7 +12144,6 @@ function renderPendingList() {
       }
       // Lower rank = higher position
       const rank = (o) => {
-        if (detectMixedCabin(o).isMixed) return 4;   // mixed cabin → very bottom
         if (o.noAvailability) return 3;              // 暂时无位 → bottom
         if (o.waitingForRelease) return 2;           // 🔒 放位 → mid
         if (o.cardholderId) return 0;                // assigned → top
@@ -11419,6 +12680,7 @@ function renderPendingOrderActions(actions, o, idx) {
     actions.innerHTML = `
       <button class="btn ${clientReportDone ? '' : 'accent'} small" onclick="markActionDone(${idx}, 'clientReport'); copyOrderCard(${idx}, 'client')" style="${clientReportDone ? doneStyle : ''}" ${!readyToReport ? 'title="填完编码和卡主后可以发送完整报表"' : ''}>${clientReportDone ? checkmark : ''}📋 代理商报表</button>
       <button class="btn small" onclick="markActionDone(${idx}, 'internalReport'); copyOrderCard(${idx}, 'internal')" style="${internalReportDone ? doneStyle : ''}">${internalReportDone ? checkmark : ''}📋 记录员报表</button>
+      ${o.tableLabel === 'G' ? `<button class="btn ghost small" onclick="copyCardholderReport(${idx})" title="复制卡主报表（航司编码 + 出票美金）发到卡主群" style="border-color:#1a70d6; color:#1a70d6;">💳 卡主报表</button>` : ''}
       ${matched.length > 0 ? `<button class="btn ${paxCopyDone ? '' : 'ghost'} small" onclick="markActionDone(${idx}, 'paxCopy'); copyOrderPax(${idx})" style="${paxCopyDone ? doneStyle : ''}">${paxCopyDone ? checkmark : ''}📋 乘客</button>` : ''}
       <button class="btn small" onclick="openCardholderDialog(${idx})" style="${chDone ? doneStyle : ''}" title="分配/更换卡主（可查看所有卡主当前负载）">${chDone ? checkmark : ''}💳 分配卡主</button>
       <button class="btn small" onclick="openVerifyDialog(${idx})" style="${verifyDone ? verifiedStyle : ''}" title="${verifyDone ? '已校验' : '在航司官网核对航班/舱位/姓名'}">${verifyDone ? '✓ 已核对' : '🔍 官网校验'}</button>
@@ -11429,10 +12691,30 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx})" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? 'background:#f3e5ff; border-color:#8e44ad; color:#6c2ea0;' : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx})" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
       ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx})" title="与行程/价格相同的订单合并乘客" style="background:var(--green-light);border-color:var(--green);color:var(--green);">⊕ 合单</button>` : ''}
+      ${o.tableLabel !== 'G' ? `<button class="btn ghost small" onclick="openQuickTicketModal(${idx})" title="快速出票：输入票号即可一键完成出票（自动填入 TKT + 标记已出票 + 生成报表）" style="border-color:var(--green); color:var(--green);">⚡ 快速出票</button>` : ''}
       <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green);" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
       <button class="btn ghost small" onclick="editOrderInNewTab(${idx})">✎ 完整编辑</button>
       <button class="btn ghost small" onclick="removeOrder(${idx})" style="color:var(--red); border-color:var(--red);">✕ 删除</button>
     `;
+}
+
+// Cardholder report for Chase Travel (表G) — two lines only:
+//   航司编码 (e.g. DL)
+//   出票美金 (e.g. $1,020.70)
+// Paste this into the cardholder group chat as a record.
+async function copyCardholderReport(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const pnr = (o.pnr || '—').toUpperCase();
+  const usd = _orderUsd(o, o.rate || settings.rate || 7.25);
+  const usdStr = usd > 0 ? `$${usd.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}` : '—';
+  const text = `${pnr}\n${usdStr}`;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(`✓ 卡主报表已复制：${pnr} ${usdStr}`);
+  } catch(e) {
+    toast('复制失败，请手动复制');
+  }
 }
 
 // Mark a manual action as done (so the button shows "completed" color)
@@ -12001,17 +13283,63 @@ async function doMergeOrders(targetIdx) {
 let _pendingSearchQ = '';
 function filterPendingOrders(q) {
   _pendingSearchQ = (q || '').trim().toLowerCase();
-  renderPendingList();
+  renderAirlineUsdPanel();   // sync compact USD panel
+  renderPendingList();        // sync detail card list
+  // Keep both search inputs in sync (main header + USD panel quick search)
+  const main = document.getElementById('pendingSearchInput');
+  const usd = document.getElementById('usdPanelSearchInput');
+  if (main && main.value !== (q || '')) main.value = q || '';
+  if (usd && usd.value !== (q || '')) usd.value = q || '';
+  // Update tab badge to show match count when searching
+  updatePendingSearchBadge();
+}
+
+// Show a small count next to the search box: "3 / 38" while filtering.
+// Empty query → no badge.
+function updatePendingSearchBadge() {
+  const badge = document.getElementById('pendingSearchBadge');
+  if (!badge) return;
+  if (!_pendingSearchQ) { badge.style.display = 'none'; return; }
+  const meaningful = STATE.orders.filter(o =>
+    isMeaningfulOrder(o) && o.tableLabel !== 'G'
+  );
+  const matched = meaningful.filter(o => orderMatchesSearch(o, _pendingSearchQ));
+  badge.textContent = `${matched.length} / ${meaningful.length}`;
+  badge.style.display = '';
+  badge.style.color = matched.length === 0 ? 'var(--red)' : matched.length === 1 ? 'var(--green)' : 'var(--accent-deep)';
 }
 
 function orderMatchesSearch(o, q) {
   if (!q) return true;
+  // Build a single haystack of every searchable field, lowercased.
+  // Includes passenger names (full + split by /), passport, DOB, flight,
+  // route, airline, agent, comm channel, label, PNR, ticket #, plus the
+  // cardholder name if assigned. This lets the operator find an order by
+  // any keyword the agent texts ("PANG cancel", "DL285 reschedule", "Hillel").
+  const ch = o.cardholderId
+    ? (settings.cardholders || []).find(c => c.id === o.cardholderId)
+    : null;
+  const paxBits = (o.passengers || []).flatMap(p => [
+    p.name || '',
+    ...(p.name || '').split('/'),
+    p.passportNo || '',
+    p.dob || '',
+  ]);
+  const segBits = (o.segments || []).flatMap(s => [
+    s.flight || '',
+    s.from || '',
+    s.to || '',
+    `${s.from || ''}${s.to || ''}`,
+    `${s.from || ''}-${s.to || ''}`,
+    s.date || '',
+  ]);
   const hay = [
-    ...(o.passengers || []).map(p => p.name || ''),
-    ...(o.segments || []).map(s => s.flight || ''),
-    ...(o.segments || []).map(s => `${s.from || ''}${s.to || ''}`),
+    ...paxBits,
+    ...segBits,
     o.pnr || '', o.tkt || '', o.airline || '', o.client || '',
-    o.commChannel || '', o.tableLabel || ''
+    o.commChannel || '', o.tableLabel || '', o.agent || '',
+    ch ? (ch.name || '') : '',
+    ch ? (ch.channel || '') : '',
   ].join(' ').toLowerCase();
   return q.split(/\s+/).every(token => hay.includes(token));
 }
@@ -12420,148 +13748,6 @@ function initDragReorder(groupEl, stateIdx) {
   });
 }
 
-// ─── Compact-row drag-to-reorder for the airline USD list ──────────────────
-// Lets the user drag rows within the same airline to manually set order
-// (e.g. "do this $7k order BEFORE that $5k one"). Writes a `manualOrder`
-// numeric position on each affected order so the sort comparator respects
-// the user's choice.
-//
-// Constraints:
-//   • Only the small ⋮⋮ handle is draggable, not the whole row (avoids
-//     accidental drags when clicking a card to expand)
-//   • Drag only allowed WITHIN the same airline group — dropping onto a
-//     different airline's row is ignored
-//   • Urgent / assigned / mixed-cabin status still wins over manual order
-//     (so dragging a normal order above an urgent one won't actually push
-//     past the urgent one — that's by design)
-//   • Double-click handle clears that row's manual order (back to auto)
-let _rowDragSrcIdx = null;
-let _rowDragSrcAirline = null;
-
-function initRowDragHandle(rowEl, originalIdx, airline) {
-  const handle = rowEl.querySelector('.usd-row-drag');
-  if (!handle) return;
-
-  // Track whether the user pressed-down on the handle. HTML5 drag fires
-  // `dragstart` from whatever element under the cursor when the user starts
-  // dragging, regardless of whether they grabbed the handle or the row body.
-  // We track mousedown source and check it in dragstart to gate the action.
-  let pressedHandle = false;
-  handle.addEventListener('mousedown', (e) => {
-    pressedHandle = true;
-    e.stopPropagation();
-  });
-  // Reset on any global mouseup
-  document.addEventListener('mouseup', () => { pressedHandle = false; });
-
-  // Row must be draggable from the start — the old try-to-flip-draggable-on-
-  // mousedown trick was unreliable (timing race with dragstart). We gate by
-  // checking the originating element in dragstart instead.
-  rowEl.draggable = true;
-
-  // Double-click handle = clear manual order on this row
-  handle.addEventListener('dblclick', async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const o = STATE.orders[originalIdx];
-    if (!o || o.manualOrder == null) return;
-    o.manualOrder = null;
-    await persistOrdersNow();
-    renderAirlineUsdPanel();
-    toast('✓ 已恢复自动排序');
-  });
-
-  rowEl.addEventListener('dragstart', (e) => {
-    // Only initiate reorder if user grabbed the handle, not the row body
-    if (!pressedHandle) {
-      e.preventDefault();
-      return;
-    }
-    _rowDragSrcIdx = originalIdx;
-    _rowDragSrcAirline = airline;
-    e.dataTransfer.effectAllowed = 'move';
-    // setData required by Firefox for drag to actually work
-    try { e.dataTransfer.setData('text/plain', String(originalIdx)); } catch(_) {}
-    rowEl.classList.add('row-dragging');
-  });
-  rowEl.addEventListener('dragend', () => {
-    pressedHandle = false;
-    rowEl.classList.remove('row-dragging');
-    document.querySelectorAll('.airline-usd-row.row-drop-target')
-      .forEach(el => el.classList.remove('row-drop-target'));
-  });
-
-  rowEl.addEventListener('dragover', (e) => {
-    if (_rowDragSrcIdx === null || _rowDragSrcIdx === originalIdx) return;
-    // Only allow drop within same airline
-    if (_rowDragSrcAirline !== airline) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    rowEl.classList.add('row-drop-target');
-  });
-  rowEl.addEventListener('dragleave', () => rowEl.classList.remove('row-drop-target'));
-
-  rowEl.addEventListener('drop', async (e) => {
-    e.preventDefault();
-    rowEl.classList.remove('row-drop-target');
-    if (_rowDragSrcIdx === null || _rowDragSrcIdx === originalIdx) return;
-    if (_rowDragSrcAirline !== airline) return;
-
-    // Strategy: assign manualOrder values to all rows in the *same status
-    // rank* as the dragged pair. We compute each row's status rank (same
-    // logic as the sort comparator) and only renumber peers — so dragging a
-    // normal/unassigned row only reshuffles other normal/unassigned rows,
-    // not assigned ones above them. This prevents the user from being
-    // confused when a drag "appears to do nothing" because urgent/assigned
-    // priority outranked it.
-    const statusRank = (o) => {
-      if (o.urgent) return 0;
-      if (o.cardholderId) return 1;
-      if (detectMixedCabin(o).isMixed) return 9;
-      return 5;  // normal/unassigned (and the cases we want to reorder)
-    };
-    const sourceRank = statusRank(sourceOrder);
-    const targetRank = statusRank(targetOrder);
-    // If dragging across different status ranks, abort + explain
-    if (sourceRank !== targetRank) {
-      _rowDragSrcIdx = null;
-      _rowDragSrcAirline = null;
-      toast('✗ 无法跨状态拖动 — 加急/已分配卡主等优先级会先生效');
-      return;
-    }
-
-    // Collect ALL rows in same airline + same status rank, in current visual order
-    const allRowsInAirline = Array.from(document.querySelectorAll(`.airline-usd-row`))
-      .filter(r => {
-        const h = r.querySelector('.usd-row-drag');
-        if (!h) return false;
-        const idx = parseInt(h.getAttribute('data-row-idx'), 10);
-        const o = STATE.orders[idx];
-        if (!o || (o.airline || '') !== airline) return false;
-        return statusRank(o) === sourceRank;
-      });
-    const orderedIdxs = allRowsInAirline
-      .map(r => parseInt(r.querySelector('.usd-row-drag').getAttribute('data-row-idx'), 10));
-    const fromPos = orderedIdxs.indexOf(_rowDragSrcIdx);
-    let toPos = orderedIdxs.indexOf(originalIdx);
-    if (fromPos < 0 || toPos < 0) return;
-    orderedIdxs.splice(fromPos, 1);
-    orderedIdxs.splice(toPos, 0, _rowDragSrcIdx);
-
-    // Assign manualOrder values 100, 200, 300, …
-    orderedIdxs.forEach((idx, i) => {
-      const o = STATE.orders[idx];
-      if (o) o.manualOrder = (i + 1) * 100;
-    });
-
-    _rowDragSrcIdx = null;
-    _rowDragSrcAirline = null;
-    await persistOrdersNow();
-    renderAirlineUsdPanel();
-    toast('✓ 顺序已更新');
-  });
-}
-// ────────────────────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEXT-STEP GUIDANCE — highlight what to fill after cardholder is assigned
@@ -12589,9 +13775,24 @@ function initKeyboardShortcuts() {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     // Don't fire with modifier keys (except Ctrl/Cmd + specific shortcuts)
     
-    // Ctrl/Cmd + K → focus search
+    // Ctrl/Cmd + K  OR  /  → focus pending search
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
+      // Auto-switch to pending tab so search has visible context
+      const pendingTab = document.querySelector('[data-tab="pending"]');
+      if (pendingTab && !document.getElementById('panel-pending').classList.contains('active')) {
+        pendingTab.click();
+      }
+      const searchEl = document.getElementById('pendingSearchInput');
+      if (searchEl) { searchEl.focus(); searchEl.select(); }
+      return;
+    }
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const pendingTab = document.querySelector('[data-tab="pending"]');
+      if (pendingTab && !document.getElementById('panel-pending').classList.contains('active')) {
+        pendingTab.click();
+      }
       const searchEl = document.getElementById('pendingSearchInput');
       if (searchEl) { searchEl.focus(); searchEl.select(); }
       return;
@@ -13901,7 +15102,6 @@ const I18N_AUTO_PHRASES = {
   '点击跳转到订单': 'click to jump to order',
   '点击换卡主或取消分配': 'click to change cardholder',
   '点击分配卡主': 'click to assign cardholder',
-  '需要客服人工处理': 'manual handling required',
   '代理公司尚未释放座位': 'Agent has not released the seat yet',
   '全部': 'All',
   '还没有': 'No ',
@@ -14503,12 +15703,7 @@ function findPassengerHistory(paxName, paxDob, paxPassport, currentOrderId) {
   const rate = settings.rate || 7.2;
   let totalUsd = 0;
   matches.forEach(m => {
-    const hasPP = Array.isArray(m.paxPrices) && m.paxPrices.length > 0;
-    const paxCount = (m.passengers || []).length || 1;
-    const fareRmb = hasPP
-      ? m.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
-      : (m.basePrice || 0) * paxCount;
-    if (fareRmb > 0) totalUsd += fareRmb / (m.rate || rate);
+    totalUsd += _orderUsd(m, m.rate || rate);
   });
 
   // Sort newest first by the most relevant timestamp
@@ -14645,12 +15840,7 @@ function openPassengerHistoryModal(paxName, paxDob, paxPassport) {
     const route = (o.segments || []).map(s => s.from + '→' + s.to).join(' / ') || '—';
     const flight = (o.segments || []).map(s => s.flight).filter(Boolean).join(', ') || '—';
     const rate = o.rate || settings.rate || 7.2;
-    const hasPP = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
-    const paxCount = (o.passengers || []).length || 1;
-    const fareRmb = hasPP
-      ? o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0)
-      : (o.basePrice || 0) * paxCount;
-    const usd = fareRmb > 0 ? Math.round(fareRmb / rate) : 0;
+    const usd = Math.round(_orderUsd(o, rate));
     const statusBadge = isTicketed
       ? '<span style="background:var(--green); color:#fff; padding:1px 7px; border-radius:8px; font-size:9.5px; font-weight:700;">已出</span>'
       : '<span style="background:var(--accent); color:#fff; padding:1px 7px; border-radius:8px; font-size:9.5px; font-weight:700;">待出</span>';
@@ -15118,6 +16308,228 @@ function toggleUrgent(idx) {
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
   toast(o.urgent ? '💣 已标记加急 — 此单已置顶' : '✓ 已取消加急');
+}
+
+// Toggle 表 Y status directly from the order card. This is the fastest path
+// for the user — no need to navigate to the entry form, find the checkbox,
+// and click it. One click here flips Y on/off AND auto-applies the 90%
+// discount (with original discount stashed for restore).
+// Inline-edit the discount % directly on the ticket card. Bound to the
+// `90%` text in the price row — click → input → Enter/blur → save.
+//
+// Authority order (highest first):
+//   1. Manual edit (this function)         — sets discountManuallyOverridden=true
+//   2. 表 Y override                       — 90% (unless manually overridden)
+//   3. Auto rule match (agent rules)       — discountRules
+//   4. Fallback                            — null
+//
+// 表 Y orders CAN be manually edited — doing so does NOT remove the Y
+// status (the order still gets Y priority sorting + visual badge), it just
+// records that the discount itself has a manual value.
+function startEditDiscount(idx, evt) {
+  if (evt) evt.stopPropagation();
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const span = document.getElementById(`discount-edit-${idx}`);
+  if (!span) return;
+  const currentVal = o.discount != null ? o.discount : '';
+  span.innerHTML = `<input type="number" id="discount-input-${idx}" value="${currentVal}" min="0" max="100" step="1"
+    style="width:54px; padding:1px 6px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); border:1.5px solid var(--accent-deep); border-radius:4px; background:#fff; outline:none; text-align:center;"
+    onclick="event.stopPropagation()"
+    onblur="commitEditDiscount(${idx})"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.dataset.cancel='1';this.blur();}"
+  ><span style="color:var(--accent-deep); font-weight:700; margin-left:1px;">%</span>`;
+  const input = document.getElementById(`discount-input-${idx}`);
+  if (input) {
+    input.focus();
+    input.select();
+  }
+}
+
+// Clear the permanent "manual override" flag on a discount. Re-applies the
+// automatic rule (表 Y → 90, else rule-match, else null). The user is asked
+// to confirm because this can change the discount they're currently seeing.
+async function clearDiscountManualOverride(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  if (!o.discountManuallyOverridden) return;
+  // Figure out what the auto-rule would say
+  let autoDiscount = null;
+  if (o.isTableY && (o.tableLabel || '').toUpperCase() === 'A') {
+    autoDiscount = 90;
+  } else if (typeof matchDiscountRule === 'function') {
+    autoDiscount = matchDiscountRule(o);
+  }
+  // Build a short summary so user knows what they're about to change to
+  const wouldChange = (autoDiscount != null && autoDiscount !== o.discount);
+  const msg = wouldChange
+    ? `清除人工覆盖后，折扣会重新按规则匹配：\n\n${o.discount}% → ${autoDiscount}%\n\n确认？`
+    : `清除人工覆盖标记？\n\n（当前折扣 ${o.discount}% 与自动规则一致，数值不变）`;
+  if (!confirm(msg)) return;
+  delete o.discountManuallyOverridden;
+  if (autoDiscount != null) {
+    o.discount = autoDiscount;
+  }
+  // Recompute derived fields
+  const fp = computeFinalPrice(o);
+  const settle = computeSettlement(o);
+  o.rmb = fp != null ? fp / (o.passengers.length || 1) : null;
+  o.cardholderFee = settle;
+  await persistOrdersNow();
+  renderPendingList();
+  renderPendingBanner();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
+  if (STATE.currentIdx === idx && typeof loadCurrToDOM === 'function') {
+    loadCurrToDOM();
+  }
+  toast(wouldChange ? `✓ 已重置为自动规则 ${autoDiscount}%` : '✓ 已清除人工标记');
+}
+
+async function commitEditDiscount(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const input = document.getElementById(`discount-input-${idx}`);
+  if (!input) return;
+  // Cancel via ESC — just re-render without saving
+  if (input.dataset.cancel === '1') {
+    renderPendingList();
+    return;
+  }
+  const raw = input.value.trim();
+  const oldDiscount = o.discount;
+  if (raw === '') {
+    // Empty = clear manual override AND clear discount
+    o.discount = null;
+    delete o.discountManuallyOverridden;
+  } else {
+    const v = Number(raw);
+    if (isNaN(v) || v < 0 || v > 100) {
+      toast('折扣必须在 0-100 之间');
+      renderPendingList();
+      return;
+    }
+    o.discount = v;
+    // Mark as manually overridden — this beats 表 Y's 90% rule for this order.
+    // Stays true through Y on/off toggles until user clears the discount or
+    // explicitly resets (取消 Y → clear override).
+    o.discountManuallyOverridden = true;
+  }
+  // Recompute derived fields so the price row updates everywhere
+  const fp = computeFinalPrice(o);
+  const settle = computeSettlement(o);
+  o.rmb = fp != null ? fp / (o.passengers.length || 1) : null;
+  o.cardholderFee = settle;
+  await persistOrdersNow();
+  renderPendingList();
+  renderPendingBanner();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
+  if (STATE.currentIdx === idx && typeof loadCurrToDOM === 'function') {
+    loadCurrToDOM();
+  }
+  // Customized toast — flag manual override on Y orders so user understands
+  if (o.discount == null) {
+    toast('✓ 折扣已清空');
+  } else if (o.isTableY && o.discount !== 90) {
+    toast(`✓ 折扣已改为 ${o.discount}%（人工覆盖表 Y 9 折）`);
+  } else {
+    toast(`✓ 折扣已更新为 ${o.discount}%`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TABLE Y — SINGLE SOURCE OF TRUTH
+//
+// All 表 Y state mutations MUST go through these two functions. Every entry
+// point (card toggle, entry form checkbox, bulk operation, parsePNR) calls
+// one of these rather than writing to o.isTableY / o._preY_discount /
+// o.discountManuallyOverridden directly.
+//
+// Authority order (highest wins):
+//   1. Manual override  (o.discountManuallyOverridden = true)
+//   2. 表 Y 90%         (when isTableY is being turned on)
+//   3. Auto rule match  (matchDiscountRule)
+//   4. Null / fallback
+//
+// Option A semantics: discountManuallyOverridden is PERMANENT — it survives
+// any number of Y on/off cycles until the user explicitly resets it via the
+// ✕ button next to the price row, or by clearing the discount field.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Turn 表 Y ON for an order.
+ * Pure data mutation — callers are responsible for UI refresh + persist.
+ *
+ * @param {object} o  - order object from STATE.orders
+ * @returns {string}  - what actually happened: 'set-90' | 'kept-manual'
+ */
+function applyTableY(o) {
+  o.isTableY = true;
+  // Always stash current discount so removeTableY can restore it.
+  o._preY_discount = (o.discount != null) ? o.discount : null;
+  if (o.discountManuallyOverridden) {
+    // User manually set a custom discount — keep it, don't overwrite with 90.
+    return 'kept-manual';
+  }
+  o.discount = 90;
+  return 'set-90';
+}
+
+/**
+ * Turn 表 Y OFF for an order.
+ * Pure data mutation — callers are responsible for UI refresh + persist.
+ *
+ * @param {object} o  - order object from STATE.orders
+ * @returns {string}  - what happened: 'restored' | 'kept-manual'
+ */
+function removeTableY(o) {
+  o.isTableY = false;
+  if (o.discountManuallyOverridden) {
+    // Option A: manual override survives Y removal. Keep the discount as-is.
+    delete o._preY_discount;
+    return 'kept-manual';
+  }
+  // Restore the discount that was in place before Y was turned on.
+  if (o._preY_discount != null) {
+    o.discount = o._preY_discount;
+  }
+  delete o._preY_discount;
+  return 'restored';
+}
+
+function toggleTableY(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  // 表 Y only valid on 表 A orders. If user tries on non-A, ask to convert.
+  if (o.tableLabel !== 'A') {
+    if (!confirm(`此订单当前是「表${o.tableLabel || '未选'}」，表 Y 只能用于表 A 订单。\n\n是否将其转为「表 A · Y」？`)) return;
+    o.tableLabel = 'A';
+  }
+  const wasY = !!o.isTableY;
+  const result = wasY ? removeTableY(o) : applyTableY(o);
+  // Recompute derived fields so the price line updates everywhere
+  const fp = computeFinalPrice(o);
+  const settle = computeSettlement(o);
+  o.rmb = fp != null ? fp / (o.passengers.length || 1) : null;
+  o.cardholderFee = settle;
+  persistOrders();
+  renderPendingList();
+  renderPendingBanner();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
+  if (STATE.currentIdx === idx && typeof loadCurrToDOM === 'function') {
+    loadCurrToDOM();
+  }
+  if (o.isTableY) {
+    toast(result === 'kept-manual'
+      ? `⚡ 已设为表 Y · 保留人工折扣 ${o.discount}%`
+      : '⚡ 已设为表 Y · 折扣已调至 90%');
+  } else {
+    toast(result === 'kept-manual'
+      ? `✓ 已取消表 Y · 保留人工折扣 ${o.discount}%`
+      : '✓ 已取消表 Y · 折扣已恢复');
+  }
 }
 
 function openLinkOrderDialog(idx) {
@@ -15635,7 +17047,14 @@ function buildCardHTML(o, idx) {
   });
 
   const tags = [];
-  if (o.tableLabel) tags.push(`<span class="tag label-${escapeHtml(o.tableLabel)}">表${escapeHtml(o.tableLabel)}</span>`);
+  if (o.tableLabel) {
+    if (o.isTableY && o.tableLabel === 'A') {
+      // 表 Y — special golden glowing tag, replaces plain "表A"
+      tags.push(`<span class="tag" style="background:linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a); color:#fff; border-color:#b88a3a; font-weight:800; letter-spacing:0.04em; box-shadow:0 0 0 1.5px rgba(255,255,255,0.7), 0 0 6px rgba(200,160,74,0.5); text-shadow:0 1px 1px rgba(0,0,0,0.15);" title="表Y · 9折优惠 · 最高优先级出票">⚡ 表A·Y</span>`);
+    } else {
+      tags.push(`<span class="tag label-${escapeHtml(o.tableLabel)}">表${escapeHtml(o.tableLabel)}</span>`);
+    }
+  }
   if (o.agent) tags.push(`<span class="tag">代理 ${escapeHtml(o.agent)}</span>`);
   if (o.branch) tags.push(`<span class="tag">${escapeHtml(o.branch)}${o.client ? escapeHtml(o.client) : ''}</span>`);
   if (o.airline) tags.push(`<span class="tag airline-tag">${escapeHtml(o.airline)}</span>`);
@@ -15645,13 +17064,22 @@ function buildCardHTML(o, idx) {
   // Looks at each segment's class code and checks if they map to different cabins.
   const mixedCabinInfo = detectMixedCabin(o);
   if (mixedCabinInfo.isMixed) {
-    tags.push(`<span class="tag" style="background:var(--red); color:#fff; border-color:var(--red); font-weight:700;" title="${escapeAttr(mixedCabinInfo.tooltip)}">⚠ 混舱</span>`);
+    tags.push(`<span class="tag" style="background:rgba(200,160,74,0.18); color:var(--accent-deep); border-color:rgba(200,160,74,0.4); font-weight:700;" title="${escapeAttr(mixedCabinInfo.tooltip)}">混舱</span>`);
   }
 
   let html = `<div class="ticket-card" data-airline="${o.airline || 'default'}">`;
+  // 表 Y toggle button — visible on every order card so the user can flip Y
+  // status with a single click directly from the order view (no need to go to
+  // entry form). Hidden for table G (Chase) since Y is an A-only concept.
+  const yToggleBtn = o.tableLabel === 'G' ? '' : (o.isTableY
+    ? `<button onclick="event.stopPropagation(); toggleTableY(${idx})" title="点击取消表 Y 标记，恢复原折扣" style="background:linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a); color:#fff; border:none; padding:4px 12px; border-radius:14px; font-size:11px; font-weight:800; cursor:pointer; letter-spacing:0.04em; box-shadow:0 0 0 1.5px rgba(255,255,255,0.7), 0 0 8px rgba(200,160,74,0.55); text-shadow:0 1px 1px rgba(0,0,0,0.15); white-space:nowrap;">⚡ 表 Y · 9折</button>`
+    : `<button onclick="event.stopPropagation(); toggleTableY(${idx})" title="点击设为表 Y（9 折优惠 · 最高优先级出票）" style="background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.7); border:1px solid rgba(255,255,255,0.18); padding:3px 11px; border-radius:14px; font-size:10.5px; font-weight:600; cursor:pointer; letter-spacing:0.04em; white-space:nowrap;">⚡ 设为表 Y</button>`);
   html += `<div class="ticket-card-header">
     <div class="tag-row">${tags.join('')}</div>
-    <div class="trip-type">${o.trip}</div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      ${yToggleBtn}
+      <div class="trip-type">${o.trip}</div>
+    </div>
   </div>`;
   html += `<div class="ticket-card-body">`;
 
@@ -15677,11 +17105,11 @@ function buildCardHTML(o, idx) {
   // this one banner without re-rendering the entire pending list.
   html += `<div id="ofac-banner-${escapeAttr(o.id || idx)}">${buildOrderOFACBannerHTML(o)}</div>`;
 
-  // Mixed-cabin warning banner — prominent, above PNR
+  // Mixed-cabin informational note — no longer blocks ticketing
   if (mixedCabinInfo.isMixed) {
-    html += `<div style="background:linear-gradient(90deg, rgba(200,68,44,0.1), rgba(200,68,44,0.04)); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); font-size:12px; color:var(--ink); box-shadow:0 1px 4px rgba(200,68,44,0.1);">
-      <strong style="color:var(--red);">⚠ 混舱订单 — 需要客服人工处理</strong><br>
-      <span style="color:var(--muted); font-size:11px; margin-top:2px; display:inline-block;">${escapeHtml(mixedCabinInfo.tooltip)}</span>
+    html += `<div style="background:rgba(200,160,74,0.08); border-left:3px solid var(--accent-deep); padding:8px 12px; margin-bottom:10px; border-radius:var(--r-sm); font-size:11.5px; color:var(--ink);">
+      <strong style="color:var(--accent-deep);">ℹ 混舱订单</strong>
+      <span style="color:var(--muted); margin-left:6px;">${escapeHtml(mixedCabinInfo.tooltip)}</span>
     </div>`;
   }
 
@@ -15811,7 +17239,24 @@ function buildCardHTML(o, idx) {
       const specialBadge = o.isSpecialDiscount
         ? `<span style="background:var(--accent); color:var(--ink); padding:1px 6px; border-radius:2px; font-size:10px; font-weight:700; margin-left:6px;" title="${escapeAttr(o.specialDiscountNote || '特殊折扣')}">🎁 特殊折扣${o.specialDiscountNote ? ' · ' + escapeHtml(o.specialDiscountNote) : ''}<button onclick="clearSpecialDiscount(${idx}); event.stopPropagation();" title="清除特殊折扣,按规则重算" style="background:none; border:none; color:var(--ink); cursor:pointer; padding:0 0 0 4px; font-size:11px; opacity:0.6;">✕</button></span>`
         : '';
-      const discountStr = o.discount != null ? `${o.discount}%` : '<span style="color:var(--red); font-weight:700;">⚠ 折扣未填</span>';
+      // 表 Y badge — appears in the price row to make the 9折 origin explicit
+      const tableYPriceBadge = o.isTableY
+        ? `<span style="background:linear-gradient(135deg, #f5d678, #c8a04a, #b88a3a); color:#fff; padding:1px 8px; border-radius:8px; font-size:10px; font-weight:800; margin-left:6px; letter-spacing:0.04em; box-shadow:0 0 0 1px rgba(255,255,255,0.6), 0 0 4px rgba(200,160,74,0.4);" title="表Y · 9 折优惠（强制 90%）· 最高优先级出票">⚡ 表Y · 9折</span>`
+        : '';
+      // Discount field — clickable inline editor.
+      // 表 Y orders default to 90% but CAN be manually edited (manual edits
+      // beat the 90% rule). Manual override is permanent — once set, it
+      // survives Y on/off toggles. User can reset via the ✕ next to the hint.
+      let discountStr;
+      if (o.discount != null) {
+        let hintHtml = '';
+        if (o.discountManuallyOverridden) {
+          hintHtml = `<span style="font-size:9px; color:var(--warning-deep); margin-left:4px; font-weight:600; letter-spacing:0.04em; display:inline-flex; align-items:center; gap:2px;" title="${o.isTableY ? '表 Y 但折扣被人工覆盖（永久）' : '折扣被人工覆盖（永久）'}">人工<button onclick="clearDiscountManualOverride(${idx}); event.stopPropagation();" title="重置为自动规则（清除人工覆盖）" style="background:none; border:none; color:var(--warning-deep); cursor:pointer; padding:0 0 0 2px; font-size:10px; opacity:0.65; line-height:1;">✕</button></span>`;
+        }
+        discountStr = `<span id="discount-edit-${idx}" class="discount-editable" onclick="startEditDiscount(${idx}, event)" title="点击修改折扣" style="cursor:pointer; padding:1px 6px; border-radius:4px; border:1px dashed transparent; transition:background 0.15s, border-color 0.15s; font-weight:700;">${o.discount}%</span>${hintHtml}`;
+      } else {
+        discountStr = `<span id="discount-edit-${idx}" class="discount-editable" onclick="startEditDiscount(${idx}, event)" title="点击设置折扣" style="cursor:pointer; color:var(--red); font-weight:700; padding:1px 6px; border-radius:4px; border:1px dashed var(--red);">⚠ 折扣未填</span>`;
+      }
       const hasPaxPrices = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
       if (hasPaxPrices) {
         const rate = effectiveRate(o);
@@ -15854,7 +17299,7 @@ function buildCardHTML(o, idx) {
         });
 
         const totalSum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
-        html += `<div class="price-row total"><span class="label">= 收入 Revenue${specialBadge}</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+        html += `<div class="price-row total"><span class="label">= 收入 Revenue${specialBadge}${tableYPriceBadge}</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
         if (rate > 0) {
           const totalFareUsd = +(totalSum / rate).toFixed(2);
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (${totalSum} ÷ ${rate.toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalFareUsd.toFixed(2)}</span></div>`;
@@ -15862,17 +17307,17 @@ function buildCardHTML(o, idx) {
       } else {
         if (o.customRate && o.usd) {
           // USD fare format: show USD as primary fare
-          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${o.customRate} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}${tableYPriceBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${o.customRate} × ${discountStr} × ${pax}</span></div>`;
           html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD × ${pax}人</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(o.usd * pax).toFixed(2)}</span></div>`;
         } else if (o.usd && o.usd > 0 && !o.customRate && !o.basePrice) {
           // Plain USD fare (e.g. "3297.73 USD") — show USD as primary, CNY as derived
-          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}${tableYPriceBadge}</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${Number(o.usd).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} × ${discountStr} × ${pax}</span></div>`;
           html += `<div class="price-row total"><span class="label">= 收入 Revenue</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           const usdAfterDisc = o.usd * (o.discount || 100) / 100;
           html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue);font-weight:600;">= 订单总金额 USD (× ${pax}人)</span><span class="value" style="color:var(--blue);font-weight:700;">$ ${(usdAfterDisc * pax).toFixed(2)}</span></div>`;
         } else {
-          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
+          html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em; text-transform:uppercase;">PRICE 售价${specialBadge}${tableYPriceBadge}</span><span class="value">${o.basePrice} × ${discountStr} × ${pax}</span></div>`;
           html += `<div class="price-row total"><span class="label">= 收入 REVENUE</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
           const basePriceUsd = o.basePrice != null ? o.basePrice / effectiveRate(o) : null;
           if (basePriceUsd != null) {
@@ -15941,12 +17386,23 @@ function getFirstDate(o) {
 }
 
 // Build client-facing copy (内容1)
-function buildClientCopy(o) {
+function buildClientCopy(o, mode) {
+  mode = mode || 'client';
   let lines = [];
 
   // Line 1: 表{label}-{client OR agent}-{cabin}
+  // For 表 Y orders: in client-facing reports, mark explicitly as 表Y (so the
+  // agent sees the 9折 designation). Internal copies (mode='internal') keep
+  // the underlying label (表A) since 表 Y is just a branch and our accounting
+  // doesn't need the distinction.
   const headParts = [];
-  if (o.tableLabel) headParts.push(`表${o.tableLabel}`);
+  if (o.tableLabel) {
+    if (o.isTableY && o.tableLabel === 'A' && mode === 'client') {
+      headParts.push('表Y');
+    } else {
+      headParts.push(`表${o.tableLabel}`);
+    }
+  }
   if (o.client) {
     headParts.push(o.client);
   } else if (o.agent) {
@@ -16077,7 +17533,7 @@ function buildInternalCopy(o) {
   }
 
   // ── All other tables: original logic ──────────────────────────────────
-  let text = buildClientCopy(o);
+  let text = buildClientCopy(o, 'internal');
   const extra = [];
 
   const ch = o.cardholderId ? (settings.cardholders || []).find(c => c.id === o.cardholderId) : null;
@@ -16505,6 +17961,209 @@ async function refreshAllOrders() {
 // ============================================
 // TICKETED
 // ============================================
+
+// ─── Quick Ticket Modal ───────────────────────────────────────────────────
+// One-click ticketing flow: paste TKT number → confirm → done.
+// Avoids having to scroll through all the validation steps when you just
+// want to tick a standard order. Still calls doMarkTicketed so all existing
+// validations, rolling snapshots, and cloud sync still fire.
+function openQuickTicketModal(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const paxName = (o.passengers[0]?.name || '—');
+  const route = (o.segments || []).map(s => (s.from||'') + '→' + (s.to||'')).join(' ');
+  const existingTkt = o.tkt || '';
+  const existingPnr = o.pnr || '';
+
+  document.getElementById('quickTicketOverlay')?.remove();
+
+  const html = `
+    <div id="quickTicketOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.55); z-index:9300; display:flex; align-items:center; justify-content:center; padding:20px;"
+      onclick="if(event.target.id==='quickTicketOverlay')document.getElementById('quickTicketOverlay').remove()">
+      <div style="background:var(--paper); border-radius:var(--r-lg); width:min(480px,95vw); box-shadow:0 25px 80px rgba(0,0,0,0.4); overflow:hidden;">
+        <div style="padding:18px 24px; background:linear-gradient(135deg, #1a6e3a, #0f4224); color:#fff;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.8; font-weight:600; margin-bottom:4px;">QUICK TICKET</div>
+          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">⚡ 快速出票</div>
+          <div style="font-size:12px; opacity:0.8; margin-top:4px;">${escapeHtml(paxName)} · ${escapeHtml(route)} · ${o.airline||'—'}</div>
+        </div>
+        <div style="padding:20px 24px;">
+          <div style="font-size:11px; color:var(--muted); margin-bottom:14px;">填写 <strong style="color:var(--ink);">票号 TKT</strong> 或 <strong style="color:var(--ink);">PNR 编码</strong>，二选一即可出票。</div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+            <div>
+              <label style="font-size:10.5px; font-weight:700; letter-spacing:0.08em; color:var(--muted); display:block; margin-bottom:6px;">TKT 票号</label>
+              <input type="text" id="quickTktInput" value="${escapeAttr(existingTkt)}"
+                placeholder="016-1234567890"
+                style="width:100%; padding:9px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; border:1.5px solid var(--line); border-radius:var(--r-sm); outline:none; box-sizing:border-box; letter-spacing:0.04em;"
+                oninput="_quickTicketValidate()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();_confirmQuickTicket(${idx});} else if(event.key==='Escape'){document.getElementById('quickTicketOverlay').remove();}">
+            </div>
+            <div>
+              <label style="font-size:10.5px; font-weight:700; letter-spacing:0.08em; color:var(--muted); display:block; margin-bottom:6px;">PNR 编码</label>
+              <input type="text" id="quickPnrInput" value="${escapeAttr(existingPnr)}"
+                placeholder="NDPYKN"
+                style="width:100%; padding:9px 12px; font-family:'JetBrains Mono',monospace; font-size:13px; border:1.5px solid var(--line); border-radius:var(--r-sm); outline:none; box-sizing:border-box; letter-spacing:0.08em; text-transform:uppercase;"
+                oninput="this.value=this.value.toUpperCase(); _quickTicketValidate()"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();_confirmQuickTicket(${idx});} else if(event.key==='Escape'){document.getElementById('quickTicketOverlay').remove();}">
+            </div>
+          </div>
+
+          <div id="quickTicketHint" style="font-size:11px; color:var(--muted); line-height:1.6; padding:8px 10px; background:var(--cream); border-radius:var(--r-sm); margin-bottom:16px;">
+            两个字段均留空时无法出票。填写后系统自动：① 更新字段 ② 标记已出票 ③ 复制代理商报表
+          </div>
+
+          <div style="display:flex; gap:10px; justify-content:flex-end;">
+            <button onclick="document.getElementById('quickTicketOverlay').remove()" style="padding:9px 16px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:var(--r-sm); cursor:pointer; font-size:12.5px;">取消</button>
+            <button id="quickTicketConfirmBtn" onclick="_confirmQuickTicket(${idx})" style="padding:9px 20px; border:1px solid #1a6e3a; background:linear-gradient(135deg,#2a8e4e,#1a6e3a); color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:13px; font-weight:700;">✓ 出票</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const c = document.createElement('div');
+  c.innerHTML = html;
+  document.body.appendChild(c.firstElementChild);
+  setTimeout(() => {
+    // Focus whichever field is empty — if TKT exists already, focus PNR and vice versa
+    const tktInp = document.getElementById('quickTktInput');
+    const pnrInp = document.getElementById('quickPnrInput');
+    if (tktInp && !existingTkt && !existingPnr) { tktInp.focus(); }
+    else if (tktInp && existingTkt) { tktInp.focus(); tktInp.select(); }
+    else if (pnrInp) { pnrInp.focus(); pnrInp.select(); }
+    _quickTicketValidate();
+  }, 50);
+}
+
+// Live validation — enable confirm button only when at least one field has a value
+function _quickTicketValidate() {
+  const tkt = (document.getElementById('quickTktInput')?.value || '').trim();
+  const pnr = (document.getElementById('quickPnrInput')?.value || '').trim();
+  const btn = document.getElementById('quickTicketConfirmBtn');
+  const hint = document.getElementById('quickTicketHint');
+  const hasValue = tkt.length > 0 || pnr.length > 0;
+  if (btn) {
+    btn.disabled = !hasValue;
+    btn.style.opacity = hasValue ? '1' : '0.45';
+    btn.style.cursor = hasValue ? 'pointer' : 'not-allowed';
+  }
+  if (hint) {
+    if (!hasValue) {
+      hint.textContent = '两个字段均留空时无法出票。填写后系统自动：① 更新字段 ② 标记已出票 ③ 复制代理商报表';
+      hint.style.color = 'var(--muted)';
+    } else if (tkt && pnr) {
+      hint.textContent = '✓ TKT + PNR 都会更新 · 系统自动标记已出票 + 复制代理商报表';
+      hint.style.color = 'var(--green)';
+    } else if (tkt) {
+      hint.textContent = `✓ TKT 票号 ${tkt} · 系统自动标记已出票 + 复制代理商报表`;
+      hint.style.color = 'var(--green)';
+    } else {
+      hint.textContent = `✓ PNR 编码 ${pnr} · 系统自动标记已出票 + 复制代理商报表`;
+      hint.style.color = 'var(--green)';
+    }
+  }
+}
+
+async function _confirmQuickTicket(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const tkt = (document.getElementById('quickTktInput')?.value || '').trim();
+  const pnr = (document.getElementById('quickPnrInput')?.value || '').trim();
+  if (!tkt && !pnr) {
+    toast('请至少填写 TKT 票号 或 PNR 编码');
+    return;
+  }
+  if (tkt) {
+    o.tkt = tkt;
+    const tktEl = document.getElementById(`tkt-${idx}`);
+    if (tktEl) tktEl.value = tkt;
+  }
+  if (pnr) {
+    o.pnr = pnr;
+    const pnrEl = document.getElementById(`pnr-${idx}`);
+    if (pnrEl) pnrEl.value = pnr;
+  }
+  document.getElementById('quickTicketOverlay')?.remove();
+
+  // Run the full ticketing flow
+  await markOrderTicketed(idx);
+
+  // After ticketing, find the order that was just moved to ticketed
+  // and show a two-button copy panel for client + internal reports.
+  const ticketed = STATE.ticketed || [];
+  const justTicketed = ticketed.length > 0 ? ticketed[ticketed.length - 1] : null;
+  if (!justTicketed) return;
+
+  // Build the two report texts upfront
+  const clientText   = buildClientCopy(justTicketed, 'client');
+  const internalText = buildInternalCopy(justTicketed);
+
+  // Show post-ticket copy panel
+  document.getElementById('quickCopyOverlay')?.remove();
+  const panel = `
+    <div id="quickCopyOverlay" style="position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:9400;
+      background:var(--ink); color:#fff; border-radius:var(--r-lg); padding:16px 20px;
+      box-shadow:0 8px 40px rgba(0,0,0,0.45); display:flex; flex-direction:column; gap:10px;
+      min-width:320px; max-width:90vw; animation:slideUp 0.2s ease;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;">
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.06em; color:var(--accent);">✅ 已出票 · 复制报表</span>
+        <button onclick="document.getElementById('quickCopyOverlay').remove()" style="background:none; border:none; color:#888; cursor:pointer; font-size:14px; padding:0;">✕</button>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button id="quickCopyClientBtn" onclick="_quickCopyReport('client')"
+          style="flex:1; padding:10px 14px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+            color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12.5px; font-weight:700;
+            font-family:inherit; transition:background 0.15s;"
+          onmouseover="this.style.background='rgba(255,255,255,0.18)'"
+          onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+          📋 代理商报表
+        </button>
+        <button id="quickCopyInternalBtn" onclick="_quickCopyReport('internal')"
+          style="flex:1; padding:10px 14px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
+            color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12.5px; font-weight:700;
+            font-family:inherit; transition:background 0.15s;"
+          onmouseover="this.style.background='rgba(255,255,255,0.18)'"
+          onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+          📋 记录员报表
+        </button>
+      </div>
+      <div id="quickCopyStatus" style="font-size:11px; color:#888; text-align:center; min-height:16px;"></div>
+    </div>
+  `;
+  // Store texts on window so the button handlers can access them
+  window._quickCopyTexts = { client: clientText, internal: internalText };
+  const c = document.createElement('div');
+  c.innerHTML = panel;
+  document.body.appendChild(c.firstElementChild);
+
+  // Auto-dismiss after 30s
+  setTimeout(() => document.getElementById('quickCopyOverlay')?.remove(), 30000);
+}
+
+async function _quickCopyReport(mode) {
+  const texts = window._quickCopyTexts;
+  if (!texts) return;
+  const text = texts[mode];
+  const btnId = mode === 'client' ? 'quickCopyClientBtn' : 'quickCopyInternalBtn';
+  const label = mode === 'client' ? '代理商报表' : '记录员报表';
+  try {
+    await navigator.clipboard.writeText(text);
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = `✓ 已复制`;
+      btn.style.background = 'rgba(94,204,107,0.25)';
+      btn.style.borderColor = 'rgba(94,204,107,0.5)';
+      btn.style.color = '#5ecc6b';
+      setTimeout(() => {
+        if (btn) { btn.innerHTML = orig; btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = '#fff'; }
+      }, 2000);
+    }
+    const status = document.getElementById('quickCopyStatus');
+    if (status) status.textContent = `✓ ${label}已复制`;
+  } catch (e) {
+    toast('复制失败，请手动复制');
+  }
+}
 
 async function markOrderTicketed(idx) {
   const o = STATE.orders[idx];
@@ -17916,6 +19575,7 @@ function renderPendingBanner() {
   // Track assignment status for progress bar
   let assigned = 0, unassigned = 0, parked = 0;
   let urgentCount = 0;
+  let tableYCount = 0;
   meaningful.forEach(o => {
     const r = orderRevenue(o);
     const c = orderCost(o);
@@ -17927,6 +19587,7 @@ function renderPendingBanner() {
     else if (o.cardholderId) assigned++;
     else unassigned++;
     if (o.urgent) urgentCount++;
+    if (o.isTableY) tableYCount++;
   });
   document.getElementById('pbCount').textContent = meaningful.length;
   // Urgent chip — only visible when there's at least one urgent order
@@ -17937,6 +19598,16 @@ function renderPendingBanner() {
       document.getElementById('pbUrgentCount').textContent = urgentCount;
     } else {
       urgentEl.style.display = 'none';
+    }
+  }
+  // 表Y chip — only visible when ≥1 表Y order
+  const yEl = document.getElementById('pbTableY');
+  if (yEl) {
+    if (tableYCount > 0) {
+      yEl.style.display = '';
+      document.getElementById('pbTableYCount').textContent = tableYCount;
+    } else {
+      yEl.style.display = 'none';
     }
   }
   const rateNow = settings.rate || 7.25;
@@ -18824,7 +20495,6 @@ function openActionDialog(existing, prefilled = {}) {
       <input type="hidden" id="ad-source" value="${escapeAttr(a.source||'manual')}">
       <input type="hidden" id="ad-sourceTicketedAt" value="${a.sourceTicketedAt||''}">
       <!-- Legacy fields (not shown but preserved for old records) -->
-      <input type="hidden" id="ad-agent" value="${escapeAttr(a.agent||'')}">
       <input type="hidden" id="ad-airline" value="${escapeAttr(a.airline||'')}">
       <input type="hidden" id="ad-tkt" value="${escapeAttr(a.tkt||'')}">
       <input type="hidden" id="ad-flight" value="${escapeAttr(a.flightNo||'')}">
@@ -21025,6 +22695,8 @@ async function enableCloudSync() {
 
 async function cloudPull(silent) {
   if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
+  _syncStatus = 'syncing';
+  updateSyncIndicator();
   try {
     const res = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
       headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
@@ -21032,6 +22704,26 @@ async function cloudPull(silent) {
     if (!res.ok) throw new Error(`拉取失败 ${res.status}`);
     const data = await res.json();
     const record = data.record || {};
+
+    // Extract metadata about who last pushed (added in cloudPush above)
+    if (record.lastDeviceAt) _lastCloudPushAt = record.lastDeviceAt;
+    if (record.lastDevice) _lastCloudPushBy = record.lastDevice;
+
+    // ── Skip redundant re-renders if cloud data is unchanged ──────────────
+    // The auto-pull every 60s used to blindly re-render the entire pending
+    // list, which could swap DOM nodes out from under user clicks (action
+    // buttons would seem to "miss"). If cloud updatedAt is the same as the
+    // last pull we successfully applied, skip the work entirely.
+    const cloudUpdatedAt = record.updatedAt || record.lastDeviceAt || 0;
+    if (silent && cloudUpdatedAt > 0 && cloudUpdatedAt === _lastAppliedCloudUpdatedAt) {
+      _syncStatus = 'success';
+      _lastSyncAt = Date.now();
+      _consecutiveFailures = 0;
+      updateCloudStatus();
+      updateSyncIndicator();
+      _initialPullComplete = true;
+      return;
+    }
 
     // ── CLOUD IS SOURCE OF TRUTH ──────────────────────────────────────────
     // Cloud data overwrites local for all fields.
@@ -21084,10 +22776,27 @@ async function cloudPull(silent) {
     renderCardholdersList();
     renderKnownPax();
     if (!silent) toast(`✓ 已拉取 ${(record.orders || []).length}单待出票 / ${cloudTicketed}单已出票`);
+    _syncStatus = 'success';
+    _lastSyncAt = Date.now();
+    _lastSyncError = '';
+    _syncRetryCount = 0;
+    _consecutiveFailures = 0;
+    _lastAppliedCloudUpdatedAt = cloudUpdatedAt;  // remember what we just applied
+    // After a successful pull, local state matches cloud → no dirty changes
+    _syncDirtyCount = 0;
     updateCloudStatus();
+    updateSyncIndicator();
   } catch (e) {
-    if (!silent) alert(`拉取失败：${e.message}`);
-    else console.warn('cloudPull error:', e);
+    _consecutiveFailures++;
+    _lastSyncError = e.message || String(e);
+    const cls = _classifySyncError(_lastSyncError);
+    if (cls.startsWith('hard-') || _consecutiveFailures >= 10) {
+      _syncStatus = 'error';
+    } else {
+      _syncStatus = 'offline';
+    }
+    updateSyncIndicator();
+    if (!silent) alert(`拉取失败：${_lastSyncError}`);
   } finally {
     // Always mark initial pull as complete — even if it failed.
     // This unblocks autoCloudPush so normal sync can resume.
@@ -21095,34 +22804,145 @@ async function cloudPull(silent) {
   }
 }
 
-async function cloudPush(silent) {
-  if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
+// Single attempt — throws on failure. Wrapped by cloudPush below for retries.
+async function _cloudPushOnce() {
+  const now = Date.now();
+  settings.updatedAt = now;
+  await storageSet('ticket-organizer-settings', settings);
+  // Strip screenshots from cloud payload — base64 images are too large for jsonbin
+  const ordersForCloud = STATE.orders.map(o => {
+    if (!o.screenshots || o.screenshots.length === 0) return o;
+    const { screenshots, ...rest } = o;
+    return rest;
+  });
+  const payload = {
+    version: 1,
+    updatedAt: now,
+    // Metadata for other devices: who pushed and when
+    lastDevice: _deviceName || '',
+    lastDeviceAt: now,
+    settings,
+    orders: ordersForCloud,
+  };
+  const payloadJson = JSON.stringify(payload);
+  _lastPayloadBytes = payloadJson.length;
+  // Pre-flight size check — fail fast before hitting the network
+  if (_lastPayloadBytes > 900_000) {
+    throw new Error(`数据 ${(_lastPayloadBytes / 1024).toFixed(0)}KB 超出 jsonbin.io 1MB 上限`);
+  }
+  // 10-second timeout to avoid hanging fetches (common when tab is backgrounded)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
   try {
-    const now = Date.now();
-    settings.updatedAt = now;
-    await storageSet('ticket-organizer-settings', settings);
-    // Strip screenshots from cloud payload — base64 images are too large for jsonbin
-    const ordersForCloud = STATE.orders.map(o => {
-      if (!o.screenshots || o.screenshots.length === 0) return o;
-      const { screenshots, ...rest } = o;
-      return rest;
-    });
-    const payload = { version: 1, updatedAt: now, settings, orders: ordersForCloud };
     const res = await fetch(`${JSONBIN_API}/${cloudSyncKey}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'X-Master-Key': JSONBIN_MASTER_KEY
       },
-      body: JSON.stringify(payload)
+      body: payloadJson,
+      signal: controller.signal,
     });
-    if (!res.ok) throw new Error(`推送失败 ${res.status}`);
-    if (!silent) toast('✓ 已推送到云端');
-    updateCloudStatus();
-  } catch (e) {
-    if (!silent) alert(`推送失败：${e.message}`);
-    console.warn('cloudPush error:', e);
+    if (!res.ok) {
+      let bodyText = '';
+      try { bodyText = await res.text(); } catch (e) {}
+      throw new Error(`HTTP ${res.status}${bodyText ? ' · ' + bodyText.slice(0, 120) : ''}`);
+    }
+    return now;
+  } finally {
+    clearTimeout(timeoutId);
   }
+}
+
+// Resilient push: tries up to 3 times in quick succession before showing
+// any error UI to the user. Network blips, brief rate-limits, and tab-
+// backgrounding pauses recover invisibly.
+async function cloudPush(silent) {
+  if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
+  _syncStatus = 'syncing';
+  updateSyncIndicator();
+
+  const QUICK_DELAYS = [0, 1500, 4000];  // attempt 1 immediate, then +1.5s, then +4s
+  let lastError = null;
+
+  for (let attempt = 0; attempt < QUICK_DELAYS.length; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, QUICK_DELAYS[attempt]));
+      _syncStatus = 'syncing';  // keep "syncing" through retries — user sees no flicker
+      updateSyncIndicator();
+    }
+    try {
+      const now = await _cloudPushOnce();
+      // SUCCESS — reset all error state
+      _syncDirtyCount = 0;
+      _syncStatus = 'success';
+      _lastSyncAt = now;
+      _lastCloudPushAt = now;
+      _lastCloudPushBy = _deviceName || '';
+      _lastAppliedCloudUpdatedAt = now;  // our own push — already locally applied
+      _lastSyncError = '';
+      _syncRetryCount = 0;
+      _consecutiveFailures = 0;
+      if (_syncRetryTimer) { clearTimeout(_syncRetryTimer); _syncRetryTimer = null; }
+      if (!silent) toast('✓ 已推送到云端');
+      updateCloudStatus();
+      updateSyncIndicator();
+      return;
+    } catch (e) {
+      lastError = e;
+      const cls = _classifySyncError(e.message);
+      // Hard errors (data too big, auth wrong) abort retry loop — no point trying again
+      if (cls.startsWith('hard-')) break;
+      // Otherwise let the loop retry
+    }
+  }
+
+  // All retries exhausted — classify and update state
+  _consecutiveFailures++;
+  _lastSyncError = lastError ? (lastError.message || String(lastError)) : 'Unknown error';
+  const errClass = _classifySyncError(_lastSyncError);
+  if (errClass.startsWith('hard-')) {
+    // Permanent/actionable error: red
+    _syncStatus = 'error';
+    if (!silent) {
+      if (errClass === 'hard-toobig') {
+        alert(`推送失败：${_lastSyncError}\n\n建议在「设置 → 已出票」清理或归档老订单。`);
+      } else {
+        alert(`推送失败：${_lastSyncError}`);
+      }
+    }
+  } else {
+    // Transient: soft "offline" state unless we've failed many times in a row
+    _syncStatus = _consecutiveFailures >= 10 ? 'error' : 'offline';
+    if (!silent && _syncStatus === 'error') {
+      alert(`已连续 ${_consecutiveFailures} 次同步失败：${_lastSyncError}\n\n请检查网络。本地数据已保存。`);
+    } else if (!silent) {
+      toast('暂时离线，已加入待推送队列');
+    }
+  }
+  updateSyncIndicator();
+  // Schedule background retry
+  scheduleSyncRetry();
+}
+
+// Exponential backoff retry. Tries to push silently until success, then stops.
+function scheduleSyncRetry() {
+  if (_syncRetryTimer) clearTimeout(_syncRetryTimer);
+  // For soft (transient) failures, retry quickly. For hard, give up scheduling.
+  if (_syncStatus === 'error' && _classifySyncError(_lastSyncError).startsWith('hard-')) {
+    return;  // no point retrying — user action required
+  }
+  const delays = [15_000, 30_000, 60_000, 120_000, 300_000];
+  const delayIdx = Math.min(_syncRetryCount, delays.length - 1);
+  const delay = delays[delayIdx];
+  _syncRetryCount++;
+  _syncRetryTimer = setTimeout(() => {
+    _syncRetryTimer = null;
+    // Only retry if we still have local dirty changes (otherwise pointless)
+    if (_syncDirtyCount > 0 && cloudSyncEnabled) {
+      cloudPush(true);
+    }
+  }, delay);
 }
 
 // ============================================
@@ -21390,9 +23210,259 @@ function autoCloudPush() {
   // CRITICAL: never push before the initial cloudPull completes on startup.
   // This prevents stale/empty local data from overwriting the cloud.
   if (!_initialPullComplete) return;
+  // Mark local as dirty so the indicator can show "未推送"
+  _syncDirtyCount++;
+  updateSyncIndicator();
   if (cloudPushTimer) clearTimeout(cloudPushTimer);
   cloudPushTimer = setTimeout(() => { cloudPush(true); }, 2000);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SYNC STATUS INDICATOR — runs in the page header so the user can always
+// tell whether their data is fresh, syncing, or potentially stale (e.g. just
+// returned to this device after using a different one).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Persistent state (not shared via cloud — local to this device)
+let _syncDirtyCount = 0;          // # changes since last successful push
+let _syncStatus = 'idle';          // idle | syncing | success | offline | error
+// _lastSyncAt is declared earlier (line ~17396); we reuse the same var.
+let _lastCloudPushAt = 0;          // ms timestamp of last cloud-side change (from server)
+let _lastCloudPushBy = '';         // device name of last push (from server)
+let _deviceName = '';              // this device's friendly name
+let _lastSyncError = '';           // human-readable error from last failed push/pull
+let _syncRetryTimer = null;        // pending retry timer (auto-backoff)
+let _syncRetryCount = 0;           // current retry attempt #
+let _lastPayloadBytes = 0;         // size of last push attempt in bytes
+let _consecutiveFailures = 0;     // consecutive transient failures (resets on success)
+let _lastAppliedCloudUpdatedAt = 0; // remember what cloud rev we last applied (skip redundant re-renders)
+
+// Determine if an error is "soft" (transient — network blip, rate limit)
+// vs "hard" (needs user action — data too big, auth wrong).
+// Soft errors show as yellow "暂时离线". Hard errors show as red "同步失败".
+function _classifySyncError(msg) {
+  if (!msg) return 'soft';
+  const m = msg.toLowerCase();
+  // Hard errors: user action required
+  if (m.includes('413') || m.includes('1mb') || m.includes('超出')) return 'hard-toobig';
+  if (m.includes('401') || m.includes('403')) return 'hard-auth';
+  // Everything else (network errors, 429 rate limits, 500s, timeouts) is soft
+  return 'soft';
+}
+
+// Load + prompt for device name. Device names live in localStorage only.
+function loadDeviceName() {
+  try {
+    _deviceName = localStorage.getItem('ticket-organizer-device-name') || '';
+  } catch (e) { _deviceName = ''; }
+  if (!_deviceName) {
+    // Suggest based on user-agent platform hint
+    const ua = navigator.userAgent || '';
+    let suggestion = '设备';
+    if (/iPhone|iPad/i.test(ua)) suggestion = '手机';
+    else if (/Mac/i.test(ua)) suggestion = 'Mac';
+    else if (/Windows/i.test(ua)) suggestion = '电脑';
+    else if (/Android/i.test(ua)) suggestion = '手机';
+    _deviceName = suggestion;
+    // Don't prompt on first load — let user rename later via the indicator click
+    try { localStorage.setItem('ticket-organizer-device-name', _deviceName); } catch (e) {}
+  }
+}
+
+function renameDevice() {
+  const newName = prompt(
+    '给这台设备起个名字（让其他设备知道是谁在改数据）：',
+    _deviceName
+  );
+  if (newName && newName.trim()) {
+    _deviceName = newName.trim().slice(0, 24);
+    try { localStorage.setItem('ticket-organizer-device-name', _deviceName); } catch (e) {}
+    updateSyncIndicator();
+    toast(`✓ 设备已更名为「${_deviceName}」`);
+  }
+}
+
+// Render the indicator into #syncIndicator in the header.
+function updateSyncIndicator() {
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+
+  if (!cloudSyncEnabled) {
+    el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:var(--r-sm); background:rgba(184,60,44,0.10); color:var(--red); font-size:11px; font-weight:600;" title="云同步已断开">⊘ 未同步</span>`;
+    return;
+  }
+
+  // Decide dot color + label
+  let dotColor, dotShadow, label, statusColor, tooltipText;
+  if (_syncStatus === 'syncing') {
+    dotColor = 'var(--accent-deep)';
+    dotShadow = '0 0 6px rgba(200,160,74,0.6)';
+    label = '同步中…';
+    statusColor = 'var(--accent-deep)';
+    tooltipText = '正在与云端同步';
+  } else if (_syncStatus === 'offline') {
+    // Soft state — transient network issue. Data is safe locally.
+    dotColor = 'var(--warning)';
+    dotShadow = '0 0 5px rgba(194,133,61,0.5)';
+    label = '暂时离线';
+    statusColor = 'var(--warning-deep)';
+    tooltipText = `📡 暂时连不上云端，正在自动重试。\n\n本地数据已保存，不会丢失。`;
+  } else if (_syncStatus === 'error') {
+    dotColor = 'var(--red)';
+    dotShadow = '0 0 6px rgba(184,60,44,0.6)';
+    label = '需要处理';
+    statusColor = 'var(--red)';
+    const retryNote = _consecutiveFailures > 0 ? `\n已连续失败 ${_consecutiveFailures} 次` : '';
+    tooltipText = `⚠ ${_lastSyncError || '未知错误'}${retryNote}\n\n点击查看详情。本地数据已保存。`;
+  } else if (_syncDirtyCount > 0) {
+    dotColor = 'var(--warning)';
+    dotShadow = '0 0 4px rgba(194,133,61,0.5)';
+    label = `待推送 ${_syncDirtyCount}`;
+    statusColor = 'var(--warning-deep)';
+    tooltipText = `本地有 ${_syncDirtyCount} 项变化未推送，2 秒后自动推送`;
+  } else if (_lastSyncAt > 0) {
+    dotColor = 'var(--green)';
+    dotShadow = '0 0 5px rgba(46,125,50,0.45)';
+    label = '已同步 ' + _relativeTimeShort(_lastSyncAt);
+    statusColor = 'var(--green)';
+    tooltipText = `上次同步：${new Date(_lastSyncAt).toLocaleString('zh-CN')}\n点击查看详情`;
+  } else {
+    dotColor = 'var(--muted)';
+    dotShadow = '';
+    label = '等待…';
+    statusColor = 'var(--muted)';
+    tooltipText = '正在初始化…';
+  }
+
+  // Recent-cloud-push hint: helps user know whether the OTHER device
+  // just pushed something they should pull
+  let cloudHint = '';
+  if (_lastCloudPushBy && _lastCloudPushBy !== _deviceName && _lastCloudPushAt > 0) {
+    const ago = _relativeTimeShort(_lastCloudPushAt);
+    cloudHint = `<span style="margin-left:8px; padding-left:8px; border-left:1px solid var(--line); color:var(--muted); font-size:10px;">${escapeHtml(_lastCloudPushBy)} · ${ago}</span>`;
+  }
+
+  el.innerHTML = `
+    <span class="sync-indicator-inner"
+      title="${escapeAttr(tooltipText)}"
+      onclick="openSyncDetails()"
+      style="display:inline-flex; align-items:center; gap:7px; padding:4px 10px; border-radius:var(--r-sm); background:rgba(255,255,255,0.5); border:1px solid var(--line); cursor:pointer; transition:background 0.15s; font-size:11px;"
+      onmouseover="this.style.background='rgba(255,255,255,0.85)'"
+      onmouseout="this.style.background='rgba(255,255,255,0.5)'">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${dotColor}; box-shadow:${dotShadow}; flex-shrink:0;"></span>
+      <span style="color:${statusColor}; font-weight:600; font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;">${label}</span>
+      <span style="color:var(--muted); font-size:10px;">·</span>
+      <span style="color:var(--ink-2); font-size:10.5px; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(_deviceName)}</span>
+      ${cloudHint}
+    </span>`;
+}
+
+// Short relative time: "30秒前" / "3分钟前" / "刚刚"
+function _relativeTimeShort(ms) {
+  const delta = Date.now() - ms;
+  if (delta < 0) return '刚刚';
+  const sec = delta / 1000;
+  if (sec < 30) return '刚刚';
+  if (sec < 60) return Math.floor(sec) + '秒前';
+  const min = sec / 60;
+  if (min < 60) return Math.floor(min) + '分钟前';
+  const hr = min / 60;
+  if (hr < 24) return Math.floor(hr) + '小时前';
+  return Math.floor(hr / 24) + '天前';
+}
+
+// Open a small details panel — shows last sync time, cloud state, device name
+function openSyncDetails() {
+  const lastSyncStr = _lastSyncAt > 0
+    ? new Date(_lastSyncAt).toLocaleString('zh-CN')
+    : '尚未同步';
+  const cloudPushStr = _lastCloudPushAt > 0
+    ? `${new Date(_lastCloudPushAt).toLocaleString('zh-CN')}${_lastCloudPushBy ? ' (' + _lastCloudPushBy + ')' : ''}`
+    : '未知';
+  const payloadKb = _lastPayloadBytes > 0 ? (_lastPayloadBytes / 1024).toFixed(0) : '?';
+  const payloadColor = _lastPayloadBytes > 900_000 ? 'var(--red)'
+                     : _lastPayloadBytes > 700_000 ? 'var(--warning-deep)'
+                     : 'var(--ink)';
+  // Error / offline section
+  const isOffline = _syncStatus === 'offline';
+  const isError = _syncStatus === 'error' && _lastSyncError;
+  let statusSection = '';
+  if (isError) {
+    statusSection = `
+      <div style="margin-top:12px; padding:12px 14px; background:rgba(184,60,44,0.06); border:1px solid rgba(184,60,44,0.25); border-left:3px solid var(--red); border-radius:var(--r-sm);">
+        <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠ 需要处理的错误</div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink); word-break:break-word; line-height:1.5;">${escapeHtml(_lastSyncError)}</div>
+        ${_consecutiveFailures > 0 ? `<div style="font-size:10.5px; color:var(--muted); margin-top:8px;">已连续失败 ${_consecutiveFailures} 次。</div>` : ''}
+        ${_lastSyncError.includes('413') || _lastSyncError.includes('超出') || _lastSyncError.includes('1MB') ? `
+          <div style="font-size:10.5px; color:var(--warning-deep); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(184,60,44,0.2);">
+            💡 数据超出 jsonbin.io 1MB 上限。建议清理或归档老的「已出票」订单。
+          </div>` : ''}
+        ${_lastSyncError.includes('401') || _lastSyncError.includes('403') ? `
+          <div style="font-size:10.5px; color:var(--warning-deep); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(184,60,44,0.2);">
+            💡 认证失败。jsonbin.io API key 可能失效或被吊销。
+          </div>` : ''}
+      </div>
+    `;
+  } else if (isOffline) {
+    statusSection = `
+      <div style="margin-top:12px; padding:12px 14px; background:rgba(194,133,61,0.08); border:1px solid rgba(194,133,61,0.3); border-left:3px solid var(--warning); border-radius:var(--r-sm);">
+        <div style="font-size:11px; font-weight:700; color:var(--warning-deep); margin-bottom:6px;">📡 暂时连不上云端</div>
+        <div style="font-size:11.5px; color:var(--ink); line-height:1.5;">本地数据已保存安全，不会丢失。系统正在自动重试。常见原因：</div>
+        <div style="font-size:10.5px; color:var(--muted); margin-top:6px; line-height:1.7;">
+          · Wi-Fi 短暂断开<br>
+          · jsonbin.io 速率限制（多设备同时同步）<br>
+          · 浏览器后台标签被节流
+        </div>
+        ${_lastSyncError ? `<div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(194,133,61,0.3);">技术细节：${escapeHtml(_lastSyncError)}</div>` : ''}
+      </div>
+    `;
+  }
+  const html = `
+    <div id="syncDetailsOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.55); z-index:9100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target.id==='syncDetailsOverlay')document.getElementById('syncDetailsOverlay').remove()">
+      <div style="background:var(--paper); border-radius:var(--r-lg); width:min(440px, 95vw); max-height:90vh; overflow:auto; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
+        <div style="padding:18px 24px; background:linear-gradient(135deg, var(--ink), var(--ink-2)); color:#fff;">
+          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent); font-weight:600; margin-bottom:4px;">SYNC STATUS</div>
+          <div style="font-family:'Fraunces',serif; font-size:18px; font-weight:600;">同步状态详情</div>
+        </div>
+        <div style="padding:20px 24px; font-size:12.5px; line-height:1.7;">
+          <div style="display:grid; grid-template-columns:auto 1fr; gap:8px 14px; align-items:baseline;">
+            <span style="color:var(--muted);">这台设备：</span>
+            <span><strong>${escapeHtml(_deviceName)}</strong>
+              <button onclick="renameDevice();document.getElementById('syncDetailsOverlay').remove();" style="margin-left:8px; border:1px solid var(--line); background:#fff; padding:2px 8px; border-radius:4px; font-size:10.5px; cursor:pointer;">改名</button>
+            </span>
+            <span style="color:var(--muted);">本地未推送：</span>
+            <span><strong style="color:${_syncDirtyCount > 0 ? 'var(--warning-deep)' : 'var(--green)'};">${_syncDirtyCount} 项</strong></span>
+            <span style="color:var(--muted);">上次同步：</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px;">${escapeHtml(lastSyncStr)}</span>
+            <span style="color:var(--muted);">云端上次更新：</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px;">${escapeHtml(cloudPushStr)}</span>
+            <span style="color:var(--muted);">数据大小：</span>
+            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:${payloadColor};"><strong>${payloadKb} KB</strong> <span style="color:var(--muted); font-weight:400;">/ 1024 KB 上限</span></span>
+          </div>
+          ${statusSection}
+          ${!statusSection ? `
+          <div style="margin-top:14px; padding:10px 12px; background:var(--cream); border-radius:var(--r-sm); font-size:11px; color:var(--muted); line-height:1.5;">
+            ${_lastCloudPushBy && _lastCloudPushBy !== _deviceName ? `💡 提示：「${escapeHtml(_lastCloudPushBy)}」最近改过数据。如果你担心错过，可以「立即拉取」一下。` : '💡 同步自动进行 —— 每次改动 2 秒后推送到云端，其他设备打开网页时自动拉取。'}
+          </div>
+          ` : ''}
+          <div style="margin-top:14px; display:flex; gap:8px;">
+            <button onclick="cloudPull(false); document.getElementById('syncDetailsOverlay').remove();" style="flex:1; padding:8px 14px; border:1px solid var(--accent-deep); background:#fff; color:var(--accent-deep); border-radius:var(--r-sm); cursor:pointer; font-size:12px; font-weight:600;">⬇ 立即拉取</button>
+            <button onclick="cloudPush(false); document.getElementById('syncDetailsOverlay').remove();" style="flex:1; padding:8px 14px; border:1px solid var(--accent-deep); background:var(--accent-deep); color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12px; font-weight:600;">⬆ 立即推送</button>
+            <button onclick="document.getElementById('syncDetailsOverlay').remove();" style="padding:8px 14px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:var(--r-sm); cursor:pointer; font-size:12px;">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const c = document.createElement('div');
+  c.innerHTML = html;
+  document.body.appendChild(c.firstElementChild);
+}
+
+// Auto-refresh the indicator's relative-time text every 15 sec
+setInterval(() => {
+  if (cloudSyncEnabled) updateSyncIndicator();
+}, 15000);
 
 async function disableCloudSync() {
   if (!confirm('确定要断开云同步吗？本地数据会保留，但不再自动推送到云端。')) return;
@@ -21406,6 +23476,250 @@ function updateCloudStatus() {
   const el = document.getElementById('cloudStatusText');
   if (!el) return;
   el.innerHTML = `<span style="color:var(--green); font-weight:600;">● 团队共享云同步已启用</span> · 所有人打开网页自动同步数据`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ANTHROPIC API KEY — local-only storage (never synced to cloud)
+// Used for AI image parsing (itinerary screenshots + passport photos).
+// ═══════════════════════════════════════════════════════════════════════════
+const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';
+
+function loadAnthropicKey() {
+  try { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ''; } catch(e) { return ''; }
+}
+
+function saveAnthropicKey() {
+  const inp = document.getElementById('s-anthropicKey');
+  const key = (inp?.value || '').trim();
+  if (!key) { toast('请输入 API Key'); return; }
+  if (!key.startsWith('sk-ant-')) {
+    toast('Key 格式不对，应以 sk-ant- 开头');
+    return;
+  }
+  try {
+    localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
+    if (inp) inp.value = '';  // clear from DOM for security
+    updateAiKeyStatus();
+    refreshAiParseZone();
+    toast('✓ API Key 已保存（仅存本设备）');
+  } catch(e) {
+    toast('保存失败：' + e.message);
+  }
+}
+
+function clearAnthropicKey() {
+  if (!confirm('确认清除 Anthropic API Key？清除后图片识别功能将不可用。')) return;
+  try { localStorage.removeItem(ANTHROPIC_KEY_STORAGE); } catch(e) {}
+  updateAiKeyStatus();
+  refreshAiParseZone();
+  toast('✓ API Key 已清除');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AI IMAGE PARSING — passport photos + itinerary screenshots
+// Model strategy:
+//   Passport → claude-haiku-4-5-20251001 (fast, cheap, structured extraction)
+//   Itinerary → claude-sonnet-4-6 (complex, varied formats need more reasoning)
+// Key stored locally only (never synced to cloud).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Compress an image File to ≤800px wide JPEG before sending to API.
+// Reduces payload from ~3MB → ~50KB, cutting latency from 5-10s to 1-2s.
+function _compressImage(file, maxPx = 800, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width  * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(blob => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          b64: reader.result.split(',')[1],
+          mediaType: 'image/jpeg',
+          origSize: file.size,
+          newSize: blob.size
+        });
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+// Show/hide the AI upload zone based on whether key is configured.
+function refreshAiParseZone() {
+  const key = loadAnthropicKey();
+  const zone = document.getElementById('aiParseZone');
+  const noKey = document.getElementById('aiParseNoKey');
+  if (zone) zone.style.display = key ? '' : 'none';
+  if (noKey) noKey.style.display = key ? 'none' : '';
+}
+
+// Set status message in the AI parse status bar
+function _aiStatus(msg, color) {
+  const el = document.getElementById('aiParseStatus');
+  if (!el) return;
+  el.style.display = msg ? '' : 'none';
+  el.style.color = color || 'var(--ink)';
+  el.textContent = msg;
+}
+
+// Main entry point — called from drop/file-input handlers
+async function handleAiImageDrop(file, mode) {
+  if (!file) return;
+  const key = loadAnthropicKey();
+  if (!key) { toast('请先在设置里配置 Anthropic API Key'); return; }
+  if (!file.type.startsWith('image/')) { toast('请上传图片文件（JPG/PNG/WEBP）'); return; }
+
+  _aiStatus(`🔄 压缩图片中…`);
+  let imgData;
+  try {
+    // Compress before sending — biggest single performance win
+    imgData = await _compressImage(file);
+    const saved = Math.round((1 - imgData.newSize / imgData.origSize) * 100);
+    _aiStatus(`🔄 正在识别${mode === 'passport' ? '护照' : '行程'}… (压缩 ${saved}%，${Math.round(imgData.newSize/1024)}KB)`);
+  } catch(e) {
+    // Compression failed — fall back to raw file
+    const reader = new FileReader();
+    const b64 = await new Promise((res, rej) => {
+      reader.onload = () => res(reader.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+    imgData = { b64, mediaType: file.type || 'image/jpeg', origSize: file.size, newSize: file.size };
+    _aiStatus(`🔄 正在识别${mode === 'passport' ? '护照' : '行程'}…`);
+  }
+
+  try {
+    if (mode === 'passport') await _aiParsePassport(key, imgData.b64, imgData.mediaType);
+    else await _aiParseItinerary(key, imgData.b64, imgData.mediaType);
+  } catch(e) {
+    _aiStatus(`❌ 识别失败：${e.message}`, 'var(--red)');
+  }
+}
+
+// Parse a passport image → extract passenger info → add to current order.
+// Uses Haiku: structured field extraction doesn't need Sonnet reasoning.
+async function _aiParsePassport(key, b64, mediaType) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+          { type: 'text', text: 'Extract passport data. Reply ONLY with JSON, no markdown:\n{"surname":"ZHANG","given":"WEI","dob":"01JAN90","gender":"MALE","passport_no":"E12345678","expiry":"01JAN30"}\ndob/expiry format: DDMMMYY. gender: MALE or FEMALE. Empty string if unclear.' }
+        ]
+      }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API ${res.status}`);
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  let parsed;
+  try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); }
+  catch(e) { throw new Error('AI 返回格式异常，请重试'); }
+
+  const { surname, given, dob, gender, passport_no, expiry } = parsed;
+  if (!surname && !given) throw new Error('未能识别姓名，请确保图片清晰');
+
+  const name = `${(surname||'').toUpperCase()}/${(given||'').toUpperCase()}`;
+  const o = curr();
+  if (!o) return;
+  const existing = o.passengers.find(p => p.name === name);
+  if (existing) {
+    if (!existing.dob && dob) existing.dob = dob;
+    if (!existing.gender && gender) existing.gender = gender;
+    if (!existing.passport && passport_no) existing.passport = passport_no;
+    if (!existing.passportExpiry && expiry) existing.passportExpiry = expiry;
+  } else {
+    o.passengers.push({ name, gender: gender||'', dob: dob||'', passport: passport_no||'', passportExpiry: expiry||'' });
+  }
+  if (surname && given) {
+    settings.knownPax = settings.knownPax || [];
+    if (!settings.knownPax.find(k => k.last === surname.toUpperCase() && k.first === given.toUpperCase())) {
+      settings.knownPax.push({ last: surname.toUpperCase(), first: given.toUpperCase(), dob: dob||'', gender: gender||'' });
+      await storageSet('ticket-organizer-settings', settings);
+      renderKnownPax();
+    }
+  }
+  renderPassengers();
+  renderPreview();
+  _aiStatus(`✓ 已识别：${name} ${dob||''} ${gender||''}${passport_no ? ' · 护照 '+passport_no : ''}`, 'var(--green)');
+  persistOrders();
+}
+
+// Parse an itinerary image → extract flight info → rawInput → auto-parse.
+// Uses Sonnet: itinerary formats are varied and need more reasoning.
+async function _aiParseItinerary(key, b64, mediaType) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 300,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
+          { type: 'text', text: 'Extract flight segments from this itinerary image. Output plain text only, one segment per line:\n<DD>月<MM>日 <CARRIER> <FLIGHT> <ORIG>-<DEST> <DEP>-<ARR>\nLast line: TOTAL CNY <AMOUNT>\nExample:\n7月15日 UA 1195 LAX-SFO 20:10-21:38\n7月15日 UA 805 SFO-ICN 23:55-04:20+2\nTOTAL CNY 24986\nUse IATA codes. +1/+2 for next day arrival. No markdown.' }
+        ]
+      }]
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API ${res.status}`);
+  }
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  if (!text) throw new Error('AI 未返回内容，请重试');
+
+  const rawInput = document.getElementById('rawInput');
+  if (rawInput) {
+    rawInput.value = text;
+    _aiStatus(`✓ 已识别行程，正在解析…`, '#1a70d6');
+    setTimeout(async () => {
+      await parsePNR();
+      _aiStatus(`✓ 行程已识别并解析完成`, 'var(--green)');
+    }, 300);
+  }
+}
+
+function updateAiKeyStatus() {
+  const el = document.getElementById('aiKeyStatusText');
+  if (!el) return;
+  const key = loadAnthropicKey();
+  if (key) {
+    const masked = key.slice(0, 12) + '••••••••' + key.slice(-4);
+    el.innerHTML = `<span style="color:#7c3aed; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${masked}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--muted);">未配置 · 配置后可上传图片自动识别</span>`;
+  }
 }
 
 async function loadCloudConfig() {
@@ -21446,7 +23760,8 @@ async function importAllData(event) {
     const data = JSON.parse(text);
     if (!data || typeof data !== 'object') throw new Error('文件格式不对');
     if (!data.settings && !data.orders) throw new Error('找不到 settings 或 orders 字段');
-    if (!confirm(`⚠️ 即将覆盖所有当前数据：\n· 待出票 ${STATE.orders.filter(o => isMeaningfulOrder(o)).length} 单\n· 已出票 ${(settings.ticketed || []).length} 单\n· 卡主 ${(settings.cardholders || []).length} 人\n\n导入后会变成文件里的数据：\n· 待出票 ${(data.orders || []).filter(o => o.passengers && o.passengers.length > 0 || o.segments && o.segments.length > 0).length} 单\n· 已出票 ${((data.settings && data.settings.ticketed) || []).length} 单\n· 卡主 ${((data.settings && data.settings.cardholders) || []).length} 人\n\n继续？`)) return;
+    const cloudWarn = cloudSyncEnabled ? '\n\n⚠ 云同步已启用 — 覆盖后会自动同步到云端，所有团队成员也会看到这份数据。' : '';
+    if (!confirm(`⚠️ 即将覆盖所有当前数据：\n· 待出票 ${STATE.orders.filter(o => isMeaningfulOrder(o)).length} 单\n· 已出票 ${(settings.ticketed || []).length} 单\n· 卡主 ${(settings.cardholders || []).length} 人\n\n导入后会变成文件里的数据：\n· 待出票 ${(data.orders || []).filter(o => o.passengers && o.passengers.length > 0 || o.segments && o.segments.length > 0).length} 单\n· 已出票 ${((data.settings && data.settings.ticketed) || []).length} 单\n· 卡主 ${((data.settings && data.settings.cardholders) || []).length} 人${cloudWarn}\n\n继续？`)) return;
     if (data.settings) {
       settings = { ...DEFAULT_SETTINGS, ...data.settings };
       if (!Array.isArray(settings.presetAgents) || settings.presetAgents.length === 0) {
@@ -21693,6 +24008,11 @@ async function mergeImportData(event) {
   // Cloud sync disabled — skip startup pull
   await loadCloudConfig();
   await loadGistConfig();
+  loadDeviceName();        // load this device's friendly name from localStorage
+  updateSyncIndicator();   // render the sync status pill in header
+  applyAllSectionStates(); // restore collapsed/expanded state of form sections
+  updateAiKeyStatus();     // show Anthropic API key status in settings
+  refreshAiParseZone();    // show/hide AI image upload zone based on key
   // Cloud sync disabled — no startup pull
 
   // Safety mechanism 3: Daily backup reminder.
