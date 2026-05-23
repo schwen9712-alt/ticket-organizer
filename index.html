@@ -232,6 +232,7 @@ body {
   font-weight: 500;
   color: var(--muted);
   white-space: nowrap;
+  flex-shrink: 0;   /* prevent tabs from compressing — let the bar scroll instead */
   transition: all var(--t-base);
   display: flex;
   align-items: center;
@@ -2702,6 +2703,23 @@ html[data-lang="en"] .zh {
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Firebase SDK v10 (modular) — Firestore for real-time multi-device sync -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, setDoc, onSnapshot,
+    enableIndexedDbPersistence
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // Expose to window for use by main app script (which is non-module)
+  window.firebaseAPI = {
+    initializeApp,
+    getFirestore, doc, getDoc, setDoc, onSnapshot,
+    enableIndexedDbPersistence
+  };
+  // Signal readiness
+  window.dispatchEvent(new Event('firebase-sdk-ready'));
+</script>
 </head>
 <body>
 <script>
@@ -2748,10 +2766,17 @@ html[data-lang="en"] .zh {
       </div>
     </div>
     <button class="btn ghost small" onclick="refreshAllOrders()" title="用最新逻辑重跑所有订单：重新解析价格/舱位/儿童/航段，并补全乘客信息" data-i18n="header.refreshLogic">🔄 用最新逻辑重跑</button>
-    <span id="syncIndicator" style="margin-left:8px;"></span>
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
+    <button id="settingsGearBtn" onclick="
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+      document.getElementById('panel-settings').classList.add('active');
+      renderRollingBackupsList(); renderOperatorsList();
+      const g=document.getElementById('settingsGearBtn');
+      g.style.background='rgba(12,27,42,0.08)'; g.style.color='var(--ink)'; g.style.borderColor='var(--ink)';
+    " title="设置" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="if(document.getElementById('panel-settings').classList.contains('active'))return; this.style.background='transparent'; this.style.color='var(--muted)'">⚙</button>
   </div>
 </header>
 
@@ -2760,12 +2785,11 @@ html[data-lang="en"] .zh {
   <button class="tab active" data-tab="new" data-i18n="tab.new">✈ 录入订单</button>
   <button class="tab" data-tab="pending"><span data-i18n="tab.pending">📋 待出票</span> <span class="count" id="draftCount">0</span></button>
   <button class="tab" data-tab="chase" style="color:#0070c9; font-weight:700;"><span data-i18n="tab.chase">💳 CHASE TRAVEL</span> <span class="count" id="chaseCount" style="background:#0070c9;">0</span></button>
-  <button class="tab" data-tab="team" id="teamTab" style="display:none;"><span data-i18n="tab.team">👥 全员</span> <span class="count" id="teamCount">0</span></button>
   <button class="tab" data-tab="ticketed"><span data-i18n="tab.ticketed">✓ 已出票</span> <span class="count" id="ticketedCount">0</span></button>
   <button class="tab" data-tab="actions"><span data-i18n="tab.actions">⚠ 处理</span> <span class="count" id="actionsCount">0</span></button>
   <button class="tab" data-tab="speed"><span data-i18n="tab.speed">📥 收单建议</span></button>
   <button class="tab" data-tab="cardholders"><span data-i18n="tab.cardholders">💳 卡主</span> <span class="count" id="cardholdersCount">0</span></button>
-  <button class="tab" data-tab="settings" data-i18n="tab.settings">⚙ 设置</button>
+  <button class="tab" data-tab="billing" id="billingTab">💰 账单 <span class="count" id="billingUnsettledCount" style="display:none; background:#e67e22;">0</span></button>
 </nav>
 
 <!-- NEW ORDER PANEL -->
@@ -2953,7 +2977,7 @@ SUN/KAILAI MS 女 28SEP08
     <!-- Show AI zone only when key is configured; otherwise show hint to configure -->
     <div id="aiParseNoKey" style="margin-bottom:10px; padding:8px 12px; background:rgba(124,58,237,0.04); border:1px solid rgba(124,58,237,0.18); border-radius:var(--r-sm); font-size:11.5px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; gap:8px;">
       <span>🤖 配置 Anthropic API Key 后可上传图片自动识别护照/行程</span>
-      <button onclick="switchTab('settings')" style="padding:3px 10px; font-size:11px; background:none; border:1px solid rgba(124,58,237,0.4); color:#7c3aed; border-radius:var(--r-sm); cursor:pointer; white-space:nowrap;">前往设置 →</button>
+      <button onclick="document.getElementById('settingsGearBtn').click()" style="padding:3px 10px; font-size:11px; background:none; border:1px solid rgba(124,58,237,0.4); color:#7c3aed; border-radius:var(--r-sm); cursor:pointer; white-space:nowrap;">前往设置 →</button>
     </div>
 
     <div class="mrz-paste-zone" style="background:#fff8e7; border:1px dashed var(--accent); border-radius:4px; padding:10px 12px; margin-bottom:10px;">
@@ -3210,11 +3234,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <div id="chasePanelContent" style="padding:0;"></div>
 </div>
 
-<!-- TEAM PANEL -->
-<div class="panel" id="panel-team">
-  <div id="teamPanelContent" style="padding:0;"></div>
-</div>
-
 <!-- TICKETED PANEL -->
 <div class="panel" id="panel-ticketed">
   <div class="section" id="monthlyExportSection" style="display:none;">
@@ -3338,6 +3357,24 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   </div>
 </div>
 
+<!-- BILLING PANEL -->
+<div class="panel" id="panel-billing">
+  <div style="padding:0 0 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div>
+      <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:var(--ink);">💰 账单</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:2px;">给卡主付款 · 向代理收款 · 仅已出票订单</div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <label style="font-size:12px; color:var(--muted); display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="billingShowSettled" onchange="renderBillingPanel()" style="accent-color:var(--accent-deep);">
+        显示已结算
+      </label>
+      <button class="btn small" onclick="exportBillingExcel()" style="background:var(--green); border-color:var(--green);">📊 导出 Excel</button>
+    </div>
+  </div>
+  <div id="billingContent"></div>
+</div>
+
 <!-- SETTINGS PANEL -->
 <div class="panel" id="panel-settings">
   <!-- Display preferences -->
@@ -3375,53 +3412,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     </div>
   </div>
 
-  <div class="section" style="border-left: 3px solid var(--accent);">
-    <div class="section-title"><span class="num">☁</span>CLOUD SYNC <span class="zh">云端同步（手机电脑共用一份数据）</span></div>
-    <div class="hint" style="margin-bottom:12px">
-      首次在任一设备点【创建云账号】，获得一个 Sync Key（一串字符串）。把它复制到另一台设备的这个框里，点【启用同步】。以后所有设备的数据都走云端，每次改动自动推送。
-    </div>
-    <div id="cloudSyncStatus" style="padding:10px 12px; background:var(--cream); border-radius:3px; margin-bottom:12px; font-family:'JetBrains Mono', monospace; font-size:12px;">
-      <span id="cloudStatusText">未连接</span>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">Sync Key 同步密钥</div>
-        <div class="desc">在所有设备使用同一个 Key 以实现数据共享</div>
-      </div>
-      <div style="display:flex; gap:4px;">
-        <input type="text" id="s-syncKey" placeholder="粘贴Key或点创建" style="width:200px; font-family:'JetBrains Mono', monospace; font-size:11px; padding:6px 8px;">
-        <button class="btn small" onclick="enableCloudSync()">启用</button>
-      </div>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">首次设置 · 从电脑开始</div>
-        <div class="desc">创建一个新 Key，把当前本地数据推上云（5秒）</div>
-      </div>
-      <button class="btn small" onclick="createCloudAccount()">+ 创建云账号</button>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">⬇️ 立即从云端拉取</div>
-        <div class="desc">覆盖本地数据</div>
-      </div>
-      <button class="btn small" onclick="cloudPull()">⬇️ 拉取</button>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">⬆️ 立即推送到云端</div>
-        <div class="desc">本地数据覆盖云端（开启同步后自动推送，通常不用手动点）</div>
-      </div>
-      <button class="btn small" onclick="cloudPush()">⬆️ 推送</button>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">断开云同步</div>
-        <div class="desc">停止自动推送，数据只保留在本地</div>
-      </div>
-      <button class="btn small ghost" onclick="disableCloudSync()">✕ 断开</button>
-    </div>
-  </div>
 
   <div class="section" style="border-left: 3px solid #7c3aed;">
     <div class="section-title"><span class="num" style="background:#7c3aed;">🤖</span>AI 图片识别 <span class="zh">自动解析行程图片和护照</span></div>
@@ -3446,119 +3436,79 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     </div>
   </div>
 
-  <div class="section" style="border-left: 3px solid #2da44e;">
-    <div class="section-title"><span class="num" style="background:#2da44e;">⑂</span>GITHUB GIST 版本历史备份 <span class="zh">每次出票自动存一个版本，可回滚到任意历史</span></div>
-    <div class="hint" style="margin-bottom:12px">
-      与云同步<strong>互相独立</strong>的第二条备份通道。每次出票自动推送到 GitHub Gist，每次推送会生成一个<strong>永久版本记录</strong>，可以回滚到任意历史时刻。配置步骤：<br>
-      1. 登录 <a href="https://github.com/settings/tokens" target="_blank" style="color:#2da44e;">github.com/settings/tokens</a> → Generate new token (classic) → 勾选 <code>gist</code> 权限 → 复制 Token<br>
-      2. 粘贴到下面 → 点「连接 Gist」→ 系统自动创建一个私密 Gist 并开始备份
-    </div>
-    <div id="gistStatus" style="padding:10px 12px; background:var(--cream); border-radius:3px; margin-bottom:12px; font-family:'JetBrains Mono', monospace; font-size:12px;">
-      <span id="gistStatusText">未连接</span>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">GitHub Personal Access Token</div>
-        <div class="desc">只需要 gist 权限。Token 仅存储在本地，不发送给任何第三方。</div>
-      </div>
-      <div style="display:flex; gap:4px;">
-        <input type="password" id="s-gistToken" placeholder="ghp_xxxxxxxxxxxx" style="width:220px; font-family:'JetBrains Mono', monospace; font-size:11px; padding:6px 8px;">
-        <button class="btn small" onclick="connectGist()" style="background:#2da44e; color:#fff;">连接 Gist</button>
-      </div>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">⬆️ 立即推送到 Gist</div>
-        <div class="desc">生成一个新的版本记录</div>
-      </div>
-      <button class="btn small" onclick="gistPush()" style="background:#2da44e; color:#fff;">⬆️ 推送</button>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">🕐 查看历史版本</div>
-        <div class="desc">每次出票对应一个版本，可选择恢复</div>
-      </div>
-      <button class="btn small" onclick="openGistHistory()">🕐 历史</button>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">断开 Gist 备份</div>
-        <div class="desc">停止自动推送（已有的 Gist 版本不会删除）</div>
-      </div>
-      <button class="btn small ghost" onclick="disconnectGist()">✕ 断开</button>
-    </div>
-  </div>
-
-  <div class="section" style="border-left:3px solid var(--accent-deep);">
-    <div class="section-title"><span class="num">👥</span>TEAM 团队协作 <span class="zh">共用同一个 Sync Key · 实时同步 · 按人过滤</span></div>
+  <div class="section" style="border-left: 3px solid #ff9800;">
+    <div class="section-title"><span class="num" style="background:#ff9800;">🔥</span>FIREBASE 实时同步 <span class="zh">手机/电脑/平板 实时同步同一份数据</span></div>
     <div class="hint" style="margin-bottom:12px;">
-      所有人共用同一个 <strong>Sync Key</strong>，每单自动打上录入人名字。员工只看自己录的单，老板看全部。每 60 秒自动拉取最新数据。
+      所有设备使用同一个 Firebase 项目，<strong>改动 1 秒内同步到其他设备</strong>，无需手动刷新。支持离线编辑，联网后自动同步。<br>
+      <strong>配置步骤（一次性，5分钟）：</strong><br>
+      1. 打开 <a href="https://console.firebase.google.com" target="_blank" style="color:#ff9800;">console.firebase.google.com</a> → 「创建项目」<br>
+      2. 项目创建后 → 左侧「Firestore Database」→ 「创建数据库」→ 选「测试模式」→ 选择地区（推荐 us-central1）<br>
+      3. 项目设置（齿轮图标）→ 「常规」→ 拖到底「您的应用」→ 点 <code>&lt;/&gt;</code> Web 图标 → 填昵称 → 「注册应用」<br>
+      4. 复制出现的 <code>firebaseConfig = { ... }</code> 整段内容 → 粘贴到下方输入框 → 点「保存连接」<br>
+      5. 在其他设备打开同一个网址，重复粘贴同一个 config 即可同步
     </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">我的名字</div>
-        <div class="desc">每个新录入的订单会自动标记是谁录的</div>
-      </div>
-      <div style="display:flex; gap:6px;">
-        <input type="text" id="s-myName" placeholder="张三 / 员工A / 老板" style="width:160px; padding:6px 8px;">
-        <button class="btn small" onclick="saveMyName()">保存</button>
-      </div>
+    <div id="fbSyncStatus" style="padding:8px 12px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:12px;">
+      <span id="fbStatusText">未配置</span>
     </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">视图模式</div>
-        <div class="desc">老板选「全部」，员工选「只看我的」</div>
+    <div class="setting-row" style="align-items:flex-start;">
+      <div style="flex:1;">
+        <div class="label">Firebase Config</div>
+        <div class="desc">粘贴整段 <code>const firebaseConfig = { ... }</code>，或仅 <code>{ apiKey:..., projectId:... }</code> 对象</div>
       </div>
-      <div style="display:flex; gap:6px;">
-        <select id="s-viewMode" onchange="saveViewMode(this.value)" style="padding:6px 8px;">
-          <option value="all">👁 全部订单（老板模式）</option>
-          <option value="mine">👤 只看我录入的（员工模式）</option>
-        </select>
-      </div>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">自动同步间隔</div>
-        <div class="desc">定时从云端拉取其他人的最新操作</div>
-      </div>
-      <div style="display:flex; align-items:center; gap:8px;">
-        <span id="autoSyncStatus" style="font-size:11px; color:var(--muted);">—</span>
-        <button class="btn small ghost" onclick="triggerManualSync()">立即同步</button>
+      <div style="display:flex; gap:4px; flex-direction:column;">
+        <textarea id="s-fbConfig" placeholder='{
+  apiKey: "AIza...",
+  authDomain: "xxx.firebaseapp.com",
+  projectId: "xxx",
+  ...
+}' style="width:340px; height:120px; font-size:10px; font-family:'JetBrains Mono',monospace; padding:8px; border:1.5px solid var(--line); border-radius:var(--r-sm); resize:vertical;"></textarea>
+        <div style="display:flex; gap:4px;">
+          <button class="btn small" onclick="saveFbConfig()" style="background:#ff9800; border-color:#ff9800; color:#fff; flex:1;">保存并连接</button>
+          <button class="btn small ghost" onclick="clearFbConfig()" style="color:var(--red);">断开</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div class="section">
-    <div class="section-title"><span class="num">💾</span>BACKUP <span class="zh">本地备份（JSON 导出/导入）</span></div>
-    <div class="hint" style="margin-bottom:12px">如果不想用云同步，也可以手动导出/导入 JSON 文件（微信/邮件传输）。</div>
-    <div class="setting-row">
-      <div>
-        <div class="label">📤 导出全部数据</div>
-        <div class="desc">下载 JSON 文件到本设备</div>
-      </div>
-      <button class="btn small" onclick="exportAllData()">📤 导出</button>
+  <div class="section" style="border-left: 3px solid #0f9d58;">
+    <div class="section-title"><span class="num" style="background:#0f9d58;">📊</span>GOOGLE SHEETS 实时同步 <span class="zh">每次出票自动推一行到 Google Sheet</span></div>
+    <div class="hint" style="margin-bottom:12px;">
+      每次出票后自动向 Google Sheet 追加一行（代理应收 + 卡主应付）。基于 Google Apps Script，无需 OAuth，只需部署一次。<br>
+      <strong>配置步骤：</strong><br>
+      1. 新建一个 Google Sheet（专用表格）<br>
+      2. 菜单 → <strong>扩展程序 → Apps 脚本</strong> → 粘贴下方代码 → 保存<br>
+      3. <strong>部署 → 新建部署 → 网络应用</strong>；执行身份：我；权限：所有人 → 复制网址<br>
+      4. 把网址粘贴到下方输入框 → 点「连接测试」
+    </div>
+    <div style="margin-bottom:12px;">
+      <button class="btn ghost small" onclick="showGsScriptCode()" style="border-color:#0f9d58; color:#0f9d58;">📋 复制 Apps Script 代码</button>
+    </div>
+    <div id="gsSyncStatus" style="padding:8px 12px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:12px;">
+      <span id="gsSyncStatusText">未配置</span>
     </div>
     <div class="setting-row">
       <div>
-        <div class="label">📥 从文件导入</div>
-        <div class="desc">⚠️ 会覆盖当前所有数据，请先导出备份</div>
+        <div class="label">Apps Script Web App URL</div>
+        <div class="desc">格式：https://script.google.com/macros/s/…/exec</div>
       </div>
-      <div>
-        <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importAllData(event)">
-        <button class="btn small" onclick="document.getElementById('importFileInput').click()">📥 选择文件</button>
+      <div style="display:flex; gap:4px; flex-wrap:wrap;">
+        <input type="text" id="s-gsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec"
+          style="width:320px; font-size:11px; font-family:'JetBrains Mono',monospace; padding:6px 8px;" autocomplete="off">
+        <button class="btn small" onclick="saveGsUrl()" style="background:#0f9d58; border-color:#0f9d58; color:#fff;">保存</button>
+        <button class="btn small ghost" onclick="testGsConnection()">连接测试</button>
+        <button class="btn small ghost" onclick="clearGsUrl()" style="color:var(--red);">清除</button>
       </div>
     </div>
     <div class="setting-row">
       <div>
-        <div class="label">🔀 合并导入（不覆盖现有数据）</div>
-        <div class="desc">把文件里的数据追加到当前数据后面，不删除现有</div>
+        <div class="label">补推历史出票</div>
+        <div class="desc">把已出票记录全部推送到 Sheet（已存在的会自动跳过，不会重复）</div>
       </div>
-      <div>
-        <input type="file" id="mergeFileInput" accept=".json,application/json" style="display:none" onchange="mergeImportData(event)">
-        <button class="btn small" onclick="document.getElementById('mergeFileInput').click()">🔀 合并</button>
-      </div>
+      <button class="btn small ghost" onclick="gsPushAllTicketed()">⬆ 补推全部</button>
     </div>
   </div>
+
+
 
   <div class="section">
     <div class="section-title"><span class="num">🛡</span>本地自动快照 <span class="zh">每次出票后自动保存最近 5 个完整快照</span></div>
@@ -5350,6 +5300,13 @@ function newOrder(init = {}) {
     // values on older orders are simply ignored by the sort comparator.
     linkedOrderIds: init.linkedOrderIds || [],      // IDs of manually-linked orders
     autoLinkedOrderIds: init.autoLinkedOrderIds || [], // IDs auto-linked by passenger match
+    // ── Settlement tracking ────────────────────────────────────────────────
+    // chSettled: cardholder has been paid (cardholderFee amount)
+    chSettled: !!init.chSettled,
+    chSettledAt: init.chSettledAt || null,
+    // agentSettled: agent has paid us (revenue amount)
+    agentSettled: !!init.agentSettled,
+    agentSettledAt: init.agentSettledAt || null,
     ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
     enteredBy: init.enteredBy || '',
     operator: init.operator || '',
@@ -6819,10 +6776,23 @@ document.querySelectorAll('.tab').forEach(t => {
     document.getElementById('panel-' + t.dataset.tab).classList.add('active');
     // Refresh rolling backups list when settings tab opens
     if (t.dataset.tab === 'settings') { renderRollingBackupsList(); renderOperatorsList(); }
+    // Highlight gear icon when settings is active
+    const gear = document.getElementById('settingsGearBtn');
+    if (gear) {
+      if (t.dataset.tab === 'settings') {
+        gear.style.background = 'rgba(12,27,42,0.08)';
+        gear.style.color = 'var(--ink)';
+        gear.style.borderColor = 'var(--ink)';
+      } else {
+        gear.style.background = 'transparent';
+        gear.style.color = 'var(--muted)';
+        gear.style.borderColor = 'var(--line)';
+      }
+    }
     // Render Chase panel on demand
     if (t.dataset.tab === 'chase') renderChasePanel();
-    if (t.dataset.tab === 'team') renderTeamPanel();
     if (t.dataset.tab === 'speed') renderSpeedAnalysis();
+    if (t.dataset.tab === 'billing') renderBillingPanel();
   });
 });
 
@@ -8835,6 +8805,7 @@ function parseSingleBooking(raw) {
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
   let parsedCustomRate = undefined;
+  let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
   // Scan whole text for product discount markers (产1, 产2, etc.)
   // Highest priority — overrides all other discount sources.
@@ -8889,7 +8860,7 @@ function parseSingleBooking(raw) {
     '迈阿密':'MIA','西雅图':'SEA','波士顿':'BOS','丹佛':'DEN','拉斯维加斯':'LAS',
     '波特兰':'PDX','圣地亚哥':'SAN','明尼阿波利斯':'MSP','底特律':'DTW',
     '华盛顿':'IAD','杜勒斯':'IAD','里根':'DCA','巴尔的摩':'BWI',
-    '夏威夷':'HNL','檀香山':'HNL','安克雷奇':'ANC','凤凰城':'PHX',
+    '夏威夷':'HNL','檀香山':'HNL','火奴鲁鲁':'HNL','安克雷奇':'ANC','凤凰城':'PHX',
     '盐湖城':'SLC','奥斯汀':'AUS','北京首都':'PEK','首都':'PEK','北京大兴':'PKX',
     '大兴':'PKX','北京':'PEK','上海浦东':'PVG','浦东':'PVG',
     '上海虹桥':'SHA','虹桥':'SHA','上海':'PVG','广州':'CAN','深圳':'SZX',
@@ -8966,18 +8937,20 @@ function parseSingleBooking(raw) {
   let segCarry = null;  // carries partial segment (carrier+flight+cls+date) waiting for next line's route
 
   // ── Pre-process: split lines that contain multiple segments or inline TOTAL.
-  // Common WeChat-pasted format glues 2 segments + total onto one line:
-  //   "7月15日 UA 1195 LAX-SFO 20:10-21:38 7月15日 UA 805 SFO-ICN 23:55-04:20+2 TOTAL CNY 24,986"
-  // We split on the position right BEFORE each "数字月数字日" marker (except the
-  // first) and before "TOTAL CNY/RMB/USD" so the rest of the parser sees them
-  // as separate lines.
+  // Only split a line when it contains 2+ date markers (meaning multiple segments
+  // were glued together). A single-segment line with one date is left intact.
   const expandedLines = [];
   for (const ln of lines) {
-    // Find boundaries: every "N月N日" after the first, and every "TOTAL <CUR>"
-    const splitRe = /(?=\d{1,2}月\d{1,2}日)|(?=\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b)/g;
-    const parts = ln.split(splitRe).filter(p => p && p.trim());
-    if (parts.length > 1) {
-      // Multiple segments on one line — split
+    const dateCount = (ln.match(/\d{1,2}月\d{1,2}日/g) || []).length;
+    if (dateCount >= 2) {
+      // Multiple date markers — split before each one (except the first)
+      const splitRe = /(?<=\s)(?=\d{1,2}月\d{1,2}日)/g;
+      const parts = ln.split(splitRe).filter(p => p && p.trim());
+      parts.forEach(p => expandedLines.push(p));
+    } else if (/\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b/i.test(ln)) {
+      // TOTAL on same line — split it off
+      const splitRe = /(?=\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b)/gi;
+      const parts = ln.split(splitRe).filter(p => p && p.trim());
       parts.forEach(p => expandedLines.push(p));
     } else {
       expandedLines.push(ln);
@@ -9015,6 +8988,21 @@ function parseSingleBooking(raw) {
     if (partialSeg) {
       segCarry = { carrier: partialSeg[1].toUpperCase(), flight: partialSeg[2], cls: partialSeg[3].toUpperCase(), date: partialSeg[4].toUpperCase() };
       continue;
+    }
+
+    // ── Standalone PNR check — MUST come before coFareMatch ─────────────────
+    // Genuine PNRs are 5-8 uppercase alphanumeric chars with letters mixed in.
+    // EXCLUDE: "CO" + pure digits — those are fare amounts in Chinese booking
+    // systems (CO26642 = 运价 ¥26,642), not PNR locators.
+    if (!parsedPnr) {
+      const pnrCandidate = trimmed.match(/^([A-Z]{2}[A-Z0-9]{3,6})$/);
+      // Must have at least one letter beyond the first two (e.g. NDPYKN, HLS4RI)
+      // CO + all-digits = fare notation, skip
+      if (pnrCandidate && !/^CO\d+$/.test(pnrCandidate[1]) && /[A-Z]/.test(pnrCandidate[1].slice(2))) {
+        parsedPnr = pnrCandidate[1];
+        _d(trimmed, '🔖 PNR', parsedPnr);
+        continue;
+      }
     }
 
     // ── FIRST PRIORITY: CO fare line "CO3709", "CO3709 经济0PC", "CO7779CNY/人"
@@ -9491,16 +9479,21 @@ function parseSingleBooking(raw) {
     // ── Chinese format segment: "1. 联合航空UA771  06月04日  洛杉矶 - 北京首都  23:35出发  04:40+2到达"
     // Also: "1. UA771  06月04日  洛杉矶 - 北京首都" (no Chinese airline name)
     // Also 恒途: "1. AS1352  06月03日(星期三)  洛杉矶T6 - 圣何塞胡安　圣玛利亚M  16:40  23:33"
+    // Also bare dot: ". UA869  07月02日  旧金山I - 香港T1  13:45  18:55+1" (no leading digit)
     const cnSeg = trimmed.match(
+      /^\s*(?:\d+\.)?\s*\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
+    ) || trimmed.match(
       /^\s*\d+\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
     );
     if (cnSeg) {
       const carrier = cnSeg[1];
       const flight = cnSeg[2];
       const date = cnDateToIATA(cnSeg[3], cnSeg[4]);
-      // Strip terminal suffix (single letter/digit at end, e.g. "T6", "B", "M")
-      const fromRaw = cnSeg[5].replace(/\s*[A-Z\d]\s*$/i, '').trim();
-      const toRaw   = cnSeg[6].replace(/\s*[A-Z\d]\s*$/i, '').trim();
+      // Strip terminal suffix: "T2", "T3", "T6", "B", "M" etc.
+      // Pattern: optional letter followed by optional digits at end, e.g. T2, T3, B, M
+      // Use greedy strip of "[letter][digits]" at end, not just one char.
+      const fromRaw = cnSeg[5].replace(/\s*[A-Z]\d*\s*$/i, '').trim();
+      const toRaw   = cnSeg[6].replace(/\s*[A-Z]\d*\s*$/i, '').trim();
       const from = cnCityToIATA(fromRaw) || cnCityToIATA(cnSeg[5].trim());
       const to   = cnCityToIATA(toRaw)   || cnCityToIATA(cnSeg[6].trim());
       const depTime = cnSeg[7];
@@ -10100,6 +10093,7 @@ function parseSingleBooking(raw) {
     cabin: parsedCabin ?? null,
     paxPrices: parsedPaxPrices ?? null,
     customRate: parsedCustomRate ?? null,
+    pnr: parsedPnr || null,
     productDiscount, productMarker, productNote,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
@@ -10399,6 +10393,8 @@ async function parsePNR() {
     }
     // Store raw PNR text for future re-parsing with updated logic
     o.rawPnr = bookingText;
+    // Use PNR extracted by parser if not already set from form/context
+    if (!o.pnr && primary.pnr) o.pnr = primary.pnr;
     if (o.rmb && !o.usd) {
       const r = settings.rate;
       o.usd = parseFloat((o.rmb / r).toFixed(2));
@@ -13254,6 +13250,11 @@ async function doMergeOrders(targetIdx) {
     }
     // If target has no screenshot, take source's
     if (!target.screenshotUrl && src.screenshotUrl) target.screenshotUrl = src.screenshotUrl;
+    // Inherit 表 Y — if any merging order is Y, the combined order is Y.
+    // The 9折 deal applies to all passengers in the booking.
+    if (src.isTableY && !target.isTableY) {
+      applyTableY(target);
+    }
   }
 
   // Recalculate paxPrices if applicable
@@ -14023,14 +14024,18 @@ function doSplitOrder(idx) {
       basePrice: source.basePrice,
       discount: source.discount,
       paxPrices: (Array.isArray(paxPricesSubset) && paxPricesSubset.length > 0) ? paxPricesSubset.slice() : null,
-      usd: null,  // recomputed below
-      rmb: null,  // recomputed below
+      usd: null,
+      rmb: null,
       isSpecialDiscount: !!source.isSpecialDiscount,
       specialDiscountNote: source.specialDiscountNote || '',
       proposals: deepCopy(source.proposals) || [],
       selectedProposalIdx: source.selectedProposalIdx || 0,
       cardholderId: keepCardholder ? source.cardholderId : null,
-      rawPnr: source.rawPnr || ''
+      rawPnr: source.rawPnr || '',
+      // Inherit 表 Y — a split order is still part of the same 9折 deal
+      isTableY: !!source.isTableY,
+      _preY_discount: source._preY_discount != null ? source._preY_discount : null,
+      discountManuallyOverridden: !!source.discountManuallyOverridden
     });
     // Recompute rmb/usd. If paxPrices present, use Σ(prices) × discount;
     // otherwise fall back to basePrice × discount × paxCount.
@@ -18089,7 +18094,7 @@ async function _confirmQuickTicket(idx) {
 
   // After ticketing, find the order that was just moved to ticketed
   // and show a two-button copy panel for client + internal reports.
-  const ticketed = STATE.ticketed || [];
+  const ticketed = settings.ticketed || [];
   const justTicketed = ticketed.length > 0 ? ticketed[ticketed.length - 1] : null;
   if (!justTicketed) return;
 
@@ -18367,8 +18372,6 @@ async function markAllTicketed() {
 
   // SAFETY: Rolling local backup + immediate cloud push after batch ticketing
   await saveRollingBackup(`批量出票 ${toSave.length} 单`);
-  if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
-  if (gistToken) gistPush(true);
 
   STATE.orders = [newOrder()];
   STATE.currentIdx = 0;
@@ -18817,8 +18820,6 @@ async function submitManualTicket(btn) {
   settings.ticketed.unshift(entry);
   await storageSet('ticket-organizer-settings', settings);
   await saveRollingBackup(`手动补录 ${pnr || paxRaw.split('\n')[0]}`);
-  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true);
-  if (typeof gistPush === 'function' && gistToken) gistPush(true);
 
   btn.closest('.verify-modal-overlay').remove();
   renderTicketed();
@@ -18982,7 +18983,6 @@ async function loadTeamConfig() {
   if (modeEl) modeEl.value = _teamConfig.viewMode || 'all';
   // Start auto-sync if Sync Key is set
   startAutoSync();
-  renderTeamPanel();
 }
 
 function saveTeamConfigLocal() {
@@ -19028,7 +19028,6 @@ function tagOrderWithUser(o) {
 let _syncFailCount = 0;
 function startAutoSync() {
   if (_autoSyncTimer) clearInterval(_autoSyncTimer);
-  if (!cloudSyncKey) return;
   _autoSyncTimer = setInterval(() => {
     if (!document.hidden) silentCloudSync();
   }, 60000);
@@ -19038,7 +19037,6 @@ function startAutoSync() {
 function updateSyncStatus() {
   const el = document.getElementById('autoSyncStatus');
   if (!el) return;
-  if (!cloudSyncKey) { el.textContent = '未设置 Sync Key'; return; }
   if (_lastSyncAt) {
     const ago = Math.round((Date.now() - _lastSyncAt) / 1000);
     const failNote = _syncFailCount > 0 ? ` · ⚠ 连续失败${_syncFailCount}次` : '';
@@ -19049,9 +19047,7 @@ function updateSyncStatus() {
 }
 
 async function silentCloudSync() {
-  if (!cloudSyncKey) return;
   try {
-    await cloudPull(true);
     _lastSyncAt = Date.now();
     _syncFailCount = 0;
     updateSyncStatus();
@@ -19063,92 +19059,322 @@ async function silentCloudSync() {
 }
 
 async function triggerManualSync() {
-  if (!cloudSyncKey) { toast('请先设置 Sync Key'); return; }
   toast('⏳ 正在同步…');
   await silentCloudSync();
   toast('✓ 同步完成');
 }
 
 // Team panel — shows who entered what
-function renderTeamPanel() {
-  const container = document.getElementById('teamPanelContent');
-  if (!container) return;
+// ═══════════════════════════════════════════════════════════════════════════
+// BILLING PANEL — 账单视图
+// Shows two tables from ticketed orders only:
+//   1. 代理应收 — what each agent owes us (revenue = basePrice × discount%)
+//   2. 卡主应付 — what we owe each cardholder (cardholderFee in USD → RMB)
+// Each row has a "已结算 ✓" toggle stored on the order object.
+// ═══════════════════════════════════════════════════════════════════════════
+function renderBillingPanel() {
+  const el = document.getElementById('billingContent');
+  if (!el) return;
+  const showSettled = document.getElementById('billingShowSettled')?.checked;
+  const rate = settings.rate || 7.25;
+  const ticketed = settings.ticketed || [];
 
-  const all = STATE.orders.filter(o => isMeaningfulOrder(o));
-
-  // Group by enteredBy
-  const byPerson = {};
-  all.forEach(o => {
-    const name = o.enteredBy || '（未标记）';
-    if (!byPerson[name]) byPerson[name] = [];
-    byPerson[name].push(o);
-  });
-
-  const myName = _teamConfig.myName || '';
-  const names = Object.keys(byPerson).sort((a, b) => {
-    if (a === myName) return -1;
-    if (b === myName) return 1;
-    return a.localeCompare(b);
-  });
-
-  if (names.length === 0) {
-    container.innerHTML = `<div style="text-align:center;padding:48px;color:var(--muted);">
-      <div style="font-size:36px;margin-bottom:12px;">👥</div>
-      <div style="font-weight:700;margin-bottom:6px;">暂无订单</div>
-      <div style="font-size:12px;">录入订单后，会按录入人分组显示在这里</div>
-    </div>`;
-    return;
+  // ── 代理应收 ──────────────────────────────────────────────────────────────
+  const agentMap = {};
+  for (const o of ticketed) {
+    if (!showSettled && o.agentSettled) continue;
+    const agent = o.agent || '未知代理';
+    if (!agentMap[agent]) agentMap[agent] = [];
+    agentMap[agent].push(o);
   }
 
-  const totalPending = all.length;
-  const lastSync = _lastSyncAt ? new Date(_lastSyncAt).toLocaleTimeString('zh-CN') : '—';
+  // ── 卡主应付 ──────────────────────────────────────────────────────────────
+  const chMap = {};
+  for (const o of ticketed) {
+    if (!showSettled && o.chSettled) continue;
+    if (!o.cardholderId) continue;
+    const ch = (settings.cardholders || []).find(c => c.id === o.cardholderId);
+    const name = ch?.name || o.cardholderId;
+    if (!chMap[name]) chMap[name] = [];
+    chMap[name].push(o);
+  }
 
-  let html = `
-    <div style="background:var(--ink);color:#fff;border-radius:6px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <div>
-        <div style="font-size:13px;font-weight:700;letter-spacing:0.05em;margin-bottom:2px;">👥 全员待出票 · 共 ${totalPending} 单</div>
-        <div style="font-size:11px;opacity:0.6;">上次同步：${lastSync} · <span onclick="triggerManualSync()" style="cursor:pointer;text-decoration:underline;">立即同步</span></div>
+  const fmtRmb = (n) => n ? `¥${Math.round(n).toLocaleString()}` : '—';
+  const fmtUsd = (n) => n ? `$${Number(n).toFixed(2)}` : '—';
+  const dateStr = (ts) => ts ? new Date(ts).toLocaleDateString('zh-CN') : '—';
+
+  const rowStyle = (settled) => settled
+    ? 'opacity:0.45; background:#f8f8f8;'
+    : '';
+
+  const buildAgentTable = (agent, orders) => {
+    const total = orders.reduce((s, o) => {
+      const rev = computeFinalPrice(o) || 0;
+      return s + rev;
+    }, 0);
+    const allSettled = orders.every(o => o.agentSettled);
+    const rows = orders.map((o, i) => {
+      const idx = settings.ticketed.indexOf(o);
+      const rev = computeFinalPrice(o) || 0;
+      const pax = (o.passengers||[]).map(p=>p.name).join('、') || '—';
+      const route = (o.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
+      const ticketedDate = dateStr(o.ticketedAt);
+      const settled = !!o.agentSettled;
+      return `<tr style="${rowStyle(settled)}">
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">${o.pnr||o.tkt||'—'}</td>
+        <td style="padding:8px 10px; font-size:12px;">${pax}</td>
+        <td style="padding:8px 10px; font-size:12px; color:var(--muted);">${route||'—'}</td>
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:12px;">${o.airline||'—'}</td>
+        <td style="padding:8px 10px; font-size:11px; color:var(--muted);">${ticketedDate}</td>
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); text-align:right;">${fmtRmb(rev)}</td>
+        <td style="padding:8px 10px; text-align:center;">
+          <button onclick="toggleAgentSettled('ticketed', ${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid; ${settled ? 'background:#e8f5e9; border-color:var(--green); color:var(--green);' : 'background:var(--cream); border-color:var(--line); color:var(--muted);'}">${settled ? '✓ 已收款' : '未收款'}</button>
+          ${settled && o.agentSettledAt ? `<div style="font-size:9px; color:var(--muted); margin-top:2px;">${dateStr(o.agentSettledAt)}</div>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      <div style="margin-bottom:20px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; padding:8px 12px; background:var(--ink); color:#fff; border-radius:var(--r-sm) var(--r-sm) 0 0;">
+          <span style="font-weight:700; font-size:14px;">代理 ${escapeHtml(agent)}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:13px;">${orders.length} 单 · 应收合计 <strong>${fmtRmb(total)}</strong></span>
+          ${!allSettled ? `<button onclick="markAllAgentSettled('${escapeAttr(agent)}')" style="padding:3px 10px; font-size:11px; font-weight:700; background:var(--green); border:none; color:#fff; border-radius:20px; cursor:pointer; margin-left:10px;">全部标为已收</button>` : ''}
+        </div>
+        <table style="width:100%; border-collapse:collapse; border:1px solid var(--line); border-top:none;">
+          <thead><tr style="background:var(--cream); font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:0.06em;">
+            <th style="padding:6px 10px; text-align:left;">编码/票号</th>
+            <th style="padding:6px 10px; text-align:left;">乘客</th>
+            <th style="padding:6px 10px; text-align:left;">航路</th>
+            <th style="padding:6px 10px; text-align:left;">航司</th>
+            <th style="padding:6px 10px; text-align:left;">出票日</th>
+            <th style="padding:6px 10px; text-align:right;">应收金额</th>
+            <th style="padding:6px 10px; text-align:center;">状态</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const buildChTable = (chName, orders) => {
+    const totalUsd = orders.reduce((s, o) => s + (o.cardholderFee || 0), 0);
+    const totalRmb = totalUsd * rate;
+    const allSettled = orders.every(o => o.chSettled);
+    const rows = orders.map((o) => {
+      const idx = settings.ticketed.indexOf(o);
+      const pax = (o.passengers||[]).map(p=>p.name).join('、') || '—';
+      const route = (o.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
+      const ticketedDate = dateStr(o.ticketedAt);
+      const settled = !!o.chSettled;
+      return `<tr style="${rowStyle(settled)}">
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">${o.pnr||o.tkt||'—'}</td>
+        <td style="padding:8px 10px; font-size:12px;">${pax}</td>
+        <td style="padding:8px 10px; font-size:12px; color:var(--muted);">${route||'—'}</td>
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:12px;">${o.airline||'—'}</td>
+        <td style="padding:8px 10px; font-size:11px; color:var(--muted);">${ticketedDate}</td>
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--muted); text-align:right;">${fmtUsd(o.cardholderFee)}</td>
+        <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); text-align:right;">${fmtRmb((o.cardholderFee||0)*rate)}</td>
+        <td style="padding:8px 10px; text-align:center;">
+          <button onclick="toggleChSettled('ticketed', ${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid; ${settled ? 'background:#e8f5e9; border-color:var(--green); color:var(--green);' : 'background:var(--cream); border-color:var(--line); color:var(--muted);'}">${settled ? '✓ 已付款' : '未付款'}</button>
+          ${settled && o.chSettledAt ? `<div style="font-size:9px; color:var(--muted); margin-top:2px;">${dateStr(o.chSettledAt)}</div>` : ''}
+        </td>
+      </tr>`;
+    }).join('');
+    return `
+      <div style="margin-bottom:20px;">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; padding:8px 12px; background:linear-gradient(135deg, #1a6e3a, #0f4224); color:#fff; border-radius:var(--r-sm) var(--r-sm) 0 0;">
+          <span style="font-weight:700; font-size:14px;">卡主 ${escapeHtml(chName)}</span>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:13px;">${orders.length} 单 · 应付合计 ${fmtUsd(totalUsd)} ≈ <strong>${fmtRmb(totalRmb)}</strong></span>
+          ${!allSettled ? `<button onclick="markAllChSettled('${escapeAttr(chName)}')" style="padding:3px 10px; font-size:11px; font-weight:700; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.4); color:#fff; border-radius:20px; cursor:pointer; margin-left:10px;">全部标为已付</button>` : ''}
+        </div>
+        <table style="width:100%; border-collapse:collapse; border:1px solid var(--line); border-top:none;">
+          <thead><tr style="background:var(--cream); font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:0.06em;">
+            <th style="padding:6px 10px; text-align:left;">编码/票号</th>
+            <th style="padding:6px 10px; text-align:left;">乘客</th>
+            <th style="padding:6px 10px; text-align:left;">航路</th>
+            <th style="padding:6px 10px; text-align:left;">航司</th>
+            <th style="padding:6px 10px; text-align:left;">出票日</th>
+            <th style="padding:6px 10px; text-align:right;">美金</th>
+            <th style="padding:6px 10px; text-align:right;">应付(RMB)</th>
+            <th style="padding:6px 10px; text-align:center;">状态</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  };
+
+  const agentAgents = Object.keys(agentMap);
+  const chNames = Object.keys(chMap);
+
+  let html = '';
+
+  // ── Unsettled totals banner ──────────────────────────────────────────────
+  const totalAgentUnsettled = (settings.ticketed||[]).filter(o=>!o.agentSettled)
+    .reduce((s,o) => s + (computeFinalPrice(o)||0), 0);
+  const totalChUnsettled = (settings.ticketed||[]).filter(o=>!o.chSettled && o.cardholderId)
+    .reduce((s,o) => s + (o.cardholderFee||0)*rate, 0);
+  html += `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+      <div style="padding:16px 20px; background:linear-gradient(135deg,rgba(12,27,42,0.06),rgba(12,27,42,0.02)); border:1.5px solid var(--line); border-left:4px solid var(--ink); border-radius:var(--r-md);">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:var(--muted); margin-bottom:6px;">代理未收款合计</div>
+        <div style="font-family:'Fraunces',serif; font-size:28px; font-weight:700; color:var(--ink);">${fmtRmb(totalAgentUnsettled)}</div>
       </div>
-      <div style="font-size:12px;opacity:0.7;">当前模式：${_teamConfig.viewMode === 'mine' ? '👤 只看我的' : '👁 全部'}</div>
+      <div style="padding:16px 20px; background:linear-gradient(135deg,rgba(30,110,58,0.06),rgba(30,110,58,0.02)); border:1.5px solid var(--line); border-left:4px solid var(--green); border-radius:var(--r-md);">
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:var(--muted); margin-bottom:6px;">卡主未付款合计</div>
+        <div style="font-family:'Fraunces',serif; font-size:28px; font-weight:700; color:#1a6e3a;">${fmtRmb(totalChUnsettled)}</div>
+      </div>
     </div>`;
 
-  names.forEach(name => {
-    const orders = byPerson[name];
-    const isMe = name === myName;
-    html += `
-      <div style="border:1px solid var(--line);border-radius:6px;margin-bottom:10px;overflow:hidden;">
-        <div style="background:${isMe ? 'var(--accent-deep)' : 'var(--cream)'};padding:9px 16px;display:flex;align-items:center;gap:8px;">
-          <span style="font-weight:700;font-size:13px;color:${isMe ? '#fff' : 'var(--ink)'};">${escapeHtml(name)}${isMe ? ' ★' : ''}</span>
-          <span style="font-size:12px;color:${isMe ? 'rgba(255,255,255,0.7)' : 'var(--muted)'};">${orders.length} 单待出票</span>
-        </div>
-        <div style="padding:8px 12px;">`;
+  if (agentAgents.length > 0) {
+    html += `<div style="font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--muted); margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--line);">📥 向代理应收</div>`;
+    agentAgents.forEach(agent => { html += buildAgentTable(agent, agentMap[agent]); });
+  } else {
+    html += `<div style="padding:20px; text-align:center; color:var(--muted); font-size:12px; margin-bottom:20px;">✓ 所有代理款项已结清</div>`;
+  }
 
-    orders.forEach(o => {
-      const pax = (o.passengers||[]).map(p => (p.name||'').split('/')[0]).filter(Boolean).join('/');
-      const seg0 = (o.segments||[])[0];
-      const segN = o.segments && o.segments[o.segments.length-1];
-      const route = seg0 ? `${seg0.from}→${(segN||seg0).to}` : '';
-      const price = o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '';
-      const originalIdx = STATE.orders.indexOf(o);
-      html += `<div onclick="scrollToOrderById('${escapeAttr(o.id)}')"
-        style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#f9f9f9;border-radius:3px;margin-bottom:3px;font-size:12px;cursor:pointer;"
-        onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#f9f9f9'">
-        <span>${o.waitingForRelease ? '🔒 ' : ''}${escapeHtml(pax||'—')}
-          <span style="color:var(--muted);font-size:10px;margin-left:4px;">${escapeHtml(o.airline||'')} ${escapeHtml(route)}</span>
-        </span>
-        <span style="font-weight:700;color:var(--accent-deep);flex-shrink:0;">${escapeHtml(price)}</span>
-      </div>`;
-    });
+  if (chNames.length > 0) {
+    html += `<div style="font-size:11px; font-weight:700; letter-spacing:0.1em; color:var(--muted); margin:24px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line);">💳 向卡主应付</div>`;
+    chNames.forEach(name => { html += buildChTable(name, chMap[name]); });
+  } else {
+    html += `<div style="padding:20px; text-align:center; color:var(--muted); font-size:12px;">✓ 所有卡主款项已结清</div>`;
+  }
 
-    html += `</div></div>`;
+  el.innerHTML = html;
+
+  // Update badge count
+  const unsettledCount = (settings.ticketed||[]).filter(o => !o.agentSettled || (!o.chSettled && o.cardholderId)).length;
+  const badge = document.getElementById('billingUnsettledCount');
+  if (badge) {
+    badge.style.display = unsettledCount > 0 ? '' : 'none';
+    badge.textContent = unsettledCount;
+  }
+}
+
+function toggleAgentSettled(list, idx) {
+  const o = STATE[list]?.[idx];
+  if (!o) return;
+  o.agentSettled = !o.agentSettled;
+  o.agentSettledAt = o.agentSettled ? Date.now() : null;
+  persistOrders();
+  // Sync settled status to Google Sheets
+  if (o.agentSettled && o.id) {
+    const url = loadGsUrl();
+    if (url) fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'settled', subtype:'agent', orderId:o.id,
+        settledDate: new Date(o.agentSettledAt).toLocaleDateString('zh-CN') })
+    }).catch(()=>{});
+  }
+  renderBillingPanel();
+}
+
+function toggleChSettled(list, idx) {
+  const o = STATE[list]?.[idx];
+  if (!o) return;
+  o.chSettled = !o.chSettled;
+  o.chSettledAt = o.chSettled ? Date.now() : null;
+  persistOrders();
+  // Sync settled status to Google Sheets
+  if (o.chSettled && o.id) {
+    const url = loadGsUrl();
+    if (url) fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ type:'settled', subtype:'cardholder', orderId:o.id,
+        settledDate: new Date(o.chSettledAt).toLocaleDateString('zh-CN') })
+    }).catch(()=>{});
+  }
+  renderBillingPanel();
+}
+
+function markAllAgentSettled(agent) {
+  const now = Date.now();
+  (settings.ticketed || []).forEach(o => {
+    if ((o.agent || '未知代理') === agent && !o.agentSettled) {
+      o.agentSettled = true;
+      o.agentSettledAt = now;
+    }
+  });
+  persistOrders();
+  renderBillingPanel();
+  toast(`✓ 代理 ${agent} 所有款项已标为已收`);
+}
+
+function markAllChSettled(chName) {
+  const now = Date.now();
+  const rate = settings.rate || 7.25;
+  (settings.ticketed || []).forEach(o => {
+    const ch = (settings.cardholders || []).find(c => c.id === o.cardholderId);
+    const name = ch?.name || o.cardholderId;
+    if (name === chName && !o.chSettled) {
+      o.chSettled = true;
+      o.chSettledAt = now;
+    }
+  });
+  persistOrders();
+  renderBillingPanel();
+  toast(`✓ 卡主 ${chName} 所有款项已标为已付`);
+}
+
+function exportBillingExcel() {
+  if (typeof XLSX === 'undefined') { toast('SheetJS 未加载，请检查网络'); return; }
+  const rate = settings.rate || 7.25;
+  const ticketed = settings.ticketed || [];
+  const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString('zh-CN') : '';
+
+  // Sheet 1: 代理应收
+  const agentHeaders = ['代理', '编码/票号', '乘客', '航路', '航司', '舱位', '出票日期', '应收金额(RMB)', '状态', '结算日期'];
+  const agentRows = ticketed.map(o => {
+    const rev = computeFinalPrice(o) || 0;
+    const pax = (o.passengers||[]).map(p=>p.name).join('、');
+    const route = (o.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
+    return [
+      o.agent || '',
+      o.pnr || o.tkt || '',
+      pax,
+      route,
+      o.airline || '',
+      o.cabin || '',
+      fmtDate(o.ticketedAt),
+      Math.round(rev),
+      o.agentSettled ? '已收款' : '未收款',
+      fmtDate(o.agentSettledAt)
+    ];
   });
 
-  container.innerHTML = html;
+  // Sheet 2: 卡主应付
+  const chHeaders = ['卡主', '编码/票号', '乘客', '航路', '航司', '出票日期', '费用(USD)', '费用(RMB)', '状态', '结算日期'];
+  const chRows = ticketed.filter(o => o.cardholderId).map(o => {
+    const ch = (settings.cardholders || []).find(c => c.id === o.cardholderId);
+    const chName = ch?.name || o.cardholderId;
+    const usd = o.cardholderFee || 0;
+    const pax = (o.passengers||[]).map(p=>p.name).join('、');
+    const route = (o.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
+    return [
+      chName,
+      o.pnr || o.tkt || '',
+      pax,
+      route,
+      o.airline || '',
+      fmtDate(o.ticketedAt),
+      Number(usd.toFixed(2)),
+      Math.round(usd * rate),
+      o.chSettled ? '已付款' : '未付款',
+      fmtDate(o.chSettledAt)
+    ];
+  });
 
-  // Update badge
-  const badge = document.getElementById('teamCount');
-  if (badge) badge.textContent = totalPending;
+  const wb = XLSX.utils.book_new();
+
+  const ws1 = XLSX.utils.aoa_to_sheet([agentHeaders, ...agentRows]);
+  ws1['!cols'] = [{wch:12},{wch:14},{wch:20},{wch:16},{wch:8},{wch:8},{wch:12},{wch:16},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws1, '代理应收');
+
+  const ws2 = XLSX.utils.aoa_to_sheet([chHeaders, ...chRows]);
+  ws2['!cols'] = [{wch:14},{wch:14},{wch:20},{wch:16},{wch:8},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, ws2, '卡主应付');
+
+  const date = new Date().toLocaleDateString('zh-CN').replace(/\//g,'-');
+  XLSX.writeFile(wb, `账单-${date}.xlsx`);
+  toast(`✓ 账单已导出：代理应收 ${agentRows.length} 单 · 卡主应付 ${chRows.length} 单`);
 }
+
 
 // Expose viewMode filter to renderPendingList
 function getViewModeFilter() {
@@ -21007,8 +21233,6 @@ async function mergeCardholders(keepId, removeId, overlay) {
 
   await storageSet('ticket-organizer-settings', settings);
   persistOrders();
-  if (typeof cloudPush === 'function' && cloudSyncEnabled) cloudPush(true);
-  if (typeof gistPush === 'function' && gistToken) gistPush(true);
 
   renderCardholdersList();
   if (overlay) overlay.remove();
@@ -21759,12 +21983,23 @@ async function doMarkTicketed(idx) {
     settings.ticketed.unshift(entry);
     await storageSet('ticket-organizer-settings', settings);
 
+    // Push to Google Sheets (fire-and-forget, won't block ticketing)
+    gsPushOrder(entry).catch(() => {});
+
+    // Refresh billing badge (new ticketed order = new unsettled item)
+    if (typeof renderBillingPanel === 'function') {
+      const badge = document.getElementById('billingUnsettledCount');
+      if (badge) {
+        const n = (settings.ticketed||[]).filter(o=>!o.agentSettled||(!o.chSettled&&o.cardholderId)).length;
+        badge.style.display = n > 0 ? '' : 'none';
+        badge.textContent = n;
+      }
+    }
+
     // Second rolling backup AFTER write — now captures the post-ticketed state
     await saveRollingBackup(`出票 #${idx+1} ${entry.pnr || ''}`);
 
     // Push to cloud immediately (bypass debounce)
-    if (cloudSyncEnabled && cloudSyncKey) cloudPush(true);
-    if (gistToken) gistPush(true);
 
     toast(`✓ 订单 #${idx+1} 已出票`);
     STATE.orders.splice(idx, 1);
@@ -22603,886 +22838,388 @@ async function loadPersistedOrders() {
   return false;
 }
 
-// ============================================
-// CLOUD SYNC (JSONBin.io)
-// ============================================
-// Strategy: use jsonbin.io v3. A "bin" is a JSON doc. We give each user a bin ID (called "Sync Key"
-// below) and store the same key on all their devices. Every save pushes to the bin; every load
-// can pull from the bin. No account needed — the bin ID itself IS the auth.
+// ═══════════════════════════════════════════════════════════════════════════
+// FIREBASE FIRESTORE SYNC
+// Real-time multi-device sync. All devices using the same Firebase config
+// share one document. onSnapshot pushes changes to all devices instantly.
+//
+// Setup: User creates a Firebase project, copies the config object,
+// pastes into settings → Firebase Sync section.
+// ═══════════════════════════════════════════════════════════════════════════
 
-const JSONBIN_API = 'https://api.jsonbin.io/v3/b';
-// Shared team key — hardcoded so all users auto-sync without any configuration
-const JSONBIN_MASTER_KEY = '$2a$10$keeTXj5XpCyQVOSLSNAREObkBTsF6h4EguGoFHTDfoIvAKI8OkkZG';
-const SHARED_BIN_ID = '69e49b6636566621a8cbe729';
+const FB_CONFIG_KEY = 'ticket-organizer-firebase-config';
+const FB_DOC_PATH   = 'ticket-organizer/main'; // collection/doc
 
-let cloudSyncEnabled = false;  // DISABLED — cloud sync turned off
-let cloudSyncKey = null;       // DISABLED
-let cloudPushTimer = null;
-let _initialPullComplete = true; // skip initial pull guard
+let _fb = null;              // { app, db } once initialized
+let _fbUnsubscribe = null;   // onSnapshot listener cleanup
+let _fbWriteTimer = null;    // debounce
+let _fbApplyingRemote = false; // guard against echo loops
+let _fbLastWriteAt = 0;      // timestamp of our last write (to ignore echo)
 
-async function createCloudAccount() {
-  toast('正在创建云账号...');
+function loadFbConfig() {
   try {
-    const payload = { version: 1, createdAt: Date.now(), settings: settings, orders: STATE.orders };
-    const res = await fetch(JSONBIN_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_MASTER_KEY,
-        'X-Bin-Private': 'true'
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(`服务返回 ${res.status}`);
-    const data = await res.json();
-    const binId = data.metadata && data.metadata.id;
-    if (!binId) throw new Error('未能获取 Bin ID');
-    cloudSyncKey = binId;
-    cloudSyncEnabled = true;
-    await storageSet('ticket-organizer-cloudsync', { key: binId, enabled: true });
-    document.getElementById('s-syncKey').value = binId;
-    updateCloudStatus();
-    // Show big alert so user can copy the key
-    alert(`✓ 云账号已创建！\n\n你的 Sync Key：\n${binId}\n\n请复制这个 Key，在其他设备的"Sync Key"框里粘贴，点【启用】即可共享数据。\n\n(Key 已自动填入本设备)`);
-    toast('✓ 云账号创建成功');
-  } catch (e) {
-    alert(`创建失败：${e.message}\n\n可能是网络问题或服务暂时不可用`);
+    const raw = localStorage.getItem(FB_CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function saveFbConfig() {
+  const inp = document.getElementById('s-fbConfig');
+  const txt = (inp?.value || '').trim();
+  if (!txt) { toast('请粘贴 Firebase config 对象'); return; }
+  // Parse — accept both `const firebaseConfig = {...}` and just `{...}`
+  let cfg;
+  try {
+    let cleaned = txt.replace(/^.*?=\s*/s, '').replace(/;?\s*$/, '');
+    // Use Function constructor to evaluate the object literal safely
+    cfg = (new Function('return ' + cleaned))();
+  } catch(e) {
+    toast('解析失败：' + e.message);
+    return;
+  }
+  if (!cfg.projectId || !cfg.apiKey) {
+    toast('config 缺少 projectId 或 apiKey');
+    return;
+  }
+  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
+  if (inp) inp.value = '';
+  toast('✓ Firebase 配置已保存，正在连接…');
+  updateFbStatus();
+  // Init immediately
+  fbInit().then(() => {
+    toast('✓ Firebase 连接成功，开始实时同步');
+  }).catch(e => {
+    toast('❌ Firebase 初始化失败：' + e.message);
+  });
+}
+
+function clearFbConfig() {
+  if (!confirm('确认断开 Firebase 同步？本地数据不变。')) return;
+  localStorage.removeItem(FB_CONFIG_KEY);
+  if (_fbUnsubscribe) { _fbUnsubscribe(); _fbUnsubscribe = null; }
+  _fb = null;
+  updateFbStatus();
+  toast('✓ 已断开 Firebase');
+}
+
+function updateFbStatus() {
+  const el = document.getElementById('fbStatusText');
+  if (!el) return;
+  const cfg = loadFbConfig();
+  if (!cfg) {
+    el.innerHTML = '<span style="color:var(--muted);">未配置</span>';
+  } else if (_fb) {
+    el.innerHTML = `<span style="color:#ff9800; font-weight:700;">● 实时同步中</span>  <span style="color:var(--muted);">项目: ${cfg.projectId}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--muted);">已配置 · 项目 ${cfg.projectId}（未连接）</span>`;
   }
 }
 
-async function enableCloudSync() {
-  const key = document.getElementById('s-syncKey').value.trim();
-  if (!key) { toast('请先输入 Sync Key'); return; }
-  toast('正在验证 Key...');
-  try {
-    const res = await fetch(`${JSONBIN_API}/${key}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-    });
-    if (!res.ok) throw new Error(`Key 无效或已失效（${res.status}）`);
-    const data = await res.json();
-    const record = data.record || {};
-    const hasData = record.orders || (record.settings && record.settings.ticketed && record.settings.ticketed.length);
-    const localHasData = STATE.orders.some(o => o.passengers.length > 0 || o.segments.length > 0) ||
-                        (settings.ticketed && settings.ticketed.length);
-    let mode = 'pull';
-    if (hasData && localHasData) {
-      mode = confirm(
-        `⚠️ 云端和本地都有数据：\n\n` +
-        `云端：${(record.orders || []).length}单待出票 / ${((record.settings && record.settings.ticketed) || []).length}单已出票\n` +
-        `本地：${STATE.orders.filter(o => isMeaningfulOrder(o)).length}单待出票 / ${(settings.ticketed || []).length}单已出票\n\n` +
-        `点【确定】= 用云端数据覆盖本地（跨设备场景推荐）\n` +
-        `点【取消】= 本地数据覆盖云端（首次同步推荐）`
-      ) ? 'pull' : 'push';
-    } else if (hasData) {
-      mode = 'pull';
-    } else {
-      mode = 'push';
-    }
-    cloudSyncKey = key;
-    cloudSyncEnabled = true;
-    await storageSet('ticket-organizer-cloudsync', { key, enabled: true });
-    updateCloudStatus();
-    if (mode === 'pull') {
-      await cloudPull(true);
-    } else {
-      await cloudPush(true);
-    }
-    toast(mode === 'pull' ? '✓ 已从云端拉取数据' : '✓ 已推送到云端');
-  } catch (e) {
-    alert(`启用失败：${e.message}`);
+async function fbInit() {
+  const cfg = loadFbConfig();
+  if (!cfg) return null;
+  if (_fb) return _fb;  // already initialized
+
+  // Wait for SDK if not ready
+  if (!window.firebaseAPI) {
+    await new Promise(r => window.addEventListener('firebase-sdk-ready', r, { once: true }));
   }
+  const { initializeApp, getFirestore, doc, getDoc, setDoc, onSnapshot, enableIndexedDbPersistence } = window.firebaseAPI;
+
+  const app = initializeApp(cfg);
+  const db  = getFirestore(app);
+
+  // Offline persistence (so the app works without network too)
+  try { await enableIndexedDbPersistence(db); }
+  catch(e) { /* may fail in multi-tab scenarios — ok to ignore */ }
+
+  _fb = { app, db, doc, getDoc, setDoc, onSnapshot };
+  updateFbStatus();
+
+  // Initial pull: read remote doc, if newer than local, apply
+  const docRef = doc(db, 'ticket-organizer', 'main');
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const remote = snap.data();
+      await fbApplyRemote(remote, /* isInitial */ true);
+    } else {
+      // First time — push current local state
+      await fbPushNow();
+    }
+  } catch(e) {
+    console.warn('Firebase initial pull failed:', e);
+  }
+
+  // Subscribe to live changes
+  _fbUnsubscribe = onSnapshot(docRef, (snap) => {
+    if (!snap.exists()) return;
+    const remote = snap.data();
+    // Ignore echo of our own write (within 3 seconds)
+    if (Date.now() - _fbLastWriteAt < 3000) return;
+    fbApplyRemote(remote);
+  }, (err) => {
+    console.warn('Firebase listener error:', err);
+  });
+
+  return _fb;
 }
 
-async function cloudPull(silent) {
-  if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
-  _syncStatus = 'syncing';
-  updateSyncIndicator();
+async function fbApplyRemote(remote, isInitial) {
+  if (!remote || !remote.orders) return;
+  // Skip if remote is older than what we have
+  const remoteTs = remote.updatedAt || 0;
+  const localTs  = parseInt(localStorage.getItem('ticket-organizer-last-update') || '0');
+  if (!isInitial && remoteTs <= localTs) return;
+
+  _fbApplyingRemote = true;
   try {
-    const res = await fetch(`${JSONBIN_API}/${cloudSyncKey}/latest`, {
-      headers: { 'X-Master-Key': JSONBIN_MASTER_KEY }
-    });
-    if (!res.ok) throw new Error(`拉取失败 ${res.status}`);
-    const data = await res.json();
-    const record = data.record || {};
-
-    // Extract metadata about who last pushed (added in cloudPush above)
-    if (record.lastDeviceAt) _lastCloudPushAt = record.lastDeviceAt;
-    if (record.lastDevice) _lastCloudPushBy = record.lastDevice;
-
-    // ── Skip redundant re-renders if cloud data is unchanged ──────────────
-    // The auto-pull every 60s used to blindly re-render the entire pending
-    // list, which could swap DOM nodes out from under user clicks (action
-    // buttons would seem to "miss"). If cloud updatedAt is the same as the
-    // last pull we successfully applied, skip the work entirely.
-    const cloudUpdatedAt = record.updatedAt || record.lastDeviceAt || 0;
-    if (silent && cloudUpdatedAt > 0 && cloudUpdatedAt === _lastAppliedCloudUpdatedAt) {
-      _syncStatus = 'success';
-      _lastSyncAt = Date.now();
-      _consecutiveFailures = 0;
-      updateCloudStatus();
-      updateSyncIndicator();
-      _initialPullComplete = true;
-      return;
+    if (remote.orders) {
+      STATE.orders = remote.orders;
+      STATE.currentIdx = Math.min(remote.currentIdx || 0, remote.orders.length - 1);
+      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
     }
-
-    // ── CLOUD IS SOURCE OF TRUTH ──────────────────────────────────────────
-    // Cloud data overwrites local for all fields.
-    // Exception: ticketed records are additive (union by id) to prevent
-    // losing records that were just written locally but not yet pushed.
-    const localSettings = await storageGet('ticket-organizer-settings') || {};
-    const cloudTicketed = ((record.settings && record.settings.ticketed) || []).length;
-
-    if (record.settings) {
-      const cloudSettings = { ...DEFAULT_SETTINGS, ...record.settings };
-      // Ticketed: union of cloud + local (additive only, cloud wins on conflict)
-      const localTicketedArr = (localSettings.ticketed || []);
-      const cloudTicketedArr = (cloudSettings.ticketed || []);
-      const mergedById = new Map();
-      localTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); });
-      cloudTicketedArr.forEach(t => { if (t.id) mergedById.set(t.id, t); }); // cloud overwrites local on same id
-      const mergedTicketed = [...mergedById.values()].sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
-      settings = cloudSettings; // cloud wins
-      settings.ticketed = mergedTicketed;
-      if (!Array.isArray(settings.presetAgents) || settings.presetAgents.length === 0) {
-        settings.presetAgents = [...DEFAULT_SETTINGS.presetAgents];
-      }
-      if (!Array.isArray(settings.cardholders)) settings.cardholders = [];
-      if (!Array.isArray(settings.knownPax)) settings.knownPax = [...DEFAULT_SETTINGS.knownPax];
-      if (!settings.agentDiscounts || typeof settings.agentDiscounts !== 'object') {
-        settings.agentDiscounts = { ...DEFAULT_SETTINGS.agentDiscounts };
-      }
-      runSettingsMigrations();
+    if (remote.settings) {
+      Object.assign(settings, remote.settings);
       await storageSet('ticket-organizer-settings', settings);
     }
-    if (Array.isArray(record.orders)) {
-      STATE.orders = record.orders.length > 0 ? record.orders.map(o => newOrder(o)) : [newOrder()];
-      STATE.currentIdx = 0;
-      const changed = runPendingMigrations(STATE.orders);
-      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: 0 });
-      if (changed.discount || changed.cabin) {
-        toastMigrationChanges(changed);
-      }
-    }
-    document.getElementById('s-rate').value = settings.rate;
-    document.getElementById('headerRate').textContent = settings.rate.toFixed(4);
-    loadCurrToDOM();
-    renderOrderTabs();
-    renderPreview();
-    renderAgentChips();
-    renderPresetAgentsList();
-    renderPendingBanner();
-    renderPendingList();
-    renderTicketed();
-    renderCardholdersList();
-    renderKnownPax();
-    if (!silent) toast(`✓ 已拉取 ${(record.orders || []).length}单待出票 / ${cloudTicketed}单已出票`);
-    _syncStatus = 'success';
-    _lastSyncAt = Date.now();
-    _lastSyncError = '';
-    _syncRetryCount = 0;
-    _consecutiveFailures = 0;
-    _lastAppliedCloudUpdatedAt = cloudUpdatedAt;  // remember what we just applied
-    // After a successful pull, local state matches cloud → no dirty changes
-    _syncDirtyCount = 0;
-    updateCloudStatus();
-    updateSyncIndicator();
-  } catch (e) {
-    _consecutiveFailures++;
-    _lastSyncError = e.message || String(e);
-    const cls = _classifySyncError(_lastSyncError);
-    if (cls.startsWith('hard-') || _consecutiveFailures >= 10) {
-      _syncStatus = 'error';
-    } else {
-      _syncStatus = 'offline';
-    }
-    updateSyncIndicator();
-    if (!silent) alert(`拉取失败：${_lastSyncError}`);
+    localStorage.setItem('ticket-organizer-last-update', String(remoteTs));
+    // Re-render
+    if (typeof renderPendingList === 'function') renderPendingList();
+    if (typeof syncOrderToDOM === 'function') syncOrderToDOM();
+    if (typeof renderPreview === 'function') renderPreview();
+    if (typeof updateCounts === 'function') updateCounts();
+    toast('↓ 已接收远程更新');
   } finally {
-    // Always mark initial pull as complete — even if it failed.
-    // This unblocks autoCloudPush so normal sync can resume.
-    _initialPullComplete = true;
+    _fbApplyingRemote = false;
   }
 }
 
-// Single attempt — throws on failure. Wrapped by cloudPush below for retries.
-async function _cloudPushOnce() {
+function fbScheduleWrite() {
+  if (!_fb || _fbApplyingRemote) return;
+  if (_fbWriteTimer) clearTimeout(_fbWriteTimer);
+  _fbWriteTimer = setTimeout(() => fbPushNow(), 800);  // 800ms debounce
+}
+
+async function fbPushNow() {
+  if (!_fb) return;
+  const { db, doc, setDoc } = _fb;
   const now = Date.now();
-  settings.updatedAt = now;
-  await storageSet('ticket-organizer-settings', settings);
-  // Strip screenshots from cloud payload — base64 images are too large for jsonbin
-  const ordersForCloud = STATE.orders.map(o => {
-    if (!o.screenshots || o.screenshots.length === 0) return o;
-    const { screenshots, ...rest } = o;
-    return rest;
-  });
-  const payload = {
-    version: 1,
-    updatedAt: now,
-    // Metadata for other devices: who pushed and when
-    lastDevice: _deviceName || '',
-    lastDeviceAt: now,
-    settings,
-    orders: ordersForCloud,
-  };
-  const payloadJson = JSON.stringify(payload);
-  _lastPayloadBytes = payloadJson.length;
-  // Pre-flight size check — fail fast before hitting the network
-  if (_lastPayloadBytes > 900_000) {
-    throw new Error(`数据 ${(_lastPayloadBytes / 1024).toFixed(0)}KB 超出 jsonbin.io 1MB 上限`);
-  }
-  // 10-second timeout to avoid hanging fetches (common when tab is backgrounded)
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+  _fbLastWriteAt = now;
+  localStorage.setItem('ticket-organizer-last-update', String(now));
   try {
-    const res = await fetch(`${JSONBIN_API}/${cloudSyncKey}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_MASTER_KEY
-      },
-      body: payloadJson,
-      signal: controller.signal,
+    await setDoc(doc(db, 'ticket-organizer', 'main'), {
+      orders     : STATE.orders || [],
+      currentIdx : STATE.currentIdx || 0,
+      settings   : settings || {},
+      updatedAt  : now,
+      device     : (navigator.userAgent.match(/iPhone|iPad|Android/) ? '手机' : '电脑')
     });
-    if (!res.ok) {
-      let bodyText = '';
-      try { bodyText = await res.text(); } catch (e) {}
-      throw new Error(`HTTP ${res.status}${bodyText ? ' · ' + bodyText.slice(0, 120) : ''}`);
-    }
-    return now;
-  } finally {
-    clearTimeout(timeoutId);
+  } catch(e) {
+    console.warn('Firebase push failed:', e);
   }
 }
 
-// Resilient push: tries up to 3 times in quick succession before showing
-// any error UI to the user. Network blips, brief rate-limits, and tab-
-// backgrounding pauses recover invisibly.
-async function cloudPush(silent) {
-  if (!cloudSyncKey) { toast('未设置 Sync Key'); return; }
-  _syncStatus = 'syncing';
-  updateSyncIndicator();
-
-  const QUICK_DELAYS = [0, 1500, 4000];  // attempt 1 immediate, then +1.5s, then +4s
-  let lastError = null;
-
-  for (let attempt = 0; attempt < QUICK_DELAYS.length; attempt++) {
-    if (attempt > 0) {
-      await new Promise(r => setTimeout(r, QUICK_DELAYS[attempt]));
-      _syncStatus = 'syncing';  // keep "syncing" through retries — user sees no flicker
-      updateSyncIndicator();
-    }
-    try {
-      const now = await _cloudPushOnce();
-      // SUCCESS — reset all error state
-      _syncDirtyCount = 0;
-      _syncStatus = 'success';
-      _lastSyncAt = now;
-      _lastCloudPushAt = now;
-      _lastCloudPushBy = _deviceName || '';
-      _lastAppliedCloudUpdatedAt = now;  // our own push — already locally applied
-      _lastSyncError = '';
-      _syncRetryCount = 0;
-      _consecutiveFailures = 0;
-      if (_syncRetryTimer) { clearTimeout(_syncRetryTimer); _syncRetryTimer = null; }
-      if (!silent) toast('✓ 已推送到云端');
-      updateCloudStatus();
-      updateSyncIndicator();
-      return;
-    } catch (e) {
-      lastError = e;
-      const cls = _classifySyncError(e.message);
-      // Hard errors (data too big, auth wrong) abort retry loop — no point trying again
-      if (cls.startsWith('hard-')) break;
-      // Otherwise let the loop retry
-    }
+// Hook into persistOrders / storageSet — defined after they exist
+// (called from init after firebase is set up)
+function fbHookPersistence() {
+  const origPersist = window.persistOrders;
+  if (typeof origPersist === 'function') {
+    window.persistOrders = function() {
+      const ret = origPersist.apply(this, arguments);
+      fbScheduleWrite();
+      return ret;
+    };
   }
-
-  // All retries exhausted — classify and update state
-  _consecutiveFailures++;
-  _lastSyncError = lastError ? (lastError.message || String(lastError)) : 'Unknown error';
-  const errClass = _classifySyncError(_lastSyncError);
-  if (errClass.startsWith('hard-')) {
-    // Permanent/actionable error: red
-    _syncStatus = 'error';
-    if (!silent) {
-      if (errClass === 'hard-toobig') {
-        alert(`推送失败：${_lastSyncError}\n\n建议在「设置 → 已出票」清理或归档老订单。`);
-      } else {
-        alert(`推送失败：${_lastSyncError}`);
+  // Also hook storageSet for settings changes
+  const origStorageSet = window.storageSet;
+  if (typeof origStorageSet === 'function') {
+    window.storageSet = async function(key, val) {
+      const ret = await origStorageSet(key, val);
+      if (key === 'ticket-organizer-pending' || key === 'ticket-organizer-settings') {
+        fbScheduleWrite();
       }
-    }
-  } else {
-    // Transient: soft "offline" state unless we've failed many times in a row
-    _syncStatus = _consecutiveFailures >= 10 ? 'error' : 'offline';
-    if (!silent && _syncStatus === 'error') {
-      alert(`已连续 ${_consecutiveFailures} 次同步失败：${_lastSyncError}\n\n请检查网络。本地数据已保存。`);
-    } else if (!silent) {
-      toast('暂时离线，已加入待推送队列');
-    }
+      return ret;
+    };
   }
-  updateSyncIndicator();
-  // Schedule background retry
-  scheduleSyncRetry();
 }
 
-// Exponential backoff retry. Tries to push silently until success, then stops.
-function scheduleSyncRetry() {
-  if (_syncRetryTimer) clearTimeout(_syncRetryTimer);
-  // For soft (transient) failures, retry quickly. For hard, give up scheduling.
-  if (_syncStatus === 'error' && _classifySyncError(_lastSyncError).startsWith('hard-')) {
-    return;  // no point retrying — user action required
-  }
-  const delays = [15_000, 30_000, 60_000, 120_000, 300_000];
-  const delayIdx = Math.min(_syncRetryCount, delays.length - 1);
-  const delay = delays[delayIdx];
-  _syncRetryCount++;
-  _syncRetryTimer = setTimeout(() => {
-    _syncRetryTimer = null;
-    // Only retry if we still have local dirty changes (otherwise pointless)
-    if (_syncDirtyCount > 0 && cloudSyncEnabled) {
-      cloudPush(true);
-    }
-  }, delay);
+// ═══════════════════════════════════════════════════════════════════════════
+// GOOGLE SHEETS SYNC
+// Pushes one row per ticketed order to a Google Sheet via Apps Script Web App.
+// No OAuth needed — user deploys the script themselves, we just POST JSON.
+// ═══════════════════════════════════════════════════════════════════════════
+const GS_URL_KEY = 'ticket-organizer-gs-url';
+
+function loadGsUrl() {
+  try { return localStorage.getItem(GS_URL_KEY) || ''; } catch(e) { return ''; }
 }
 
-// ============================================
-// GITHUB GIST BACKUP — version-history secondary cloud
-// Every ticketing action pushes a new Gist revision.
-// Users can browse revisions and restore any of them.
-// Storage: localStorage key 'ticket-organizer-gist' → { token, gistId }
-// ============================================
-const GIST_STORAGE_KEY = 'ticket-organizer-gist';
-const GIST_FILENAME = 'ticket_organizer_data.json';
-const GIST_API = 'https://api.github.com/gists';
-let gistToken = '';
-let gistId = '';
-
-async function loadGistConfig() {
-  try {
-    const raw = localStorage.getItem(GIST_STORAGE_KEY);
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    gistToken = cfg.token || '';
-    gistId = cfg.gistId || '';
-    if (gistToken) updateGistStatus();
-  } catch (e) { /* ignore */ }
-}
-
-function saveGistConfig() {
-  localStorage.setItem(GIST_STORAGE_KEY, JSON.stringify({ token: gistToken, gistId: gistId }));
-}
-
-function updateGistStatus() {
-  const el = document.getElementById('gistStatusText');
-  const box = document.getElementById('gistStatus');
-  if (!el) return;
-  if (!gistToken) {
-    el.textContent = '未连接';
-    if (box) box.style.background = 'var(--cream)';
+function saveGsUrl() {
+  const inp = document.getElementById('s-gsScriptUrl');
+  const url = (inp?.value || '').trim();
+  if (!url) { toast('请输入 Apps Script URL'); return; }
+  if (!url.includes('script.google.com')) {
+    toast('URL 格式不对，应包含 script.google.com');
     return;
   }
-  if (gistId) {
-    el.innerHTML = `● 已连接 · Gist ID: <a href="https://gist.github.com/${gistId}" target="_blank" style="color:#2da44e; font-family:'JetBrains Mono',monospace;">${gistId.slice(0,12)}…</a> · 自动备份已开启`;
-    if (box) box.style.background = '#e6f4ea';
-  } else {
-    el.textContent = '● Token 已填写 · 尚未创建 Gist（点「推送」自动创建）';
-    if (box) box.style.background = '#fffbe6';
-  }
-  // Show token in input masked
-  const inp = document.getElementById('s-gistToken');
-  if (inp && !inp.value) inp.placeholder = gistToken ? '●●●●●●●●●●●● (已设置)' : 'ghp_xxxxxxxxxxxx';
-}
-
-async function connectGist() {
-  const inp = document.getElementById('s-gistToken');
-  const token = (inp ? inp.value.trim() : '') || gistToken;
-  if (!token) { toast('请填写 GitHub Token'); return; }
-  if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-    if (!confirm('Token 格式看起来不对（应以 ghp_ 或 github_pat_ 开头），确定继续？')) return;
-  }
-  gistToken = token;
-  // Test the token by listing gists
   try {
-    const res = await fetch(GIST_API, {
-      headers: { 'Authorization': `token ${gistToken}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error(`Token 验证失败 ${res.status}`);
-    toast('✓ GitHub Token 验证成功，正在创建 Gist…');
-    saveGistConfig();
-    await gistPush(false);  // Create gist on first push
-    updateGistStatus();
-  } catch (e) {
-    toast(`⚠ ${e.message}`);
+    localStorage.setItem(GS_URL_KEY, url);
+    if (inp) inp.value = '';
+    updateGsSyncStatus();
+    toast('✓ Google Sheets URL 已保存');
+  } catch(e) { toast('保存失败：' + e.message); }
+}
+
+function clearGsUrl() {
+  if (!confirm('确认清除 Google Sheets 同步 URL？')) return;
+  try { localStorage.removeItem(GS_URL_KEY); } catch(e) {}
+  updateGsSyncStatus();
+  toast('✓ 已清除');
+}
+
+function updateGsSyncStatus() {
+  const el = document.getElementById('gsSyncStatusText');
+  if (!el) return;
+  const url = loadGsUrl();
+  if (url) {
+    const short = url.replace('https://script.google.com/macros/s/', '').slice(0, 20) + '…';
+    el.innerHTML = `<span style="color:#0f9d58; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${short}</span>`;
+  } else {
+    el.innerHTML = `<span style="color:var(--muted);">未配置 · 每次出票后将自动推送到 Google Sheet</span>`;
   }
 }
 
-function disconnectGist() {
-  if (!confirm('断开 Gist 备份？已有的 Gist 版本记录不会删除，只是停止自动推送。')) return;
-  gistToken = '';
-  gistId = '';
-  saveGistConfig();
-  updateGistStatus();
-  toast('已断开 Gist 备份');
+async function testGsConnection() {
+  const url = loadGsUrl();
+  if (!url) { toast('请先保存 URL'); return; }
+  try {
+    // Apps Script redirects through googleusercontent.com which blocks CORS reads.
+    // Use no-cors (opaque response) — we can't read the body, but a successful
+    // fetch means the request reached the server.
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ping' })
+    });
+    toast('✓ 请求已发送 · 请检查 Google Sheet 是否收到（或查看 Apps Script 执行日志）');
+  } catch(e) {
+    toast('❌ 网络错误：' + e.message);
+  }
 }
 
-// Build the data payload to push
-function buildGistPayload() {
-  return {
-    pushedAt: Date.now(),
-    pushedAtHuman: new Date().toLocaleString('zh-CN'),
-    ticketedCount: (settings.ticketed || []).length,
-    pendingCount: STATE.orders.filter(o => isMeaningfulOrder(o)).length,
-    settings: settings,
-    orders: STATE.orders
+// Push one ticketed order to Google Sheets (both agent + cardholder rows)
+async function gsPushOrder(order) {
+  const url = loadGsUrl();
+  if (!url || !order) return;
+  const rate = settings.rate || 7.25;
+  const pax  = (order.passengers||[]).map(p=>p.name).join('、');
+  const route = (order.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
+  const date  = order.ticketedAt ? new Date(order.ticketedAt).toLocaleDateString('zh-CN') : '';
+
+  const basePayload = {
+    orderId : order.id || '',
+    date,
+    pax,
+    route,
+    airline : order.airline || '',
+    cabin   : order.cabin || '',
+    pnr     : order.pnr || order.tkt || '',
   };
-}
 
-// Push to Gist — creates if gistId not set, updates otherwise
-async function gistPush(silent) {
-  if (!gistToken) return;
+  const fetchOpts = (body) => ({
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  // 1. Agent row
+  const rev = computeFinalPrice(order) || 0;
   try {
-    const content = JSON.stringify(buildGistPayload(), null, 2);
-    let res;
-    if (!gistId) {
-      // Create new private Gist
-      res = await fetch(GIST_API, {
-        method: 'POST',
-        headers: {
-          'Authorization': `token ${gistToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          description: `Ticket Organizer Backup — ${new Date().toLocaleDateString('zh-CN')}`,
-          public: false,
-          files: { [GIST_FILENAME]: { content } }
-        })
-      });
-      if (!res.ok) throw new Error(`创建 Gist 失败 ${res.status}`);
-      const data = await res.json();
-      gistId = data.id;
-      saveGistConfig();
-      updateGistStatus();
-      if (!silent) toast(`✓ Gist 已创建 (ID: ${gistId.slice(0,8)}…)`);
-    } else {
-      // Update existing Gist
-      res = await fetch(`${GIST_API}/${gistId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `token ${gistToken}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          description: `Ticket Organizer — ${(settings.ticketed||[]).length}单已出票 · ${new Date().toLocaleString('zh-CN')}`,
-          files: { [GIST_FILENAME]: { content } }
-        })
-      });
-      if (!res.ok) throw new Error(`推送 Gist 失败 ${res.status}`);
-      if (!silent) toast('✓ 已推送到 GitHub Gist');
-    }
-  } catch (e) {
-    if (!silent) toast(`⚠ Gist 推送失败: ${e.message}`);
-    else console.warn('Gist push error:', e);
+    await fetch(url, fetchOpts({
+      ...basePayload,
+      type    : 'agent',
+      agent   : order.agent || '',
+      amount  : Math.round(rev),
+      discount: order.discount != null ? order.discount + '%' : '',
+    }));
+  } catch(e) { /* silent */ }
+
+  // 2. Cardholder row
+  if (order.cardholderId && order.cardholderFee) {
+    const ch = (settings.cardholders||[]).find(c=>c.id===order.cardholderId);
+    try {
+      await fetch(url, fetchOpts({
+        ...basePayload,
+        type       : 'cardholder',
+        cardholder : ch?.name || order.cardholderId,
+        usd        : Number(order.cardholderFee.toFixed(2)),
+        rmb        : Math.round(order.cardholderFee * rate),
+      }));
+    } catch(e) { /* silent */ }
   }
 }
 
-// Pull latest from Gist and restore
-async function gistPull(silent) {
-  if (!gistToken || !gistId) { if (!silent) toast('未连接 Gist'); return; }
-  try {
-    const res = await fetch(`${GIST_API}/${gistId}`, {
-      headers: { 'Authorization': `token ${gistToken}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error(`拉取失败 ${res.status}`);
-    const data = await res.json();
-    const file = data.files && data.files[GIST_FILENAME];
-    if (!file) throw new Error('Gist 文件不存在');
-    const raw = file.content || (file.truncated ? await (await fetch(file.raw_url)).text() : '');
-    const payload = JSON.parse(raw);
-    await applyGistPayload(payload, silent);
-  } catch (e) {
-    if (!silent) toast(`⚠ Gist 拉取失败: ${e.message}`);
-    else console.warn('Gist pull error:', e);
+// Push all historical ticketed orders (skips existing via dedup in Apps Script)
+async function gsPushAllTicketed() {
+  const url = loadGsUrl();
+  if (!url) { toast('请先配置 Google Sheets URL'); return; }
+  const list = (settings.ticketed || []);
+  if (list.length === 0) { toast('暂无已出票记录'); return; }
+  toast(`正在推送 ${list.length} 条已出票记录…`);
+  let pushed = 0;
+  for (const o of list) {
+    await gsPushOrder(o);
+    pushed++;
   }
+  toast(`✓ 已推送 ${pushed} 条到 Google Sheets`);
 }
 
-async function applyGistPayload(payload, silent) {
-  if (payload.settings) {
-    settings = { ...DEFAULT_SETTINGS, ...payload.settings };
-    runSettingsMigrations();
-    await storageSet('ticket-organizer-settings', settings);
-  }
-  if (Array.isArray(payload.orders)) {
-    STATE.orders = payload.orders;
-    ensureDraft();
-    await persistOrdersNow();
-  }
-  loadCurrToDOM(); renderOrderTabs(); renderPreview();
-  renderPendingList(); renderPendingBanner();
-  renderTicketed(); renderCardholdersList();
-  if (!silent) {
-    const tk = (settings.ticketed || []).length;
-    const pd = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
-    toast(`✓ 已从 Gist 恢复：${tk} 单已出票 · ${pd} 单待出票`);
-  }
-}
+// Show the Apps Script code in a modal for easy copy-paste
+function showGsScriptCode() {
+  const code = `/**
+ * Ticket Organizer — Google Apps Script 收单器
+ * 部署步骤：
+ * 1. 打开 Google Sheet → 扩展程序 → Apps 脚本
+ * 2. 粘贴此代码 → 保存
+ * 3. 部署 → 新建部署 → 网络应用
+ *    执行身份：我  |  权限：所有人
+ * 4. 复制 Web 应用网址 → 粘贴到 Ticket Organizer 设置
+ */
+const AGENT_SHEET='代理应收',CH_SHEET='卡主应付';
+function doPost(e){try{const d=JSON.parse(e.postData.contents);if(d.type==='agent')return _wa(d);if(d.type==='cardholder')return _wc(d);if(d.type==='settled')return _ms(d);if(d.type==='ping')return _ok({message:'连接成功 ✓'});return _err('unknown type')}catch(err){return _err(err.toString())}}
+function doGet(){return _ok({message:'Ticket Organizer Sheets 同步器运行中 ✓'})}
+function _wa(d){const ss=SpreadsheetApp.getActiveSpreadsheet();const s=_gc(ss,AGENT_SHEET,['出票日期','代理','乘客','航路','航司','舱位','编码/票号','应收金额(RMB)','折扣%','状态','结算日期','订单ID']);if(d.orderId&&_re(s,d.orderId,12))return _ok({skipped:true});s.appendRow([d.date||'',d.agent||'',d.pax||'',d.route||'',d.airline||'',d.cabin||'',d.pnr||'',d.amount||0,d.discount||'','未收款','',d.orderId||'']);_af(s);return _ok({written:true})}
+function _wc(d){if(!d.cardholder)return _ok({skipped:'no ch'});const ss=SpreadsheetApp.getActiveSpreadsheet();const s=_gc(ss,CH_SHEET,['出票日期','卡主','乘客','航路','航司','编码/票号','费用(USD)','费用(RMB)','状态','结算日期','订单ID']);if(d.orderId&&_re(s,d.orderId,11))return _ok({skipped:true});s.appendRow([d.date||'',d.cardholder||'',d.pax||'',d.route||'',d.airline||'',d.pnr||'',d.usd||0,d.rmb||0,'未付款','',d.orderId||'']);_af(s);return _ok({written:true})}
+function _ms(d){const ss=SpreadsheetApp.getActiveSpreadsheet();const sn=d.subtype==='agent'?AGENT_SHEET:CH_SHEET;const ic=d.subtype==='agent'?12:11;const sc=d.subtype==='agent'?10:9;const dc=d.subtype==='agent'?11:10;const s=ss.getSheetByName(sn);if(!s)return _err('sheet not found');const vals=s.getDataRange().getValues();for(let i=1;i<vals.length;i++){if(String(vals[i][ic-1])===String(d.orderId)){s.getRange(i+1,sc).setValue(d.subtype==='agent'?'已收款':'已付款');s.getRange(i+1,dc).setValue(d.settledDate||new Date().toLocaleDateString('zh-CN'));return _ok({updated:true})}}return _ok({updated:false})}
+function _gc(ss,name,headers){let s=ss.getSheetByName(name);if(!s){s=ss.insertSheet(name);s.appendRow(headers);s.setFrozenRows(1);s.getRange(1,1,1,headers.length).setBackground('#1a1a2e').setFontColor('#ffffff').setFontWeight('bold')}return s}
+function _re(s,id,c){return s.getDataRange().getValues().some((r,i)=>i>0&&String(r[c-1])===String(id))}
+function _af(s){const r=s.getLastRow();if(r<2)return;s.getRange(r,1,1,s.getLastColumn()).setBackground(r%2===0?'#f8f9fa':'#ffffff')}
+function _ok(p){return ContentService.createTextOutput(JSON.stringify({success:true,...p})).setMimeType(ContentService.MimeType.JSON)}
+function _err(m){return ContentService.createTextOutput(JSON.stringify({success:false,error:m})).setMimeType(ContentService.MimeType.JSON)}`;
 
-// Open history dialog — shows all revisions with restore buttons
-async function openGistHistory() {
-  if (!gistToken || !gistId) { toast('请先连接 GitHub Gist'); return; }
-  const overlay = document.createElement('div');
-  overlay.className = 'verify-modal-overlay';
-  overlay.innerHTML = `
-    <div class="verify-modal" onclick="event.stopPropagation()" style="max-width:600px; max-height:80vh; overflow-y:auto;">
-      <div class="verify-modal-header">
-        <h3>⑂ Gist 历史版本</h3>
-        <button onclick="this.closest('.verify-modal-overlay').remove()" class="close-btn">×</button>
-      </div>
-      <div id="gistHistoryList" style="padding:16px;">
-        <div style="text-align:center; padding:24px; color:var(--muted);">正在加载历史版本…</div>
-      </div>
-    </div>
-  `;
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-  document.body.appendChild(overlay);
-
-  try {
-    // Fetch revision list
-    const res = await fetch(`${GIST_API}/${gistId}/commits`, {
-      headers: { 'Authorization': `token ${gistToken}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error(`获取历史失败 ${res.status}`);
-    const commits = await res.json();
-    const list = document.getElementById('gistHistoryList');
-    if (!list) return;
-    if (!commits.length) {
-      list.innerHTML = '<div style="color:var(--muted); text-align:center; padding:24px;">暂无历史版本</div>';
-      return;
-    }
-    list.innerHTML = commits.map((c, i) => {
-      const d = new Date(c.committed_at).toLocaleString('zh-CN');
-      const size = c.change_status ? `+${c.change_status.additions}/-${c.change_status.deletions}` : '';
-      const isLatest = i === 0;
-      return `
-        <div style="display:flex; align-items:center; gap:10px; padding:10px; border:1px solid var(--line); border-radius:3px; margin-bottom:6px; background:${isLatest ? '#e6f4ea' : '#fff'};">
-          <div style="flex:1;">
-            <div style="font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;">${d} ${isLatest ? '<span style="background:#2da44e;color:#fff;padding:1px 6px;border-radius:2px;font-size:10px;margin-left:4px;">最新</span>' : ''}</div>
-            <div style="font-size:11px; color:var(--muted); margin-top:2px;">版本 SHA: ${c.version.slice(0,8)}… ${size ? '· 变更: ' + size : ''}</div>
-          </div>
-          ${!isLatest ? `<button onclick="restoreGistRevision('${c.version}', '${d}', this.closest('.verify-modal-overlay'))"
-            style="background:var(--ink); color:#fff; border:none; padding:6px 12px; border-radius:3px; cursor:pointer; font-size:12px; white-space:nowrap;">
-            ↩ 恢复此版本
-          </button>` : '<span style="color:#2da44e; font-size:12px; font-weight:700;">当前版本</span>'}
-        </div>
-      `;
-    }).join('');
-  } catch (e) {
-    const list = document.getElementById('gistHistoryList');
-    if (list) list.innerHTML = `<div style="color:var(--red); padding:16px;">⚠ ${e.message}</div>`;
-  }
-}
-
-async function restoreGistRevision(sha, dateStr, overlay) {
-  if (!confirm(`确认恢复到 ${dateStr} 的版本？\n\n当前数据会被覆盖！\n（系统会先自动保存当前状态到本地快照）`)) return;
-  // Save current state as rolling backup before overwriting
-  await saveRollingBackup(`恢复 Gist 版本 ${sha.slice(0,8)} 前的自动备份`);
-  try {
-    const res = await fetch(`${GIST_API}/${gistId}/${sha}`, {
-      headers: { 'Authorization': `token ${gistToken}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error(`获取历史版本失败 ${res.status}`);
-    const data = await res.json();
-    const file = data.files && data.files[GIST_FILENAME];
-    if (!file) throw new Error('历史版本文件不存在');
-    const raw = file.content || (file.truncated ? await (await fetch(file.raw_url)).text() : '');
-    const payload = JSON.parse(raw);
-    await applyGistPayload(payload, false);
-    if (overlay) overlay.remove();
-  } catch (e) {
-    toast(`⚠ 恢复失败: ${e.message}`);
-  }
-}
-
-function autoCloudPush() {
-  // Debounced auto-push triggered after every data change
-  if (!cloudSyncEnabled || !cloudSyncKey) return;
-  // CRITICAL: never push before the initial cloudPull completes on startup.
-  // This prevents stale/empty local data from overwriting the cloud.
-  if (!_initialPullComplete) return;
-  // Mark local as dirty so the indicator can show "未推送"
-  _syncDirtyCount++;
-  updateSyncIndicator();
-  if (cloudPushTimer) clearTimeout(cloudPushTimer);
-  cloudPushTimer = setTimeout(() => { cloudPush(true); }, 2000);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// SYNC STATUS INDICATOR — runs in the page header so the user can always
-// tell whether their data is fresh, syncing, or potentially stale (e.g. just
-// returned to this device after using a different one).
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Persistent state (not shared via cloud — local to this device)
-let _syncDirtyCount = 0;          // # changes since last successful push
-let _syncStatus = 'idle';          // idle | syncing | success | offline | error
-// _lastSyncAt is declared earlier (line ~17396); we reuse the same var.
-let _lastCloudPushAt = 0;          // ms timestamp of last cloud-side change (from server)
-let _lastCloudPushBy = '';         // device name of last push (from server)
-let _deviceName = '';              // this device's friendly name
-let _lastSyncError = '';           // human-readable error from last failed push/pull
-let _syncRetryTimer = null;        // pending retry timer (auto-backoff)
-let _syncRetryCount = 0;           // current retry attempt #
-let _lastPayloadBytes = 0;         // size of last push attempt in bytes
-let _consecutiveFailures = 0;     // consecutive transient failures (resets on success)
-let _lastAppliedCloudUpdatedAt = 0; // remember what cloud rev we last applied (skip redundant re-renders)
-
-// Determine if an error is "soft" (transient — network blip, rate limit)
-// vs "hard" (needs user action — data too big, auth wrong).
-// Soft errors show as yellow "暂时离线". Hard errors show as red "同步失败".
-function _classifySyncError(msg) {
-  if (!msg) return 'soft';
-  const m = msg.toLowerCase();
-  // Hard errors: user action required
-  if (m.includes('413') || m.includes('1mb') || m.includes('超出')) return 'hard-toobig';
-  if (m.includes('401') || m.includes('403')) return 'hard-auth';
-  // Everything else (network errors, 429 rate limits, 500s, timeouts) is soft
-  return 'soft';
-}
-
-// Load + prompt for device name. Device names live in localStorage only.
-function loadDeviceName() {
-  try {
-    _deviceName = localStorage.getItem('ticket-organizer-device-name') || '';
-  } catch (e) { _deviceName = ''; }
-  if (!_deviceName) {
-    // Suggest based on user-agent platform hint
-    const ua = navigator.userAgent || '';
-    let suggestion = '设备';
-    if (/iPhone|iPad/i.test(ua)) suggestion = '手机';
-    else if (/Mac/i.test(ua)) suggestion = 'Mac';
-    else if (/Windows/i.test(ua)) suggestion = '电脑';
-    else if (/Android/i.test(ua)) suggestion = '手机';
-    _deviceName = suggestion;
-    // Don't prompt on first load — let user rename later via the indicator click
-    try { localStorage.setItem('ticket-organizer-device-name', _deviceName); } catch (e) {}
-  }
-}
-
-function renameDevice() {
-  const newName = prompt(
-    '给这台设备起个名字（让其他设备知道是谁在改数据）：',
-    _deviceName
-  );
-  if (newName && newName.trim()) {
-    _deviceName = newName.trim().slice(0, 24);
-    try { localStorage.setItem('ticket-organizer-device-name', _deviceName); } catch (e) {}
-    updateSyncIndicator();
-    toast(`✓ 设备已更名为「${_deviceName}」`);
-  }
-}
-
-// Render the indicator into #syncIndicator in the header.
-function updateSyncIndicator() {
-  const el = document.getElementById('syncIndicator');
-  if (!el) return;
-
-  if (!cloudSyncEnabled) {
-    el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 9px; border-radius:var(--r-sm); background:rgba(184,60,44,0.10); color:var(--red); font-size:11px; font-weight:600;" title="云同步已断开">⊘ 未同步</span>`;
-    return;
-  }
-
-  // Decide dot color + label
-  let dotColor, dotShadow, label, statusColor, tooltipText;
-  if (_syncStatus === 'syncing') {
-    dotColor = 'var(--accent-deep)';
-    dotShadow = '0 0 6px rgba(200,160,74,0.6)';
-    label = '同步中…';
-    statusColor = 'var(--accent-deep)';
-    tooltipText = '正在与云端同步';
-  } else if (_syncStatus === 'offline') {
-    // Soft state — transient network issue. Data is safe locally.
-    dotColor = 'var(--warning)';
-    dotShadow = '0 0 5px rgba(194,133,61,0.5)';
-    label = '暂时离线';
-    statusColor = 'var(--warning-deep)';
-    tooltipText = `📡 暂时连不上云端，正在自动重试。\n\n本地数据已保存，不会丢失。`;
-  } else if (_syncStatus === 'error') {
-    dotColor = 'var(--red)';
-    dotShadow = '0 0 6px rgba(184,60,44,0.6)';
-    label = '需要处理';
-    statusColor = 'var(--red)';
-    const retryNote = _consecutiveFailures > 0 ? `\n已连续失败 ${_consecutiveFailures} 次` : '';
-    tooltipText = `⚠ ${_lastSyncError || '未知错误'}${retryNote}\n\n点击查看详情。本地数据已保存。`;
-  } else if (_syncDirtyCount > 0) {
-    dotColor = 'var(--warning)';
-    dotShadow = '0 0 4px rgba(194,133,61,0.5)';
-    label = `待推送 ${_syncDirtyCount}`;
-    statusColor = 'var(--warning-deep)';
-    tooltipText = `本地有 ${_syncDirtyCount} 项变化未推送，2 秒后自动推送`;
-  } else if (_lastSyncAt > 0) {
-    dotColor = 'var(--green)';
-    dotShadow = '0 0 5px rgba(46,125,50,0.45)';
-    label = '已同步 ' + _relativeTimeShort(_lastSyncAt);
-    statusColor = 'var(--green)';
-    tooltipText = `上次同步：${new Date(_lastSyncAt).toLocaleString('zh-CN')}\n点击查看详情`;
-  } else {
-    dotColor = 'var(--muted)';
-    dotShadow = '';
-    label = '等待…';
-    statusColor = 'var(--muted)';
-    tooltipText = '正在初始化…';
-  }
-
-  // Recent-cloud-push hint: helps user know whether the OTHER device
-  // just pushed something they should pull
-  let cloudHint = '';
-  if (_lastCloudPushBy && _lastCloudPushBy !== _deviceName && _lastCloudPushAt > 0) {
-    const ago = _relativeTimeShort(_lastCloudPushAt);
-    cloudHint = `<span style="margin-left:8px; padding-left:8px; border-left:1px solid var(--line); color:var(--muted); font-size:10px;">${escapeHtml(_lastCloudPushBy)} · ${ago}</span>`;
-  }
-
-  el.innerHTML = `
-    <span class="sync-indicator-inner"
-      title="${escapeAttr(tooltipText)}"
-      onclick="openSyncDetails()"
-      style="display:inline-flex; align-items:center; gap:7px; padding:4px 10px; border-radius:var(--r-sm); background:rgba(255,255,255,0.5); border:1px solid var(--line); cursor:pointer; transition:background 0.15s; font-size:11px;"
-      onmouseover="this.style.background='rgba(255,255,255,0.85)'"
-      onmouseout="this.style.background='rgba(255,255,255,0.5)'">
-      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${dotColor}; box-shadow:${dotShadow}; flex-shrink:0;"></span>
-      <span style="color:${statusColor}; font-weight:600; font-family:'JetBrains Mono',monospace; letter-spacing:0.02em;">${label}</span>
-      <span style="color:var(--muted); font-size:10px;">·</span>
-      <span style="color:var(--ink-2); font-size:10.5px; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(_deviceName)}</span>
-      ${cloudHint}
-    </span>`;
-}
-
-// Short relative time: "30秒前" / "3分钟前" / "刚刚"
-function _relativeTimeShort(ms) {
-  const delta = Date.now() - ms;
-  if (delta < 0) return '刚刚';
-  const sec = delta / 1000;
-  if (sec < 30) return '刚刚';
-  if (sec < 60) return Math.floor(sec) + '秒前';
-  const min = sec / 60;
-  if (min < 60) return Math.floor(min) + '分钟前';
-  const hr = min / 60;
-  if (hr < 24) return Math.floor(hr) + '小时前';
-  return Math.floor(hr / 24) + '天前';
-}
-
-// Open a small details panel — shows last sync time, cloud state, device name
-function openSyncDetails() {
-  const lastSyncStr = _lastSyncAt > 0
-    ? new Date(_lastSyncAt).toLocaleString('zh-CN')
-    : '尚未同步';
-  const cloudPushStr = _lastCloudPushAt > 0
-    ? `${new Date(_lastCloudPushAt).toLocaleString('zh-CN')}${_lastCloudPushBy ? ' (' + _lastCloudPushBy + ')' : ''}`
-    : '未知';
-  const payloadKb = _lastPayloadBytes > 0 ? (_lastPayloadBytes / 1024).toFixed(0) : '?';
-  const payloadColor = _lastPayloadBytes > 900_000 ? 'var(--red)'
-                     : _lastPayloadBytes > 700_000 ? 'var(--warning-deep)'
-                     : 'var(--ink)';
-  // Error / offline section
-  const isOffline = _syncStatus === 'offline';
-  const isError = _syncStatus === 'error' && _lastSyncError;
-  let statusSection = '';
-  if (isError) {
-    statusSection = `
-      <div style="margin-top:12px; padding:12px 14px; background:rgba(184,60,44,0.06); border:1px solid rgba(184,60,44,0.25); border-left:3px solid var(--red); border-radius:var(--r-sm);">
-        <div style="font-size:11px; font-weight:700; color:var(--red); margin-bottom:6px;">⚠ 需要处理的错误</div>
-        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink); word-break:break-word; line-height:1.5;">${escapeHtml(_lastSyncError)}</div>
-        ${_consecutiveFailures > 0 ? `<div style="font-size:10.5px; color:var(--muted); margin-top:8px;">已连续失败 ${_consecutiveFailures} 次。</div>` : ''}
-        ${_lastSyncError.includes('413') || _lastSyncError.includes('超出') || _lastSyncError.includes('1MB') ? `
-          <div style="font-size:10.5px; color:var(--warning-deep); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(184,60,44,0.2);">
-            💡 数据超出 jsonbin.io 1MB 上限。建议清理或归档老的「已出票」订单。
-          </div>` : ''}
-        ${_lastSyncError.includes('401') || _lastSyncError.includes('403') ? `
-          <div style="font-size:10.5px; color:var(--warning-deep); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(184,60,44,0.2);">
-            💡 认证失败。jsonbin.io API key 可能失效或被吊销。
-          </div>` : ''}
-      </div>
-    `;
-  } else if (isOffline) {
-    statusSection = `
-      <div style="margin-top:12px; padding:12px 14px; background:rgba(194,133,61,0.08); border:1px solid rgba(194,133,61,0.3); border-left:3px solid var(--warning); border-radius:var(--r-sm);">
-        <div style="font-size:11px; font-weight:700; color:var(--warning-deep); margin-bottom:6px;">📡 暂时连不上云端</div>
-        <div style="font-size:11.5px; color:var(--ink); line-height:1.5;">本地数据已保存安全，不会丢失。系统正在自动重试。常见原因：</div>
-        <div style="font-size:10.5px; color:var(--muted); margin-top:6px; line-height:1.7;">
-          · Wi-Fi 短暂断开<br>
-          · jsonbin.io 速率限制（多设备同时同步）<br>
-          · 浏览器后台标签被节流
-        </div>
-        ${_lastSyncError ? `<div style="font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--muted); margin-top:8px; padding-top:8px; border-top:1px dashed rgba(194,133,61,0.3);">技术细节：${escapeHtml(_lastSyncError)}</div>` : ''}
-      </div>
-    `;
-  }
+  document.getElementById('gsCodeOverlay')?.remove();
   const html = `
-    <div id="syncDetailsOverlay" style="position:fixed; inset:0; background:rgba(12,27,42,0.55); z-index:9100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target.id==='syncDetailsOverlay')document.getElementById('syncDetailsOverlay').remove()">
-      <div style="background:var(--paper); border-radius:var(--r-lg); width:min(440px, 95vw); max-height:90vh; overflow:auto; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
-        <div style="padding:18px 24px; background:linear-gradient(135deg, var(--ink), var(--ink-2)); color:#fff;">
-          <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent); font-weight:600; margin-bottom:4px;">SYNC STATUS</div>
-          <div style="font-family:'Fraunces',serif; font-size:18px; font-weight:600;">同步状态详情</div>
-        </div>
-        <div style="padding:20px 24px; font-size:12.5px; line-height:1.7;">
-          <div style="display:grid; grid-template-columns:auto 1fr; gap:8px 14px; align-items:baseline;">
-            <span style="color:var(--muted);">这台设备：</span>
-            <span><strong>${escapeHtml(_deviceName)}</strong>
-              <button onclick="renameDevice();document.getElementById('syncDetailsOverlay').remove();" style="margin-left:8px; border:1px solid var(--line); background:#fff; padding:2px 8px; border-radius:4px; font-size:10.5px; cursor:pointer;">改名</button>
-            </span>
-            <span style="color:var(--muted);">本地未推送：</span>
-            <span><strong style="color:${_syncDirtyCount > 0 ? 'var(--warning-deep)' : 'var(--green)'};">${_syncDirtyCount} 项</strong></span>
-            <span style="color:var(--muted);">上次同步：</span>
-            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px;">${escapeHtml(lastSyncStr)}</span>
-            <span style="color:var(--muted);">云端上次更新：</span>
-            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px;">${escapeHtml(cloudPushStr)}</span>
-            <span style="color:var(--muted);">数据大小：</span>
-            <span style="font-family:'JetBrains Mono',monospace; font-size:11.5px; color:${payloadColor};"><strong>${payloadKb} KB</strong> <span style="color:var(--muted); font-weight:400;">/ 1024 KB 上限</span></span>
-          </div>
-          ${statusSection}
-          ${!statusSection ? `
-          <div style="margin-top:14px; padding:10px 12px; background:var(--cream); border-radius:var(--r-sm); font-size:11px; color:var(--muted); line-height:1.5;">
-            ${_lastCloudPushBy && _lastCloudPushBy !== _deviceName ? `💡 提示：「${escapeHtml(_lastCloudPushBy)}」最近改过数据。如果你担心错过，可以「立即拉取」一下。` : '💡 同步自动进行 —— 每次改动 2 秒后推送到云端，其他设备打开网页时自动拉取。'}
-          </div>
-          ` : ''}
-          <div style="margin-top:14px; display:flex; gap:8px;">
-            <button onclick="cloudPull(false); document.getElementById('syncDetailsOverlay').remove();" style="flex:1; padding:8px 14px; border:1px solid var(--accent-deep); background:#fff; color:var(--accent-deep); border-radius:var(--r-sm); cursor:pointer; font-size:12px; font-weight:600;">⬇ 立即拉取</button>
-            <button onclick="cloudPush(false); document.getElementById('syncDetailsOverlay').remove();" style="flex:1; padding:8px 14px; border:1px solid var(--accent-deep); background:var(--accent-deep); color:#fff; border-radius:var(--r-sm); cursor:pointer; font-size:12px; font-weight:600;">⬆ 立即推送</button>
-            <button onclick="document.getElementById('syncDetailsOverlay').remove();" style="padding:8px 14px; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:var(--r-sm); cursor:pointer; font-size:12px;">关闭</button>
+    <div id="gsCodeOverlay" style="position:fixed;inset:0;background:rgba(12,27,42,0.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px"
+      onclick="if(event.target.id==='gsCodeOverlay')document.getElementById('gsCodeOverlay').remove()">
+      <div style="background:var(--ink);border-radius:var(--r-lg);width:min(700px,95vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.5);">
+        <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);">
+          <span style="color:#fff;font-weight:700;font-size:14px;">📋 Apps Script 代码</span>
+          <div style="display:flex;gap:8px;">
+            <button onclick="navigator.clipboard.writeText(document.getElementById('gsCodeText').value);toast('✓ 代码已复制')" style="padding:6px 14px;background:#0f9d58;border:none;color:#fff;border-radius:var(--r-sm);cursor:pointer;font-weight:700;font-size:12px;">复制代码</button>
+            <button onclick="document.getElementById('gsCodeOverlay').remove()" style="padding:6px 10px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:var(--r-sm);cursor:pointer;">✕</button>
           </div>
         </div>
+        <textarea id="gsCodeText" readonly style="flex:1;padding:16px;background:transparent;color:#e8e8e8;font-family:'JetBrains Mono',monospace;font-size:11px;border:none;outline:none;resize:none;line-height:1.6;">${escapeHtml(code)}</textarea>
       </div>
-    </div>
-  `;
+    </div>`;
   const c = document.createElement('div');
   c.innerHTML = html;
   document.body.appendChild(c.firstElementChild);
 }
 
-// Auto-refresh the indicator's relative-time text every 15 sec
-setInterval(() => {
-  if (cloudSyncEnabled) updateSyncIndicator();
-}, 15000);
-
-async function disableCloudSync() {
-  if (!confirm('确定要断开云同步吗？本地数据会保留，但不再自动推送到云端。')) return;
-  cloudSyncEnabled = false;
-  await storageSet('ticket-organizer-cloudsync', { key: cloudSyncKey, enabled: false });
-  updateCloudStatus();
-  toast('云同步已断开');
-}
-
-function updateCloudStatus() {
-  const el = document.getElementById('cloudStatusText');
-  if (!el) return;
-  el.innerHTML = `<span style="color:var(--green); font-weight:600;">● 团队共享云同步已启用</span> · 所有人打开网页自动同步数据`;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// ANTHROPIC API KEY — local-only storage (never synced to cloud)
-// Used for AI image parsing (itinerary screenshots + passport photos).
-// ═══════════════════════════════════════════════════════════════════════════
-const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';
 
 function loadAnthropicKey() {
   try { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ''; } catch(e) { return ''; }
@@ -23722,12 +23459,6 @@ function updateAiKeyStatus() {
   }
 }
 
-async function loadCloudConfig() {
-  // Shared bin is hardcoded — no config needed, always connected
-  cloudSyncKey = SHARED_BIN_ID;
-  cloudSyncEnabled = true;
-  updateCloudStatus();
-}
 
 function exportAllData() {
   const data = {
@@ -23760,7 +23491,7 @@ async function importAllData(event) {
     const data = JSON.parse(text);
     if (!data || typeof data !== 'object') throw new Error('文件格式不对');
     if (!data.settings && !data.orders) throw new Error('找不到 settings 或 orders 字段');
-    const cloudWarn = cloudSyncEnabled ? '\n\n⚠ 云同步已启用 — 覆盖后会自动同步到云端，所有团队成员也会看到这份数据。' : '';
+    const cloudWarn = '';  // cloud sync removed
     if (!confirm(`⚠️ 即将覆盖所有当前数据：\n· 待出票 ${STATE.orders.filter(o => isMeaningfulOrder(o)).length} 单\n· 已出票 ${(settings.ticketed || []).length} 单\n· 卡主 ${(settings.cardholders || []).length} 人\n\n导入后会变成文件里的数据：\n· 待出票 ${(data.orders || []).filter(o => o.passengers && o.passengers.length > 0 || o.segments && o.segments.length > 0).length} 单\n· 已出票 ${((data.settings && data.settings.ticketed) || []).length} 单\n· 卡主 ${((data.settings && data.settings.cardholders) || []).length} 人${cloudWarn}\n\n继续？`)) return;
     if (data.settings) {
       settings = { ...DEFAULT_SETTINGS, ...data.settings };
@@ -24009,11 +23740,18 @@ async function mergeImportData(event) {
   await loadCloudConfig();
   await loadGistConfig();
   loadDeviceName();        // load this device's friendly name from localStorage
-  updateSyncIndicator();   // render the sync status pill in header
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
+  updateGsSyncStatus();    // show Google Sheets sync status in settings
+  updateFbStatus();        // show Firebase sync status in settings
   refreshAiParseZone();    // show/hide AI image upload zone based on key
-  // Cloud sync disabled — no startup pull
+
+  // ── Firebase real-time sync: init if configured ─────────────────────────
+  // Hook persistence functions BEFORE init, so the very first changes also sync.
+  fbHookPersistence();
+  if (loadFbConfig()) {
+    fbInit().catch(e => console.warn('Firebase init failed:', e));
+  }
 
   // Safety mechanism 3: Daily backup reminder.
   // Once per day, remind the user to export a JSON backup.

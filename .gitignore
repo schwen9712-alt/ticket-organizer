@@ -1,0 +1,6 @@
+# Local development backups — don't track in git
+.backups/
+
+# Build artifacts
+*.bak
+*~
