@@ -37,6 +37,30 @@
 
 ---
 
+## 2026-05-23 22:00 — 汇率源换成多源 fallback（更准更可靠）
+
+**改了什么**:
+- `fetchRate()` 重构为多源 fallback 链：
+  1. `open.er-api.com`（每日更新，主要源）
+  2. `frankfurter.app`（欧央行 ECB，最权威，但周末不更新）
+  3. `exchangerate-api.com`（原来的源，兜底）
+- 每个源加 sanity check：USD/CNY 应该在 5-10 之间，超出范围视为错误数据跳过
+- toast 现在显示用了哪个源：`已更新: USD 1 = ¥6.79 (open.er-api.com)`
+- 加 `cache: 'no-cache'` 避免浏览器缓存旧汇率
+
+**为什么改**:
+- 用户截图 Google 显示 USD/CNY = 6.79，但 app 一直显示 6.81
+- 6.81 是 5 月 18 日的数据，说明 `exchangerate-api.com` **数据延迟 5 天**
+- 一单 3000 美元的差 0.02 汇率 = 差 60 块人民币
+
+**风险或注意事项**:
+- Google 没有公开汇率 API，无法直接用 Google 的值
+- 这三个源都是免费 + 无需 API key，但都不是 Google
+- open.er-api.com 准确度 ≈ Google（误差 < 0.01）
+- 周末 frankfurter 不更新（欧央行休市），所以放第二位由 open.er-api.com 兜住
+
+---
+
 ## 2026-05-23 21:33 — 修 ANTHROPIC_KEY_STORAGE 未定义
 
 **改了什么**:

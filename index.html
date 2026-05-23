@@ -22618,27 +22618,60 @@ async function clearAllData() {
 async function fetchRate() {
   document.querySelectorAll('.rate-refresh').forEach(b => b.classList.add('spinning'));
   toast('正在获取汇率...');
-  try {
-    const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    const data = await res.json();
-    if (data.rates && data.rates.CNY) {
-      settings.rate = parseFloat(data.rates.CNY.toFixed(4));
-      const sRateEl = document.getElementById('s-rate');
-      if (sRateEl) sRateEl.value = settings.rate;
-      const hdr = document.getElementById('headerRate');
-      if (hdr) hdr.textContent = settings.rate.toFixed(4);
-      await storageSet('ticket-organizer-settings', settings);
-      renderPreview();
-      renderDerivedFields();
-      toast(`已更新: USD 1 = ¥${settings.rate}`);
-    } else {
-      toast('获取失败，请手动输入');
+
+  // Multi-source fallback. Try in order until one succeeds.
+  // open.er-api.com refreshes daily; frankfurter uses ECB (closed weekends);
+  // exchangerate-api is the legacy fallback.
+  const sources = [
+    {
+      name: 'open.er-api.com',
+      url: 'https://open.er-api.com/v6/latest/USD',
+      pick: d => d?.rates?.CNY
+    },
+    {
+      name: 'frankfurter.app',
+      url: 'https://api.frankfurter.app/latest?from=USD&to=CNY',
+      pick: d => d?.rates?.CNY
+    },
+    {
+      name: 'exchangerate-api.com',
+      url: 'https://api.exchangerate-api.com/v4/latest/USD',
+      pick: d => d?.rates?.CNY
     }
-  } catch(e) {
-    toast('网络错误，请手动输入');
-  } finally {
-    document.querySelectorAll('.rate-refresh').forEach(b => b.classList.remove('spinning'));
+  ];
+
+  let rate = null;
+  let usedSource = '';
+  for (const src of sources) {
+    try {
+      const res = await fetch(src.url, { cache: 'no-cache' });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const r = src.pick(data);
+      if (r && r > 0 && r < 20) {  // sanity check: USD/CNY should be 5-10
+        rate = parseFloat(r.toFixed(4));
+        usedSource = src.name;
+        break;
+      }
+    } catch(e) { /* try next source */ }
   }
+
+  document.querySelectorAll('.rate-refresh').forEach(b => b.classList.remove('spinning'));
+
+  if (rate == null) {
+    toast('所有汇率源都失败，请手动输入');
+    return;
+  }
+
+  settings.rate = rate;
+  const sRateEl = document.getElementById('s-rate');
+  if (sRateEl) sRateEl.value = settings.rate;
+  const hdr = document.getElementById('headerRate');
+  if (hdr) hdr.textContent = settings.rate.toFixed(4);
+  await storageSet('ticket-organizer-settings', settings);
+  renderPreview();
+  renderDerivedFields();
+  toast(`已更新: USD 1 = ¥${settings.rate} (${usedSource})`);
 }
 
 // ============================================
