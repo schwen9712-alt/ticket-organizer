@@ -37,6 +37,43 @@
 
 ---
 
+## 2026-05-23 21:33 — 修 ANTHROPIC_KEY_STORAGE 未定义
+
+**改了什么**:
+- 新增缺失的常量声明：`const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';`
+- 这个常量被 `loadAnthropicKey()` / `saveAnthropicKey()` / `clearAnthropicKey()` 三处引用，但从未声明
+
+**为什么改**:
+- 用户截图显示「保存失败：ANTHROPIC_KEY_STORAGE is not defined」
+- 历史代码 audit 时漏掉了这个 bug（之前可能定义过，删 Cloud Sync 时被一起误删）
+- AI 图片识别功能因此无法保存 API Key
+
+**风险或注意事项**:
+- 用户的本地 localStorage 应该还保留着以前用过的 key（如果有的话），这次修复后能正常读写
+
+---
+
+## 2026-05-23 20:43 — 回滚：移除登录页
+
+**改了什么**:
+- 完整移除上一版加的密码登录系统（约 190 行）
+- 删除 `SIMPLE PASSWORD AUTH` 整个代码块（sha256 / hashPassword / showAuthGate / verifyPassword / tryAutoLogin / changePassword / logoutAndShowGate）
+- 删除设置页「🔒 登录密码」UI 区块
+- 合并 `fbInit` 和 `fbStartSync` 回单一函数（启动时拉数据 + 订阅 onSnapshot）
+- 移除 `_authReady` 守卫和相关变量
+- 启动流程恢复为原来的直接 `fbInit()`
+
+**为什么改**:
+- 用户改主意「完全不需要登录」
+- 听用户的，撤掉
+
+**风险或注意事项**:
+- 数据现在再次完全公开（任何打开 URL 的人都能读写）
+- 用户接受这个状态
+- 如果以后想加保护，可以加 Firestore 规则（不需要登录页也能做基础保护）
+
+---
+
 ## 2026-05-23 20:38 — 简单密码登录（保护 Firestore 数据）
 
 **改了什么**:
