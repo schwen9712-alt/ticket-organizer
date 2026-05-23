@@ -37,6 +37,53 @@
 
 ---
 
+## 2026-05-23 05:27 — Linear/Notion 风格大改
+
+**改了什么**:
+- 设计 token 全面切换：
+  - 背景：米色 `#F5EFE6` → 纯白 `#FFFFFF`
+  - 主色：金色 `#C8A04A` → Linear 紫蓝 `#5E6AD2`
+  - 文字主色：`#0C1B2A` → `#1F2328`（GitHub 风格的近黑色）
+  - 圆角：6/10/16/20px → 4/6/8/12px（更紧凑）
+  - 阴影：多层柔阴影 → 几乎不用，靠细线分隔
+- 字体：除了 logo `.brand h1` 保留 Fraunces 衬线（保留品牌识别），其余全部改为 Inter / 系统 UI 字体
+- body 字体栈：`-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, 'Noto Sans SC'`
+- `.section` 用白底 + 细线代替米色 + 阴影，padding 缩到 18px 20px
+- `.btn` 去掉 box-shadow 和 translateY 动效，纯净扁平
+- 移除 logo 渐变（`linear-gradient(135deg, var(--ink) 0%, #2a4060 100%)`），改纯 ink
+
+**为什么改**:
+- 用户反馈「整体不美观」，明确想要 Linear/Notion 现代极简风
+- 原风格偏「优雅暖色」（米色+金色+衬线），与「机票订单工具」的工具属性气质不符
+- Linear/Notion 风格更适合信息密集型工作场景
+
+**风险或注意事项**:
+- 只改了 CSS 变量和核心组件（section/btn/body/brand），没改 23,000 行内联样式
+- 可能存在某些区块写死了米色/金色，导致颜色不一致 — 用了几天发现的话再补
+- 整体对比度变高，可能需要调整某些颜色的具体值
+- 文件大小没增加，纯样式替换
+
+---
+
+## 2026-05-23 05:23 — Tab 栏更紧凑 + 右侧渐变提示可滚动
+
+**改了什么**:
+- Tab padding 从 8px 16px 缩到 7px 12px，gap 从 6px 缩到 5px，font-size 13px → 12.5px
+- 把 `<nav class="tabs">` 包在 `.tabs-wrap` 容器里
+- `.tabs-wrap::after` 加右侧白色渐变伪元素，提示「这里可以滚动」
+- JS 监听 scroll 和 resize 事件，只在真的有溢出时显示渐变（`.has-overflow` 类）
+
+**为什么改**:
+- 用户反馈「💰 账单」Tab 被截断不美观
+- 不能简单删 Tab（每个都有用），所以让 Tab 更紧凑
+- 加渐变让用户知道可以滚动查看后面的内容
+
+**风险或注意事项**:
+- 渐变颜色用 `var(--cream)`，深色模式下可能不匹配（但目前默认是亮色）
+- Tab 字体小了一点点，在小屏幕上可读性略下降
+
+---
+
 ## 2026-05-22 (whole session) — Firebase 实时同步替换 JSONBin
 
 **改了什么**:

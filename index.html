@@ -50,50 +50,57 @@
   font-weight: 800; font-style: normal; font-display: swap;
 }
 :root {
-  /* Core palette — warmer, richer */
-  --ink: #0C1B2A;
-  --ink-2: #1A2B3D;
-  --paper: #F5EFE6;
-  --paper-2: #EBE3D5;
-  --cream: #FBF6EC;
-  --accent: #C8A04A;
-  --accent-deep: #8B6914;
-  --accent-light: rgba(200, 160, 74, 0.12);
-  --red: #C8442C;
-  --red-light: rgba(200, 68, 44, 0.1);
-  --green: #2E7D52;
-  --green-light: rgba(46, 125, 82, 0.1);
-  --blue: #2B4C7E;
-  --blue-light: rgba(43, 76, 126, 0.1);
-  /* Warning amber — fits warm palette, replaces flat var(--warning) / var(--warning-deep) */
-  --warning: #C2853D;
-  --warning-deep: #9C6826;
-  --warning-light: rgba(194, 133, 61, 0.12);
-  --muted: #7B8794;
-  --line: rgba(12, 27, 42, 0.1);
-  --line-strong: rgba(12, 27, 42, 0.28);
+  /* ─── Linear/Notion-inspired palette ─────────────────────────────────────
+     White background, neutral grays for hierarchy, single blue accent.
+     No more warm tones — purely cool/neutral. */
+  --ink:        #1F2328;      /* primary text (near-black, not pure) */
+  --ink-2:      #3A3F45;      /* secondary text */
+  --paper:      #FFFFFF;      /* page background — pure white */
+  --paper-2:    #F7F8FA;      /* subtle surface (cards, hovers) */
+  --cream:      #F7F8FA;      /* alias for legacy use — now same as paper-2 */
 
-  /* Elevation — more nuanced */
-  --shadow-xs: 0 1px 3px rgba(12,27,42,0.06), 0 1px 2px rgba(12,27,42,0.04);
-  --shadow: 0 4px 12px rgba(12,27,42,0.08), 0 2px 4px rgba(12,27,42,0.04);
-  --shadow-md: 0 8px 24px rgba(12,27,42,0.1), 0 3px 8px rgba(12,27,42,0.06);
-  --shadow-strong: 0 16px 48px rgba(12,27,42,0.14), 0 6px 16px rgba(12,27,42,0.08);
+  /* Accent — Linear's purple-blue, used sparingly */
+  --accent:        #5E6AD2;
+  --accent-deep:   #4752C4;
+  --accent-light:  rgba(94, 106, 210, 0.1);
 
-  /* Radii — consistent rounding */
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 16px;
-  --r-xl: 20px;
+  /* Status colors — desaturated, professional */
+  --red:        #D93F3F;
+  --red-light:  rgba(217, 63, 63, 0.08);
+  --green:      #22863A;
+  --green-light:rgba(34, 134, 58, 0.08);
+  --blue:       #3578E5;
+  --blue-light: rgba(53, 120, 229, 0.08);
+  --warning:    #D97706;
+  --warning-deep: #B45309;
+  --warning-light: rgba(217, 119, 6, 0.08);
+
+  /* Neutrals — fine-grained hierarchy */
+  --muted:       #6B7280;     /* tertiary text */
+  --line:        rgba(31, 35, 40, 0.08);
+  --line-strong: rgba(31, 35, 40, 0.16);
+
+  /* Elevation — barely-there, lines do the work */
+  --shadow-xs: 0 1px 2px rgba(31, 35, 40, 0.04);
+  --shadow:    0 1px 3px rgba(31, 35, 40, 0.06), 0 1px 2px rgba(31, 35, 40, 0.04);
+  --shadow-md: 0 4px 8px rgba(31, 35, 40, 0.08), 0 1px 3px rgba(31, 35, 40, 0.04);
+  --shadow-strong: 0 8px 24px rgba(31, 35, 40, 0.1), 0 2px 6px rgba(31, 35, 40, 0.06);
+
+  /* Radii — tighter, more modern */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
 
   /* Transitions */
-  --t-fast: 0.12s ease;
-  --t-base: 0.2s ease;
+  --t-fast: 0.1s ease;
+  --t-base: 0.15s ease;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
 body {
-  font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
   background: var(--paper);
   color: var(--ink);
   min-height: 100vh;
@@ -150,15 +157,12 @@ body {
 }
 .brand h1 {
   font-family: 'Fraunces', serif;
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: -0.025em;
   font-variation-settings: "opsz" 144;
   line-height: 1;
-  background: linear-gradient(135deg, var(--ink) 0%, #2a4060 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--ink);
 }
 .brand .zh {
   font-family: 'Noto Sans SC', sans-serif;
@@ -208,10 +212,27 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Tabs */
+.tabs-wrap {
+  position: relative;
+  margin-bottom: 24px;
+}
+.tabs-wrap::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  bottom: 5px;
+  width: 24px;
+  background: linear-gradient(to right, transparent, var(--cream) 70%);
+  pointer-events: none;
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.tabs-wrap.has-overflow::after { opacity: 1; }
 .tabs {
   display: flex;
   gap: 3px;
-  margin-bottom: 24px;
   padding: 5px 6px;
   background: rgba(12,27,42,0.07);
   border-radius: var(--r-lg);
@@ -222,13 +243,13 @@ body {
 }
 .tabs::-webkit-scrollbar { display: none; }
 .tab {
-  padding: 8px 16px;
+  padding: 7px 12px;
   background: transparent;
   border: none;
   border-radius: var(--r-md);
   cursor: pointer;
   font-family: 'Noto Sans SC', sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--muted);
   white-space: nowrap;
@@ -236,7 +257,7 @@ body {
   transition: all var(--t-base);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   position: relative;
 }
 .tab:hover { color: var(--ink); background: rgba(255,255,255,0.6); }
@@ -265,21 +286,19 @@ body {
 
 /* Form sections */
 .section {
-  background: var(--cream);
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  padding: 20px 22px;
-  margin-bottom: 16px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
   position: relative;
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--t-base), border-color var(--t-base);
+  transition: border-color var(--t-base);
 }
 .section:focus-within {
-  border-color: rgba(139,105,20,0.25);
-  box-shadow: var(--shadow), 0 0 0 3px rgba(139,105,20,0.07);
+  border-color: var(--accent);
 }
 .section-title {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
@@ -381,35 +400,34 @@ textarea.raw-input:focus {
 
 /* Buttons */
 .btn {
-  padding: 9px 18px;
-  border: 1.5px solid var(--ink);
+  padding: 7px 14px;
+  border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--paper);
-  font-family: 'Noto Sans SC', sans-serif;
+  font-family: inherit;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   border-radius: var(--r-sm);
-  transition: all var(--t-fast);
+  transition: background var(--t-fast), border-color var(--t-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  letter-spacing: 0.01em;
-  box-shadow: 0 1px 3px rgba(12,27,42,0.2);
+  letter-spacing: 0;
 }
-.btn:hover { background: var(--ink-2); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(12,27,42,0.25); }
-.btn:active { transform: translateY(0); box-shadow: 0 1px 2px rgba(12,27,42,0.15); }
+.btn:hover { background: var(--ink-2); }
+.btn:active { background: #000; }
 .btn.ghost {
   background: transparent;
   color: var(--ink);
   border-color: var(--line-strong);
-  box-shadow: none;
 }
-.btn.ghost:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); box-shadow: 0 3px 8px rgba(12,27,42,0.2); }
-.btn.accent { background: var(--accent-deep); border-color: var(--accent-deep); color: #fff; box-shadow: 0 2px 8px rgba(139,105,20,0.35); }
-.btn.accent:hover { background: #6b5010; box-shadow: 0 4px 14px rgba(139,105,20,0.4); }
-.btn.danger { background: var(--red); border-color: var(--red); box-shadow: 0 2px 6px rgba(183,50,31,0.3); }
-.btn.small { padding: 5px 11px; font-size: 11.5px; border-radius: var(--r-sm); letter-spacing: 0; box-shadow: none; }
+.btn.ghost:hover { background: var(--paper-2); border-color: var(--ink); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.accent:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+.btn.danger { background: var(--red); border-color: var(--red); }
+.btn.danger:hover { background: #B83030; border-color: #B83030; }
+.btn.small { padding: 4px 10px; font-size: 12px; border-radius: var(--r-sm); }
 .btn-row {
   display: flex;
   gap: 8px;
@@ -1546,7 +1564,7 @@ kbd {
   color: var(--muted);
 }
 .empty-state-title {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   font-weight: 500;
   font-style: italic;
@@ -1652,7 +1670,7 @@ code:not([class]):not(pre code) {
 /* ── Headings inside dialogs use Fraunces consistently ── */
 .verify-modal-header h3,
 [id*="Overlay"] h3 {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-weight: 600;
   letter-spacing: -0.005em;
 }
@@ -1746,7 +1764,7 @@ code:not([class]):not(pre code) {
   50%      { transform: translateY(-4px); }
 }
 .empty-state > div:not(.icon) {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-style: italic;
   font-weight: 400;
@@ -2227,7 +2245,7 @@ html { scroll-behavior: smooth; }
   min-width: 80px;
 }
 .gradient-skyline-num {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 26px;
   font-weight: 600;
   line-height: 1;
@@ -2311,7 +2329,7 @@ html { scroll-behavior: smooth; }
   flex-shrink: 0;
 }
 .gradient-band-label {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 15px;
   font-weight: 600;
   color: var(--ink);
@@ -2419,7 +2437,7 @@ html { scroll-behavior: smooth; }
   color: var(--muted);
 }
 .gradient-chip-amount {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 17px;
   font-weight: 600;
   color: var(--ink);
@@ -2781,7 +2799,8 @@ html[data-lang="en"] .zh {
 </header>
 
 <!-- Tabs -->
-<nav class="tabs">
+<div class="tabs-wrap" id="tabsWrap">
+<nav class="tabs" id="tabsNav">
   <button class="tab active" data-tab="new" data-i18n="tab.new">✈ 录入订单</button>
   <button class="tab" data-tab="pending"><span data-i18n="tab.pending">📋 待出票</span> <span class="count" id="draftCount">0</span></button>
   <button class="tab" data-tab="chase" style="color:#0070c9; font-weight:700;"><span data-i18n="tab.chase">💳 CHASE TRAVEL</span> <span class="count" id="chaseCount" style="background:#0070c9;">0</span></button>
@@ -2791,6 +2810,25 @@ html[data-lang="en"] .zh {
   <button class="tab" data-tab="cardholders"><span data-i18n="tab.cardholders">💳 卡主</span> <span class="count" id="cardholdersCount">0</span></button>
   <button class="tab" data-tab="billing" id="billingTab">💰 账单 <span class="count" id="billingUnsettledCount" style="display:none; background:#e67e22;">0</span></button>
 </nav>
+</div>
+<script>
+// Show/hide right-edge fade based on whether tabs overflow + scroll position
+(function() {
+  function updateFade() {
+    const wrap = document.getElementById('tabsWrap');
+    const nav = document.getElementById('tabsNav');
+    if (!wrap || !nav) return;
+    const canScrollRight = nav.scrollWidth - nav.clientWidth - nav.scrollLeft > 4;
+    wrap.classList.toggle('has-overflow', canScrollRight);
+  }
+  window.addEventListener('load', updateFade);
+  window.addEventListener('resize', updateFade);
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('tabsNav')?.addEventListener('scroll', updateFade);
+    updateFade();
+  });
+})();
+</script>
 
 <!-- NEW ORDER PANEL -->
 <div class="panel active" id="panel-new">
@@ -3361,7 +3399,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 <div class="panel" id="panel-billing">
   <div style="padding:0 0 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
     <div>
-      <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:700; color:var(--ink);">💰 账单</div>
+      <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:700; color:var(--ink);">💰 账单</div>
       <div style="font-size:12px; color:var(--muted); margin-top:2px;">给卡主付款 · 向代理收款 · 仅已出票订单</div>
     </div>
     <div style="display:flex; gap:8px; align-items:center;">
@@ -4462,7 +4500,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   box-shadow: 0 2px 8px rgba(139,105,20,0.06);
 }
 .finalize-head {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   font-weight: 600;
   color: var(--accent-deep);
@@ -4597,7 +4635,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .pending-pointer .pp-icon { font-size: 16px; }
 .pending-pointer .pp-count {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 20px;
   font-weight: 700;
   color: var(--accent);
@@ -4664,7 +4702,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .verify-modal-header h3 {
   margin: 0;
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   font-weight: 600;
   color: var(--paper);
@@ -4711,7 +4749,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-weight: 600;
   font-size: 14px;
 }
@@ -4788,7 +4826,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   border-bottom: 1px solid var(--line);
 }
 .modal-title {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 18px;
   font-weight: 700;
 }
@@ -4901,7 +4939,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   pointer-events: none;
 }
 .ch-detail-header .name {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -4997,7 +5035,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   opacity: 0.85;
 }
 .pending-banner .pb-count {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 34px;
   font-weight: 700;
   line-height: 1;
@@ -5146,7 +5184,7 @@ input[type="text"], input[type="number"], textarea {
   margin-bottom: 12px;
 }
 .daily-summary-head {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
@@ -5226,7 +5264,7 @@ input[type="text"], input[type="number"], textarea {
   gap: 10px;
 }
 .grand-total .gt-label {
-  font-family: 'Fraunces', serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -6248,19 +6286,19 @@ function renderSpeedAnalysis() {
     <div style="background:linear-gradient(135deg, rgba(200,160,74,0.08), rgba(200,160,74,0.02)); border:1px solid var(--line); border-radius:var(--r-md); padding:14px 18px; margin-bottom:14px; display:grid; grid-template-columns:repeat(4,1fr); gap:18px;">
       <div>
         <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">历史出票</div>
-        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--ink); line-height:1.1;">${volumeUsable.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:600; color:var(--ink); line-height:1.1;">${volumeUsable.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
       </div>
       <div>
         <div style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">当前待出票</div>
-        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--accent-deep); line-height:1.1;">${pending.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:600; color:var(--accent-deep); line-height:1.1;">${pending.length}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">单</span></div>
       </div>
       <div>
         <div style="font-size:10px; color:var(--green); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">建议多收</div>
-        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--green); line-height:1.1;">${recCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:600; color:var(--green); line-height:1.1;">${recCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
       </div>
       <div>
         <div style="font-size:10px; color:var(--red); font-family:'JetBrains Mono',monospace; letter-spacing:0.1em; font-weight:600;">建议暂缓</div>
-        <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600; color:var(--red); line-height:1.1;">${avoidCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:600; color:var(--red); line-height:1.1;">${avoidCount}<span style="font-size:12px; color:var(--muted); font-weight:400; margin-left:3px;">组</span></div>
       </div>
     </div>
   `;
@@ -6381,7 +6419,7 @@ function buildCurrentQueueAnalysis(pending) {
       <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px;">
         <div>
           <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent-deep); font-weight:700;">CURRENT QUEUE ANALYSIS</div>
-          <div style="font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--ink); margin-top:2px;">📊 当前出票分析</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:17px; font-weight:600; color:var(--ink); margin-top:2px;">📊 当前出票分析</div>
         </div>
         <div style="text-align:right; font-size:11px; color:var(--muted); line-height:1.5;">
           基于当前 <strong style="color:var(--ink); font-family:'JetBrains Mono',monospace;">${pending.length}</strong> 单待出票<br>
@@ -6393,19 +6431,19 @@ function buildCurrentQueueAnalysis(pending) {
       <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:18px;">
         <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
           <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">待出总额</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">$${Math.round(totalUsd).toLocaleString()}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">$${Math.round(totalUsd).toLocaleString()}</div>
         </div>
         <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
           <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">平均等候</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">${_humanDuration(avgAgeMs)}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600; color:var(--ink); margin-top:2px;">${_humanDuration(avgAgeMs)}</div>
         </div>
         <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);">
           <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">最久等待</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:${oldestAgeMs > 48*3600_000 ? 'var(--red)' : oldestAgeMs > 24*3600_000 ? 'var(--warning-deep)' : 'var(--ink)'}; margin-top:2px;">${_humanDuration(oldestAgeMs)}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600; color:${oldestAgeMs > 48*3600_000 ? 'var(--red)' : oldestAgeMs > 24*3600_000 ? 'var(--warning-deep)' : 'var(--ink)'}; margin-top:2px;">${_humanDuration(oldestAgeMs)}</div>
         </div>
         <div style="background:var(--cream); padding:10px 12px; border-radius:var(--r-sm);" title="基于团队近期出票节奏估算">
           <div style="font-size:10px; color:var(--muted); letter-spacing:0.08em; font-family:'JetBrains Mono',monospace; font-weight:600;">预计清空</div>
-          <div style="font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--accent-deep); margin-top:2px;">${escapeHtml(clearETAStr)}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:17px; font-weight:600; color:var(--accent-deep); margin-top:2px;">${escapeHtml(clearETAStr)}</div>
           <div style="font-size:10px; color:var(--muted); margin-top:2px;">${escapeHtml(clearRateStr)}</div>
         </div>
       </div>
@@ -7363,7 +7401,7 @@ function openBulkCancelModal() {
       <div style="background:var(--paper); border-radius:var(--r-lg); width:min(640px, 95vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
         <div style="padding:18px 24px; background:linear-gradient(135deg, var(--red), #8b3a2d); color:#fff;">
           <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.85; font-weight:600; margin-bottom:4px;">BULK CANCEL</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">批量撤单 · ${selected.length} 单</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600;">批量撤单 · ${selected.length} 单</div>
           <div style="font-size:12px; opacity:0.85; margin-top:4px;">合计 $${Math.round(totalUsd).toLocaleString()} · 此操作不可撤销</div>
         </div>
         <div style="padding:18px 24px; overflow:auto;">
@@ -7526,7 +7564,7 @@ function openBulkSetTableYModal(setY) {
       <div style="background:var(--paper); border-radius:var(--r-lg); width:min(640px, 95vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 25px 80px rgba(0,0,0,0.4);">
         <div style="padding:18px 24px; background:${headerBg}; color:#fff;">
           <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.85; font-weight:600; margin-bottom:4px;">BULK ${setY ? 'SET' : 'UNSET'} TABLE Y</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">${titleText}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600;">${titleText}</div>
           <div style="font-size:12px; opacity:0.85; margin-top:4px;">${subtitleText}</div>
         </div>
         <div style="padding:18px 24px; overflow:auto;">
@@ -13546,7 +13584,7 @@ function openStatsDashboard() {
         <div style="position:absolute;top:-30px;right:-20px;width:160px;height:160px;background:radial-gradient(circle,rgba(200,160,74,0.22) 0%,transparent 70%);pointer-events:none;"></div>
         <div style="position:relative;z-index:1;">
           <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;letter-spacing:0.2em;color:var(--accent);text-transform:uppercase;margin-bottom:4px;">analytics overview</div>
-          <div style="font-family:'Fraunces',serif;font-size:24px;font-weight:600;letter-spacing:-0.01em;">${CURRENT_LANG === 'en' ? 'Analytics Dashboard' : '数据统计仪表板'}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.01em;">${CURRENT_LANG === 'en' ? 'Analytics Dashboard' : '数据统计仪表板'}</div>
           <div style="font-size:12px;opacity:0.7;margin-top:4px;font-family:'JetBrains Mono',monospace;letter-spacing:0.04em;">${CURRENT_LANG === 'en' ? `${totalCount} ticketed · ${sortedMonths.length} months` : `${totalCount} 单已出票 · ${sortedMonths.length} 个月`}</div>
         </div>
         <button onclick="document.getElementById('statsOverlay').remove()" style="position:relative;z-index:1;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;border-radius:var(--r-sm);padding:7px 14px;cursor:pointer;font-size:12px;font-weight:500;transition:background 0.15s;" onmouseover="this.style.background='rgba(255,255,255,0.18)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">✕ ${CURRENT_LANG === 'en' ? 'Close' : '关闭'}</button>
@@ -13556,15 +13594,15 @@ function openStatsDashboard() {
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:24px 28px 0;">
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid var(--green);border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
           <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">REVENUE ${CURRENT_LANG === 'en' ? 'Total' : '总收入'}</div>
-          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--green);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">¥${Math.round(totalRevenue).toLocaleString()}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:26px;font-weight:600;color:var(--green);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">¥${Math.round(totalRevenue).toLocaleString()}</div>
         </div>
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid ${profitOk ? 'var(--accent)' : 'var(--red)'};border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
           <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">PROFIT ${CURRENT_LANG === 'en' ? 'Cumulative' : '累计利润'}</div>
-          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:${profitOk ? 'var(--accent-deep)' : 'var(--red)'};line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${profitOk ? '+' : ''}¥${Math.round(totalProfit).toLocaleString()}</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:26px;font-weight:600;color:${profitOk ? 'var(--accent-deep)' : 'var(--red)'};line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${profitOk ? '+' : ''}¥${Math.round(totalProfit).toLocaleString()}</div>
         </div>
         <div class="stats-card" style="background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:var(--r-md);padding:18px 16px;box-shadow:var(--shadow-xs);">
           <div style="font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;letter-spacing:0.15em;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">VOLUME ${CURRENT_LANG === 'en' ? 'Tickets' : '出票总数'}</div>
-          <div style="font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--blue);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${totalCount}<span style="font-size:14px;color:var(--muted);font-weight:400;margin-left:4px;">${CURRENT_LANG === 'en' ? 'orders' : '单'}</span></div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:26px;font-weight:600;color:var(--blue);line-height:1;letter-spacing:-0.01em;font-variant-numeric:tabular-nums lining-nums;">${totalCount}<span style="font-size:14px;color:var(--muted);font-weight:400;margin-left:4px;">${CURRENT_LANG === 'en' ? 'orders' : '单'}</span></div>
         </div>
       </div>
 
@@ -13572,7 +13610,7 @@ function openStatsDashboard() {
       <div style="padding:24px 28px 0;">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.18em;color:var(--accent-deep);text-transform:uppercase;">MONTHLY</span>
-          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Monthly breakdown' : '按月明细'}</span>
+          <span style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Monthly breakdown' : '按月明细'}</span>
           <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.04em;">${sortedMonths.length} months</span>
         </div>
         <div style="background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;">
@@ -13594,7 +13632,7 @@ function openStatsDashboard() {
       <div style="padding:24px 28px 0;">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);">
           <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.18em;color:var(--accent-deep);text-transform:uppercase;">LEADERBOARD</span>
-          <span style="font-family:'Fraunces',serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Cardholder ticket ranking' : '卡主出票排行'}</span>
+          <span style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;font-size:15px;font-weight:500;color:var(--ink);">${CURRENT_LANG === 'en' ? 'Cardholder ticket ranking' : '卡主出票排行'}</span>
           <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.04em;">top ${chLeaderboard.length}</span>
         </div>
         <div style="background:#fff;border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;">
@@ -15865,7 +15903,7 @@ function openPassengerHistoryModal(paxName, paxDob, paxPassport) {
         <div style="padding:20px 28px; background:linear-gradient(135deg, var(--ink), var(--ink-2)); color:#fff; display:flex; align-items:center; justify-content:space-between;">
           <div>
             <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--accent); font-weight:600; margin-bottom:4px;">PASSENGER HISTORY</div>
-            <div style="font-family:'Fraunces',serif; font-size:22px; font-weight:600;">${escapeHtml(paxName)} ${paxDob ? '<span style="font-size:13px; opacity:0.6; margin-left:8px; font-family:\'JetBrains Mono\',monospace;">' + escapeHtml(paxDob) + '</span>' : ''}</div>
+            <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:22px; font-weight:600;">${escapeHtml(paxName)} ${paxDob ? '<span style="font-size:13px; opacity:0.6; margin-left:8px; font-family:\'JetBrains Mono\',monospace;">' + escapeHtml(paxDob) + '</span>' : ''}</div>
             <div style="font-size:12px; opacity:0.75; margin-top:4px;">
               <span style="margin-right:14px;">${tier.icon} <strong style="color:${tier.color === 'var(--blue)' ? '#5b8bbd' : tier.color === 'var(--accent-deep)' ? '#e2b878' : '#fff'};">${tier.label || '回头客户'}</strong></span>
               <span style="margin-right:14px;">已出票 ${history.ticketedCount} 单</span>
@@ -17988,7 +18026,7 @@ function openQuickTicketModal(idx) {
       <div style="background:var(--paper); border-radius:var(--r-lg); width:min(480px,95vw); box-shadow:0 25px 80px rgba(0,0,0,0.4); overflow:hidden;">
         <div style="padding:18px 24px; background:linear-gradient(135deg, #1a6e3a, #0f4224); color:#fff;">
           <div style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.2em; opacity:0.8; font-weight:600; margin-bottom:4px;">QUICK TICKET</div>
-          <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600;">⚡ 快速出票</div>
+          <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:20px; font-weight:600;">⚡ 快速出票</div>
           <div style="font-size:12px; opacity:0.8; margin-top:4px;">${escapeHtml(paxName)} · ${escapeHtml(route)} · ${o.airline||'—'}</div>
         </div>
         <div style="padding:20px 24px;">
@@ -19216,11 +19254,11 @@ function renderBillingPanel() {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
       <div style="padding:16px 20px; background:linear-gradient(135deg,rgba(12,27,42,0.06),rgba(12,27,42,0.02)); border:1.5px solid var(--line); border-left:4px solid var(--ink); border-radius:var(--r-md);">
         <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:var(--muted); margin-bottom:6px;">代理未收款合计</div>
-        <div style="font-family:'Fraunces',serif; font-size:28px; font-weight:700; color:var(--ink);">${fmtRmb(totalAgentUnsettled)}</div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:28px; font-weight:700; color:var(--ink);">${fmtRmb(totalAgentUnsettled)}</div>
       </div>
       <div style="padding:16px 20px; background:linear-gradient(135deg,rgba(30,110,58,0.06),rgba(30,110,58,0.02)); border:1.5px solid var(--line); border-left:4px solid var(--green); border-radius:var(--r-md);">
         <div style="font-size:10px; font-weight:700; letter-spacing:0.12em; color:var(--muted); margin-bottom:6px;">卡主未付款合计</div>
-        <div style="font-family:'Fraunces',serif; font-size:28px; font-weight:700; color:#1a6e3a;">${fmtRmb(totalChUnsettled)}</div>
+        <div style="font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; font-size:28px; font-weight:700; color:#1a6e3a;">${fmtRmb(totalChUnsettled)}</div>
       </div>
     </div>`;
 
@@ -20624,7 +20662,7 @@ function openActionDialog(existing, prefilled = {}) {
 
   dialog.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; background:linear-gradient(135deg,var(--ink) 0%,#1e3248 100%); border-radius:var(--r-lg) var(--r-lg) 0 0;">
-      <h3 style="margin:0; font-size:16px; font-family:'Fraunces',serif; color:var(--paper); font-weight:600;">${isNew ? '＋ 新建处理记录' : '✎ 编辑处理记录'}</h3>
+      <h3 style="margin:0; font-size:16px; font-family:-apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', Roboto, sans-serif; color:var(--paper); font-weight:600;">${isNew ? '＋ 新建处理记录' : '✎ 编辑处理记录'}</h3>
       <button style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.7); border-radius:var(--r-sm); padding:3px 10px; cursor:pointer; font-size:14px;" onclick="closeActionDialog()">✕</button>
     </div>
     <div style="padding:20px 24px; display:flex; flex-direction:column; gap:18px;">
