@@ -15405,7 +15405,6 @@ const OFAC_API_BASE = 'https://sdn-openapi.netlify.app/api/search';
 // but neither full name token matches).
 const OFAC_MATCH_HIGH = 0.80;
 const OFAC_MATCH_LOW  = 0.65;
-const OFAC_MIN_SCORE  = OFAC_MATCH_LOW;  // legacy alias, used to filter results we keep
 const OFAC_DEBOUNCE_MS = 600;
 
 // Returns true if the OFAC result `r.name` actually shares meaningful name
@@ -22853,7 +22852,6 @@ async function loadPersistedOrders() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const FB_CONFIG_KEY = 'ticket-organizer-firebase-config';
-const FB_DOC_PATH   = 'ticket-organizer/main'; // collection/doc
 
 // ── Hardcoded Firebase config (deployed) ─────────────────────────────────
 // This config is intentionally embedded in the source so all devices opening
