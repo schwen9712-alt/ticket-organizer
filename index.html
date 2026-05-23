@@ -12700,34 +12700,38 @@ function renderPendingOrderActions(actions, o, idx) {
     const internalReportDone = !!done.internalReport;
     const paxCopyDone = !!done.paxCopy;
 
-    const doneStyle = 'background:#d8efd8; border-color:#7cb87c; color:var(--ink);';
-    const verifiedStyle = 'background:var(--green); border-color:var(--green); color:#fff;';
+    // ── Action button color rules ────────────────────────────────────────
+    // Only ONE button is colored: ✓ 已出票 (the terminal CTA).
+    // Everything else is neutral ghost. Status is shown via subtle
+    // background tint when "done", not via different button colors.
+    const doneStyle = 'background:rgba(34,134,58,0.08); color:var(--green); border-color:rgba(34,134,58,0.3);';
     const checkmark = '✓ ';
 
-    // Build secondary actions HTML (shown in dropdown)
+    // Secondary actions (dropdown) — all neutral ghost
     const secondaryActions = `
-      ${o.tableLabel === 'G' ? `<button class="btn ghost small" onclick="copyCardholderReport(${idx}); closeOrderMenu()" title="复制卡主报表（航司编码 + 出票美金）" style="border-color:#1a70d6; color:#1a70d6;">💳 卡主报表</button>` : ''}
-      <button class="btn small" onclick="openVerifyDialog(${idx}); closeOrderMenu()" style="${verifyDone ? verifiedStyle : ''}" title="${verifyDone ? '已校验' : '在航司官网核对航班/舱位/姓名'}">${verifyDone ? '✓ 已核对' : '🔍 官网校验'}</button>
-      <button class="btn ${passportDone ? '' : 'ghost'} small" onclick="openMRZDialog(${idx}); closeOrderMenu()" style="${passportDone ? doneStyle : ''}" title="粘贴护照 MRZ 给此单添加乘客">${passportDone ? checkmark : ''}📷 加护照</button>
-      <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? 'background:var(--warning-light); border-color:var(--warning); color:var(--warning-deep);' : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
-      <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? 'background:#e0e0e0; border-color:#888; color:#555;' : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
-      <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? 'background:#f3e5ff; border-color:#8e44ad; color:#6c2ea0;' : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
+      ${o.tableLabel === 'G' ? `<button class="btn ghost small" onclick="copyCardholderReport(${idx}); closeOrderMenu()" title="复制卡主报表（航司编码 + 出票美金）">💳 卡主报表</button>` : ''}
+      <button class="btn ghost small" onclick="openVerifyDialog(${idx}); closeOrderMenu()" style="${verifyDone ? doneStyle : ''}" title="${verifyDone ? '已校验' : '在航司官网核对航班/舱位/姓名'}">${verifyDone ? '✓ 已核对' : '🔍 官网校验'}</button>
+      <button class="btn ghost small" onclick="openMRZDialog(${idx}); closeOrderMenu()" style="${passportDone ? doneStyle : ''}" title="粘贴护照 MRZ 给此单添加乘客">${passportDone ? checkmark : ''}📷 加护照</button>
+      <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? doneStyle : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
+      <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
+      <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? doneStyle : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx}); closeOrderMenu()" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
-      ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx}); closeOrderMenu()" title="与行程/价格相同的订单合并乘客" style="background:var(--green-light);border-color:var(--green);color:var(--green);">⊕ 合单</button>` : ''}
-      ${o.tableLabel !== 'G' ? `<button class="btn ghost small" onclick="openQuickTicketModal(${idx}); closeOrderMenu()" title="快速出票：输入票号即可一键完成出票" style="border-color:var(--green); color:var(--green);">⚡ 快速出票</button>` : ''}
+      ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx}); closeOrderMenu()" title="与行程/价格相同的订单合并乘客">⊕ 合单</button>` : ''}
+      ${o.tableLabel !== 'G' ? `<button class="btn ghost small" onclick="openQuickTicketModal(${idx}); closeOrderMenu()" title="快速出票：输入票号即可一键完成出票">⚡ 快速出票</button>` : ''}
       <button class="btn ghost small" onclick="editOrderInNewTab(${idx}); closeOrderMenu()">✎ 完整编辑</button>
-      <button class="btn ghost small" onclick="removeOrder(${idx}); closeOrderMenu()" style="color:var(--red); border-color:var(--red);">✕ 删除</button>
+      <button class="btn ghost small" onclick="removeOrder(${idx}); closeOrderMenu()" style="color:var(--red);">✕ 删除</button>
     `;
 
+    // Primary actions — all neutral ghost except final ✓ 已出票 (the one CTA)
     actions.innerHTML = `
-      <button class="btn ${clientReportDone ? '' : 'accent'} small" onclick="markActionDone(${idx}, 'clientReport'); copyOrderCard(${idx}, 'client')" style="${clientReportDone ? doneStyle : ''}" ${!readyToReport ? 'title="填完编码和卡主后可以发送完整报表"' : ''}>${clientReportDone ? checkmark : ''}📋 代理商报表</button>
-      <button class="btn small" onclick="markActionDone(${idx}, 'internalReport'); copyOrderCard(${idx}, 'internal')" style="${internalReportDone ? doneStyle : ''}">${internalReportDone ? checkmark : ''}📋 记录员报表</button>
-      ${matched.length > 0 ? `<button class="btn ${paxCopyDone ? '' : 'ghost'} small" onclick="markActionDone(${idx}, 'paxCopy'); copyOrderPax(${idx})" style="${paxCopyDone ? doneStyle : ''}">${paxCopyDone ? checkmark : ''}📋 乘客</button>` : ''}
-      <button class="btn small" onclick="openCardholderDialog(${idx})" style="${chDone ? doneStyle : ''}" title="分配/更换卡主（可查看所有卡主当前负载）">${chDone ? checkmark : ''}💳 分配卡主</button>
+      <button class="btn ghost small" onclick="markActionDone(${idx}, 'clientReport'); copyOrderCard(${idx}, 'client')" style="${clientReportDone ? doneStyle : ''}" ${!readyToReport ? 'title="填完编码和卡主后可以发送完整报表"' : ''}>${clientReportDone ? checkmark : ''}📋 代理商报表</button>
+      <button class="btn ghost small" onclick="markActionDone(${idx}, 'internalReport'); copyOrderCard(${idx}, 'internal')" style="${internalReportDone ? doneStyle : ''}">${internalReportDone ? checkmark : ''}📋 记录员报表</button>
+      ${matched.length > 0 ? `<button class="btn ghost small" onclick="markActionDone(${idx}, 'paxCopy'); copyOrderPax(${idx})" style="${paxCopyDone ? doneStyle : ''}">${paxCopyDone ? checkmark : ''}📋 乘客</button>` : ''}
+      <button class="btn ghost small" onclick="openCardholderDialog(${idx})" style="${chDone ? doneStyle : ''}" title="分配/更换卡主（可查看所有卡主当前负载）">${chDone ? checkmark : ''}💳 分配卡主</button>
       <button class="btn ghost small" onclick="openReparseDialog(${idx})" title="重新粘贴PNR并解析此单的所有字段">⟲ 重新解析</button>
-      <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green);" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
+      <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green); color:#fff;" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
       <span style="position:relative; display:inline-block;">
-        <button class="btn ghost small" onclick="toggleOrderMenu(${idx}, event)" title="更多操作" style="padding:4px 8px;">⋯ 更多</button>
+        <button class="btn ghost small" onclick="toggleOrderMenu(${idx}, event)" title="更多操作">⋯ 更多</button>
         <div id="orderMenu-${idx}" class="order-action-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; padding:6px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-md); z-index:100; min-width:240px; max-width:300px;">
           <div style="display:flex; flex-direction:column; gap:4px;">
             ${secondaryActions}
