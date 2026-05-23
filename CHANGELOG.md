@@ -37,6 +37,69 @@
 
 ---
 
+## 2026-05-23 20:38 — 简单密码登录（保护 Firestore 数据）
+
+**改了什么**:
+- 新增「锁屏式」登录页：进入网址 → 弹出密码框 → 输对了才显示 app
+- 新增 `sha256()` 和 `hashPassword()`（用 Web Crypto API，加固定盐 `tkto-2026-v1`）
+- 新增 `verifyPassword()`：和 Firestore `ticket-organizer/auth` 文档里的 hash 对比
+- 新增 `tryAutoLogin()`：localStorage 存了已验证 hash 时跳过登录页
+- 新增 `changePassword()`：设置页修改密码（要旧密码 + 两次新密码确认）
+- 新增 `logoutAndShowGate()`：手动登出当前设备
+- 拆分 `fbInit()`：现在只做 SDK setup，不再立刻读 Firestore
+- 新增 `fbStartSync()`：登录通过后才拉数据 + 订阅 onSnapshot
+- 启动流程改为：init Firebase → 检查 auth（自动或弹窗）→ 通过后 fbStartSync
+- `fbScheduleWrite` 和 `fbPushNow` 都加了 `_authReady` 守卫
+- 设置页新增「🔒 登录密码」区块：修改密码 + 退出登录 + 忘记密码恢复指引
+
+**密码机制**:
+- 初始密码：`change_me_now`（用户首次登录后必须改）
+- 哈希算法：SHA-256，加固定 salt
+- 存储：Firestore `ticket-organizer/auth` 文档存 hash（不存明文）
+- 设备记忆：localStorage 存 hash，下次自动跳过登录页
+- 改密后：其他设备本地存的 hash 与远程不匹配，会自动要求重新登录
+
+**为什么改**:
+- 用户用 Firebase config 写死在代码里 + GitHub Pages 公开访问，任何人都能看数据
+- 用户接受这个权衡但希望加一道密码保护
+- 用户要求「找回密码」机制 → 提供「Firebase 控制台手动重置 auth doc」的指引
+
+**风险或注意事项**:
+- ⚠️ **Firestore 规则还没改** — 即使前端有登录页，没改规则的话陌生人理论上还能直接调 Firestore API 读写
+- ⚠️ 必须接着加 Firestore 规则才完整安全（下一步要做的事）
+- 密码哈希加盐用的是 SHA-256，对单纯字典攻击足够，但盐是固定的（不是 per-user salt）
+- 「记住我」永久 → 浏览器清缓存会要求重新登录
+
+**待办**:
+- [ ] 加 Firestore 安全规则（要求 client 验证才允许写）
+- [ ] 测试：在新设备打开 → 输 change_me_now → 进 app → 在设置改密码 → 在另一设备验证
+
+---
+
+## 2026-05-23 06:50 — Firebase config 写死到代码（零配置同步）
+
+**改了什么**:
+- 新增 `FB_DEFAULT_CONFIG` 常量直接嵌入源码（包含 apiKey/projectId 等）
+- `loadFbConfig()` 改为：先看 localStorage 自定义 config，没有则用 default
+- 启动时自动用 default config 连接 Firebase，无需手动粘贴
+- 设置页 UI 改造：
+  - 提示文字改为「✓ 自动连接」
+  - 输入框折叠在 `<details>` 里（标签「⚙ 自定义 Firebase 项目（高级）」），不挤占设置页
+  - 「断开」按钮 → 改为「恢复默认」（断开变成无意义操作）
+
+**为什么改**:
+- 用户希望所有设备打开同一个 GitHub Pages 网址就能立刻同步，无需手动配置
+- 三台设备每次都要手动配 Firebase config 麻烦
+- 用户**已知风险**：apiKey 公开在源码里，理论上访问网址的人都能读写 Firestore
+
+**风险或注意事项**:
+- ⚠️ **严重提醒**：GitHub Pages 是公开的，任何人访问 URL 都能直接连这个 Firebase 项目，读取/修改/删除所有订单数据
+- ⚠️ Test mode 30 天后过期 — 必须前往 Firebase 控制台改 Firestore 规则
+- 推荐的最低限度规则：限制 collection 路径 + 限制文档大小，避免被恶意刷爆
+- 用户接受了这个风险，但应该尽快加规则保护
+
+---
+
 ## 2026-05-23 06:35 — 大扫除：清理 JSONBin/Gist/Team 残留代码
 
 **改了什么**:

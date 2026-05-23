@@ -3474,38 +3474,64 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     </div>
   </div>
 
+  <div class="section" style="border-left: 3px solid var(--ink);">
+    <div class="section-title"><span class="num" style="background:var(--ink);">🔒</span>登录密码 <span class="zh">控制谁能访问你的数据</span></div>
+    <div class="hint" style="margin-bottom:12px;">
+      所有打开此网址的设备都需要先输入密码才能访问数据。<br>
+      <strong>初始密码：</strong><code style="background:var(--paper-2); padding:1px 6px; border-radius:3px;">change_me_now</code> — 第一次登录后请立即修改。
+    </div>
+
+    <div style="display:grid; grid-template-columns:120px 1fr; gap:8px 12px; align-items:center; max-width:480px;">
+      <label style="font-size:13px; color:var(--ink);">当前密码</label>
+      <input type="password" id="authOldPwd" placeholder="输入旧密码"
+             style="padding:7px 10px; font-size:13px; border:1px solid var(--line-strong); border-radius:var(--r-sm); font-family:inherit;">
+      <label style="font-size:13px; color:var(--ink);">新密码</label>
+      <input type="password" id="authNewPwd" placeholder="至少 6 位"
+             style="padding:7px 10px; font-size:13px; border:1px solid var(--line-strong); border-radius:var(--r-sm); font-family:inherit;">
+      <label style="font-size:13px; color:var(--ink);">确认新密码</label>
+      <input type="password" id="authNewPwd2" placeholder="再次输入新密码"
+             style="padding:7px 10px; font-size:13px; border:1px solid var(--line-strong); border-radius:var(--r-sm); font-family:inherit;">
+    </div>
+    <div style="margin-top:14px; display:flex; gap:8px;">
+      <button class="btn small" onclick="changePassword()">修改密码</button>
+      <button class="btn ghost small" onclick="logoutAndShowGate()" style="color:var(--red);">退出登录（其他设备不受影响）</button>
+    </div>
+    <div style="margin-top:14px; padding:10px 12px; background:var(--paper-2); border-radius:var(--r-sm); font-size:11px; color:var(--muted); line-height:1.6;">
+      <strong>密码忘了怎么办？</strong><br>
+      去 Firebase 控制台 → Firestore Database → 找到 <code>ticket-organizer/auth</code> 文档 → 删除它（或修改 hash 字段）→ 下次登录会用初始密码 <code>change_me_now</code> 重置。
+    </div>
+  </div>
+
   <div class="section" style="border-left: 3px solid #ff9800;">
     <div class="section-title"><span class="num" style="background:#ff9800;">🔥</span>FIREBASE 实时同步 <span class="zh">手机/电脑/平板 实时同步同一份数据</span></div>
     <div class="hint" style="margin-bottom:12px;">
-      所有设备使用同一个 Firebase 项目，<strong>改动 1 秒内同步到其他设备</strong>，无需手动刷新。支持离线编辑，联网后自动同步。<br>
-      <strong>配置步骤（一次性，5分钟）：</strong><br>
-      1. 打开 <a href="https://console.firebase.google.com" target="_blank" style="color:#ff9800;">console.firebase.google.com</a> → 「创建项目」<br>
-      2. 项目创建后 → 左侧「Firestore Database」→ 「创建数据库」→ 选「测试模式」→ 选择地区（推荐 us-central1）<br>
-      3. 项目设置（齿轮图标）→ 「常规」→ 拖到底「您的应用」→ 点 <code>&lt;/&gt;</code> Web 图标 → 填昵称 → 「注册应用」<br>
-      4. 复制出现的 <code>firebaseConfig = { ... }</code> 整段内容 → 粘贴到下方输入框 → 点「保存连接」<br>
-      5. 在其他设备打开同一个网址，重复粘贴同一个 config 即可同步
+      <strong>✓ 自动连接</strong> — 打开网址即可同步，无需手动配置。任何设备改动 1 秒内同步到其他设备。<br>
+      <span style="color:var(--muted); font-size:11px;">高级用户可在下方输入框粘贴自己的 Firebase config 来使用独立项目。留空则使用默认配置。</span>
     </div>
     <div id="fbSyncStatus" style="padding:8px 12px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:12px;">
       <span id="fbStatusText">未配置</span>
     </div>
-    <div class="setting-row" style="align-items:flex-start;">
-      <div style="flex:1;">
-        <div class="label">Firebase Config</div>
-        <div class="desc">粘贴整段 <code>const firebaseConfig = { ... }</code>，或仅 <code>{ apiKey:..., projectId:... }</code> 对象</div>
-      </div>
-      <div style="display:flex; gap:4px; flex-direction:column;">
-        <textarea id="s-fbConfig" placeholder='{
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer; font-size:12px; color:var(--muted);">⚙ 自定义 Firebase 项目（高级）</summary>
+      <div class="setting-row" style="align-items:flex-start; margin-top:8px;">
+        <div style="flex:1;">
+          <div class="label">Firebase Config</div>
+          <div class="desc">粘贴整段 <code>const firebaseConfig = { ... }</code>，或仅 <code>{ apiKey:..., projectId:... }</code> 对象</div>
+        </div>
+        <div style="display:flex; gap:4px; flex-direction:column;">
+          <textarea id="s-fbConfig" placeholder='{
   apiKey: "AIza...",
   authDomain: "xxx.firebaseapp.com",
   projectId: "xxx",
   ...
 }' style="width:340px; height:120px; font-size:10px; font-family:'JetBrains Mono',monospace; padding:8px; border:1.5px solid var(--line); border-radius:var(--r-sm); resize:vertical;"></textarea>
-        <div style="display:flex; gap:4px;">
-          <button class="btn small" onclick="saveFbConfig()" style="background:#ff9800; border-color:#ff9800; color:#fff; flex:1;">保存并连接</button>
-          <button class="btn small ghost" onclick="clearFbConfig()" style="color:var(--red);">断开</button>
+          <div style="display:flex; gap:4px;">
+            <button class="btn small" onclick="saveFbConfig()" style="background:#ff9800; border-color:#ff9800; color:#fff; flex:1;">保存覆盖</button>
+            <button class="btn small ghost" onclick="clearFbConfig()" style="color:var(--red);">恢复默认</button>
+          </div>
         </div>
       </div>
-    </div>
+    </details>
   </div>
 
   <div class="section" style="border-left: 3px solid #0f9d58;">
@@ -22813,6 +22839,196 @@ async function loadPersistedOrders() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// SIMPLE PASSWORD AUTH — lightweight gate to prevent strangers from
+// reading/writing the Firestore data. Hash stored in Firestore at
+// ticket-organizer/auth. Local "remember me" flag in localStorage.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const AUTH_INITIAL_PASSWORD = 'change_me_now';  // initial seed; user must change after first login
+const AUTH_SALT = 'tkto-2026-v1';                // fixed app-level salt
+const AUTH_REMEMBER_KEY = 'ticket-organizer-auth-remember';
+
+let _authPasswordHash = null;  // current verified hash, in-memory only
+let _authReady = false;        // true after successful login
+
+async function sha256(text) {
+  const buf = new TextEncoder().encode(text);
+  const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hashBuf))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(pwd) {
+  return await sha256(AUTH_SALT + ':' + pwd);
+}
+
+// Show the lock screen overlay. Returns a promise that resolves after success.
+function showAuthGate(message) {
+  return new Promise(resolve => {
+    let gate = document.getElementById('authGate');
+    if (gate) gate.remove();
+
+    gate = document.createElement('div');
+    gate.id = 'authGate';
+    gate.style.cssText = `
+      position: fixed; inset: 0; z-index: 99999;
+      background: var(--paper); color: var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      font-family: inherit;
+    `;
+    gate.innerHTML = `
+      <div style="max-width:380px; width:90%; padding:40px 32px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-md);">
+        <h2 style="margin:0 0 6px 0; font-size:18px; font-weight:700; color:var(--ink);">🔒 Ticket Organizer</h2>
+        <p style="margin:0 0 24px 0; font-size:13px; color:var(--muted);">${message || '请输入密码以访问数据'}</p>
+        <input type="password" id="authGateInput" placeholder="密码" autofocus
+               style="width:100%; box-sizing:border-box; padding:10px 12px; font-size:14px;
+                      border:1px solid var(--line-strong); border-radius:var(--r-sm); margin-bottom:8px;
+                      font-family:inherit;">
+        <div id="authGateError" style="display:none; font-size:12px; color:var(--red); margin-bottom:8px;"></div>
+        <button id="authGateBtn"
+                style="width:100%; padding:10px; font-size:14px; font-weight:600;
+                       background:var(--ink); color:var(--paper); border:none;
+                       border-radius:var(--r-sm); cursor:pointer; margin-top:6px;">
+          登录
+        </button>
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--line); font-size:11px; color:var(--muted); line-height:1.6;">
+          首次使用？初始密码：<code style="background:var(--paper-2); padding:1px 6px; border-radius:3px;">${AUTH_INITIAL_PASSWORD}</code><br>
+          登录后请立即在设置页修改密码。
+        </div>
+      </div>
+    `;
+    document.body.appendChild(gate);
+
+    const input = document.getElementById('authGateInput');
+    const btn = document.getElementById('authGateBtn');
+    const err = document.getElementById('authGateError');
+
+    const tryLogin = async () => {
+      const pwd = input.value;
+      if (!pwd) return;
+      btn.disabled = true;
+      btn.textContent = '验证中...';
+      err.style.display = 'none';
+      try {
+        const ok = await verifyPassword(pwd);
+        if (ok) {
+          _authPasswordHash = await hashPassword(pwd);
+          localStorage.setItem(AUTH_REMEMBER_KEY, _authPasswordHash);
+          _authReady = true;
+          gate.style.transition = 'opacity 0.3s';
+          gate.style.opacity = '0';
+          setTimeout(() => { gate.remove(); resolve(true); }, 300);
+        } else {
+          err.textContent = '密码错误';
+          err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = '登录';
+          input.value = '';
+          input.focus();
+        }
+      } catch (e) {
+        err.textContent = '验证失败：' + e.message;
+        err.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = '登录';
+      }
+    };
+
+    btn.addEventListener('click', tryLogin);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
+  });
+}
+
+// Verify password against Firestore (or create with initial seed if no auth doc).
+async function verifyPassword(pwd) {
+  if (!_fb) throw new Error('Firebase 未连接');
+  const { db, doc, getDoc, setDoc } = _fb;
+  const authRef = doc(db, 'ticket-organizer', 'auth');
+  const snap = await getDoc(authRef);
+  const inputHash = await hashPassword(pwd);
+
+  if (!snap.exists()) {
+    // First-time: create the auth doc with the initial password
+    const initialHash = await hashPassword(AUTH_INITIAL_PASSWORD);
+    await setDoc(authRef, { hash: initialHash, createdAt: Date.now() });
+    return inputHash === initialHash;
+  }
+  return inputHash === snap.data().hash;
+}
+
+// Try to skip the login gate using localStorage remembered hash.
+async function tryAutoLogin() {
+  if (!_fb) return false;
+  const remembered = localStorage.getItem(AUTH_REMEMBER_KEY);
+  if (!remembered) return false;
+  try {
+    const { db, doc, getDoc, setDoc } = _fb;
+    const authRef = doc(db, 'ticket-organizer', 'auth');
+    const snap = await getDoc(authRef);
+    if (!snap.exists()) {
+      // First-time setup — seed initial password
+      const initialHash = await hashPassword(AUTH_INITIAL_PASSWORD);
+      await setDoc(authRef, { hash: initialHash, createdAt: Date.now() });
+      // Remembered hash won't match initial; require login
+      return false;
+    }
+    if (remembered === snap.data().hash) {
+      _authPasswordHash = remembered;
+      _authReady = true;
+      return true;
+    }
+    // Password was changed elsewhere — clear local memory
+    localStorage.removeItem(AUTH_REMEMBER_KEY);
+    return false;
+  } catch (e) {
+    console.warn('Auto-login failed:', e);
+    return false;
+  }
+}
+
+// Change password — called from settings page.
+async function changePassword() {
+  const oldPwdEl = document.getElementById('authOldPwd');
+  const newPwdEl = document.getElementById('authNewPwd');
+  const new2El = document.getElementById('authNewPwd2');
+  if (!oldPwdEl || !newPwdEl || !new2El) return;
+  const oldPwd = oldPwdEl.value;
+  const newPwd = newPwdEl.value;
+  const new2 = new2El.value;
+
+  if (!oldPwd || !newPwd) { toast('请填写旧密码和新密码'); return; }
+  if (newPwd !== new2)    { toast('两次输入的新密码不一致'); return; }
+  if (newPwd.length < 6)  { toast('新密码至少 6 位'); return; }
+  if (newPwd === AUTH_INITIAL_PASSWORD) { toast('请不要使用初始密码'); return; }
+
+  try {
+    const ok = await verifyPassword(oldPwd);
+    if (!ok) { toast('旧密码错误'); return; }
+
+    const newHash = await hashPassword(newPwd);
+    const { db, doc, setDoc } = _fb;
+    await setDoc(doc(db, 'ticket-organizer', 'auth'), {
+      hash: newHash,
+      updatedAt: Date.now()
+    });
+    _authPasswordHash = newHash;
+    localStorage.setItem(AUTH_REMEMBER_KEY, newHash);
+    oldPwdEl.value = ''; newPwdEl.value = ''; new2El.value = '';
+    toast('✓ 密码已更新。其他设备下次打开需重新登录。');
+  } catch (e) {
+    toast('修改失败：' + e.message);
+  }
+}
+
+function logoutAndShowGate() {
+  if (!confirm('确认退出登录？')) return;
+  localStorage.removeItem(AUTH_REMEMBER_KEY);
+  _authPasswordHash = null;
+  _authReady = false;
+  location.reload();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // FIREBASE FIRESTORE SYNC
 // Real-time multi-device sync. All devices using the same Firebase config
 // share one document. onSnapshot pushes changes to all devices instantly.
@@ -22824,6 +23040,21 @@ async function loadPersistedOrders() {
 const FB_CONFIG_KEY = 'ticket-organizer-firebase-config';
 const FB_DOC_PATH   = 'ticket-organizer/main'; // collection/doc
 
+// ── Hardcoded Firebase config (deployed) ─────────────────────────────────
+// This config is intentionally embedded in the source so all devices opening
+// the GitHub Pages URL get instant sync without needing manual setup.
+// SECURITY NOTE: The apiKey here is a Firebase project identifier, not a
+// password. The actual access control happens via Firestore Security Rules
+// (configure in Firebase Console → Firestore → Rules).
+const FB_DEFAULT_CONFIG = {
+  apiKey: "AIzaSyB8i6_JRA1C5K_tRJgCMxN38ceg4WqY-Mk",
+  authDomain: "ticker-orangizer.firebaseapp.com",
+  projectId: "ticker-orangizer",
+  storageBucket: "ticker-orangizer.firebasestorage.app",
+  messagingSenderId: "358841344991",
+  appId: "1:358841344991:web:c73fd8f1a4736e3fec5a6a"
+};
+
 let _fb = null;              // { app, db } once initialized
 let _fbUnsubscribe = null;   // onSnapshot listener cleanup
 let _fbWriteTimer = null;    // debounce
@@ -22831,10 +23062,13 @@ let _fbApplyingRemote = false; // guard against echo loops
 let _fbLastWriteAt = 0;      // timestamp of our last write (to ignore echo)
 
 function loadFbConfig() {
+  // Prefer user-overridden config in localStorage (for advanced users who
+  // want to point at their own Firebase project), else use hardcoded default.
   try {
     const raw = localStorage.getItem(FB_CONFIG_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch(e) { return null; }
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return FB_DEFAULT_CONFIG;
 }
 
 function saveFbConfig() {
@@ -22868,12 +23102,13 @@ function saveFbConfig() {
 }
 
 function clearFbConfig() {
-  if (!confirm('确认断开 Firebase 同步？本地数据不变。')) return;
+  if (!confirm('恢复默认 Firebase 配置？将使用内置的共享项目。')) return;
   localStorage.removeItem(FB_CONFIG_KEY);
   if (_fbUnsubscribe) { _fbUnsubscribe(); _fbUnsubscribe = null; }
   _fb = null;
   updateFbStatus();
-  toast('✓ 已断开 Firebase');
+  // Reconnect with default config
+  fbInit().then(() => toast('✓ 已恢复默认 Firebase 配置')).catch(e => toast('❌ 连接失败：' + e.message));
 }
 
 function updateFbStatus() {
@@ -22909,9 +23144,16 @@ async function fbInit() {
 
   _fb = { app, db, doc, getDoc, setDoc, onSnapshot };
   updateFbStatus();
+  return _fb;
+}
 
-  // Initial pull: read remote doc, if newer than local, apply
+// Pull the main data doc + subscribe to live updates. Called AFTER auth passes.
+async function fbStartSync() {
+  if (!_fb || !_authReady) return;
+  const { db, doc, getDoc, onSnapshot } = _fb;
   const docRef = doc(db, 'ticket-organizer', 'main');
+
+  // Initial pull
   try {
     const snap = await getDoc(docRef);
     if (snap.exists()) {
@@ -22935,8 +23177,6 @@ async function fbInit() {
   }, (err) => {
     console.warn('Firebase listener error:', err);
   });
-
-  return _fb;
 }
 
 async function fbApplyRemote(remote, isInitial) {
@@ -22970,13 +23210,13 @@ async function fbApplyRemote(remote, isInitial) {
 }
 
 function fbScheduleWrite() {
-  if (!_fb || _fbApplyingRemote) return;
+  if (!_fb || _fbApplyingRemote || !_authReady) return;
   if (_fbWriteTimer) clearTimeout(_fbWriteTimer);
   _fbWriteTimer = setTimeout(() => fbPushNow(), 800);  // 800ms debounce
 }
 
 async function fbPushNow() {
-  if (!_fb) return;
+  if (!_fb || !_authReady) return;
   const { db, doc, setDoc } = _fb;
   const now = Date.now();
   _fbLastWriteAt = now;
@@ -23718,11 +23958,25 @@ async function mergeImportData(event) {
   updateFbStatus();        // show Firebase sync status in settings
   refreshAiParseZone();    // show/hide AI image upload zone based on key
 
-  // ── Firebase real-time sync: init if configured ─────────────────────────
-  // Hook persistence functions BEFORE init, so the very first changes also sync.
+  // ── Firebase + Auth bootstrap ───────────────────────────────────────────
+  // Sequence: init Firebase SDK → check auth (auto or show login gate) →
+  // ONLY after auth passes, do the full data pull + start listening.
   fbHookPersistence();
   if (loadFbConfig()) {
-    fbInit().catch(e => console.warn('Firebase init failed:', e));
+    (async function bootstrapAuth() {
+      try {
+        await fbInit();
+        // Auth is checked once Firebase is connected
+        const autoLoggedIn = await tryAutoLogin();
+        if (!autoLoggedIn) {
+          await showAuthGate();  // blocks until user enters correct password
+        }
+        // Now safe to pull data + subscribe to live updates
+        await fbStartSync();
+      } catch (e) {
+        console.warn('Auth/Firebase bootstrap failed:', e);
+      }
+    })();
   }
 
   // Safety mechanism 3: Daily backup reminder.
