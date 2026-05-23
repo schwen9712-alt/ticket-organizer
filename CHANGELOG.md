@@ -37,6 +37,53 @@
 
 ---
 
+## 2026-05-23 06:35 — 大扫除：清理 JSONBin/Gist/Team 残留代码
+
+**改了什么**:
+- 移除启动时的 orphan 调用：`await loadCloudConfig()` 和 `await loadGistConfig()`（这两个函数早已删除，运行时报「is not a function」会中断初始化）
+- 移除 `TEAM_STORAGE_KEY` 常量及相关 storage IO（团队功能依赖 JSONBin，已不可用）
+- 移除 `loadTeamConfig` / `saveMyName` / `saveViewMode` / `saveTeamConfigLocal`
+- 移除 60 秒自动同步定时器代码（`startAutoSync` / `updateSyncStatus` / `silentCloudSync` / `triggerManualSync` / `_autoSyncTimer` / `_lastSyncAt` / `_syncFailCount`）
+- 移除「员工模式 filter banner」死代码（依赖已删除的 saveViewMode）
+- 移除主初始化函数里的 `loadTeamConfig()` 调用
+
+**保留**:
+- `_teamConfig` 变量（默认 `{viewMode:'all', myName:''}`），因为 `applyViewModeFilter` / `tagOrderWithUser` 还引用
+- `enteredBy` 订单字段（向后兼容老数据）
+
+**为什么改**:
+- 用户要求「整体审计一遍修 BUG」
+- 发现启动时会调用不存在的函数 → 静默吞掉错误但破坏后续逻辑
+- 这些残留是删 JSONBin 时漏的（团队功能依赖 JSONBin 的共享 bin）
+
+**验证**:
+- ✅ Syntax OK
+- ✅ No duplicate function defs
+- ✅ 18 个 orphan 引用名全部清干净
+- ✅ 9 个关键函数（fbInit / renderBillingPanel / persistOrders 等）完整
+
+**风险或注意事项**:
+- 文件减少约 100 行
+- 多人协作 + 自动 60s 拉取功能彻底没了，但 Firebase 实时同步覆盖了这个需求且更好
+
+---
+
+## 2026-05-23 06:25 — 修复「⋯ 更多」下拉菜单遮挡问题
+
+**改了什么**:
+- 下拉菜单展开方向：从「按钮下方」`top:100%` 改为「按钮上方」`bottom:100%`
+- z-index 从 100 提到 1000，避免被相邻订单卡片堆叠遮挡
+
+**为什么改**:
+- 用户反馈点击「⋯ 更多」后菜单不可见或点不到
+- 「⋯ 更多」按钮位于订单卡片底部，向下空间被下一张卡挡住
+- 向上展开能完全显示
+
+**风险或注意事项**:
+- 如果订单是页面第一张且 viewport 顶部空间不够，可能会被截断（边缘情况，先不处理）
+
+---
+
 ## 2026-05-23 06:10 — 按钮配色统一：去掉五颜六色
 
 **改了什么**:

@@ -11978,20 +11978,7 @@ function renderPendingList() {
   }
   // ──────────────────────────────────────────────────────────────────────────
   // ────────────────────────────────────────────────────────────────────────
-
-  // Show filter banner if in employee mode
-  const filterBanner = document.getElementById('viewModeFilterBanner');
-  if (!filterBanner && _teamConfig && _teamConfig.viewMode === 'mine' && _teamConfig.myName) {
-    const banner = document.createElement('div');
-    banner.id = 'viewModeFilterBanner';
-    banner.style.cssText = 'background:var(--warning-light);border:1px solid var(--warning);border-radius:4px;padding:6px 12px;margin-bottom:10px;font-size:12px;display:flex;align-items:center;justify-content:space-between;';
-    banner.innerHTML = `<span>👤 员工模式 — 只显示「${escapeHtml(_teamConfig.myName)}」录入的订单（共 ${meaningful.length} 单）</span><button onclick="saveViewMode('all')" style="background:none;border:none;cursor:pointer;font-size:11px;color:var(--warning-deep);text-decoration:underline;">切换到全部</button>`;
-    area.parentNode.insertBefore(banner, area);
-  } else if (filterBanner && (!_teamConfig || _teamConfig.viewMode !== 'mine')) {
-    filterBanner.remove();
-  } else if (filterBanner && _teamConfig && _teamConfig.viewMode === 'mine') {
-    filterBanner.querySelector('span').textContent = `👤 员工模式 — 只显示「${_teamConfig.myName}」录入的订单（共 ${meaningful.length} 单）`;
-  }
+  // (Team/employee filter banner removed — _teamConfig.viewMode is always 'all')
 
   const batchActions = document.getElementById('pendingBatchActions');
 
@@ -12732,7 +12719,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green); color:#fff;" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
       <span style="position:relative; display:inline-block;">
         <button class="btn ghost small" onclick="toggleOrderMenu(${idx}, event)" title="更多操作">⋯ 更多</button>
-        <div id="orderMenu-${idx}" class="order-action-menu" style="display:none; position:absolute; top:100%; right:0; margin-top:4px; padding:6px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-md); z-index:100; min-width:240px; max-width:300px;">
+        <div id="orderMenu-${idx}" class="order-action-menu" style="display:none; position:absolute; bottom:100%; right:0; margin-bottom:6px; padding:6px; background:var(--paper); border:1px solid var(--line); border-radius:var(--r-md); box-shadow:var(--shadow-md); z-index:1000; min-width:240px; max-width:300px;">
           <div style="display:flex; flex-direction:column; gap:4px;">
             ${secondaryActions}
           </div>
@@ -19030,110 +19017,28 @@ async function deleteTicketed(id) {
 // ── CHASE TRAVEL panel ─────────────────────────────────────────────────────
 // Shows all pending orders with tableLabel='G' (产G = CHASE TRAVEL bookings).
 // Layout mirrors the pending tab but filtered.
-// ── TEAM MANAGEMENT v2 — shared Sync Key, real-time polling ─────────────────
-// Architecture: everyone shares ONE Sync Key (same jsonbin bin).
-// Each order tagged with o.enteredBy = myName on creation.
-// viewMode='all' → see all orders (boss). viewMode='mine' → filter by enteredBy (employee).
-// Auto-polls every 60s to pick up changes from other users.
-
-const TEAM_STORAGE_KEY = 'ticket-organizer-team';
+// ── TEAM MANAGEMENT — minimal stub ──────────────────────────────────────
+// The full team/multi-user feature was removed when JSONBin sync was removed.
+// We keep `_teamConfig` so view-mode filter code still works (always 'all').
 let _teamConfig = { myName: '', viewMode: 'all' };
-let _autoSyncTimer = null;
-let _lastSyncAt = null;
 
-async function loadTeamConfig() {
-  try {
-    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
-    if (raw) _teamConfig = { myName: '', viewMode: 'all', ...JSON.parse(raw) };
-  } catch (e) {}
-  const nameInp = document.getElementById('s-myName');
-  if (nameInp) nameInp.value = _teamConfig.myName || '';
-  const modeEl = document.getElementById('s-viewMode');
-  if (modeEl) modeEl.value = _teamConfig.viewMode || 'all';
-  // Start auto-sync if Sync Key is set
-  startAutoSync();
-}
-
-function saveTeamConfigLocal() {
-  localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(_teamConfig));
-}
-
-function saveMyName() {
-  const inp = document.getElementById('s-myName');
-  if (!inp) return;
-  _teamConfig.myName = inp.value.trim();
-  saveTeamConfigLocal();
-  toast(`✓ 名字已保存：${_teamConfig.myName || '(未填)'}`);
-}
-
-function saveViewMode(val) {
-  _teamConfig.viewMode = val;
-  saveTeamConfigLocal();
-  // Re-render the pending list to apply filter
-  renderPendingList();
-  renderPendingBanner();
-  const modeEl = document.getElementById('s-viewMode');
-  if (modeEl) modeEl.value = val;
-  toast(val === 'mine' ? '👤 员工模式：只显示我录入的订单' : '👁 老板模式：显示全部订单');
-}
-
-// Filter orders based on viewMode
+// Filter orders based on viewMode (kept for compatibility; with default config
+// it always returns the full list unchanged).
 function applyViewModeFilter(orders) {
   if (!_teamConfig.viewMode || _teamConfig.viewMode === 'all') return orders;
   const myName = (_teamConfig.myName || '').trim();
-  if (!myName) return orders;  // no name set → show all
+  if (!myName) return orders;
   return orders.filter(o => (o.enteredBy || '') === myName || !(o.enteredBy));
 }
 
-// Tag new orders with enteredBy when created
+// Tag new orders with enteredBy when created (no-op with empty myName)
 function tagOrderWithUser(o) {
   if (_teamConfig.myName && !o.enteredBy) {
     o.enteredBy = _teamConfig.myName;
   }
 }
 
-// Auto-sync: poll cloud every 60 seconds
-// Auto-sync: poll cloud every 60 seconds, with backoff on consecutive failures
-let _syncFailCount = 0;
-function startAutoSync() {
-  if (_autoSyncTimer) clearInterval(_autoSyncTimer);
-  _autoSyncTimer = setInterval(() => {
-    if (!document.hidden) silentCloudSync();
-  }, 60000);
-  updateSyncStatus();
-}
 
-function updateSyncStatus() {
-  const el = document.getElementById('autoSyncStatus');
-  if (!el) return;
-  if (_lastSyncAt) {
-    const ago = Math.round((Date.now() - _lastSyncAt) / 1000);
-    const failNote = _syncFailCount > 0 ? ` · ⚠ 连续失败${_syncFailCount}次` : '';
-    el.textContent = `上次同步 ${ago < 60 ? ago + '秒' : Math.round(ago/60) + '分'}前 · 每60秒自动拉取${failNote}`;
-  } else {
-    el.textContent = '已启用自动同步（60秒/次）';
-  }
-}
-
-async function silentCloudSync() {
-  try {
-    _lastSyncAt = Date.now();
-    _syncFailCount = 0;
-    updateSyncStatus();
-  } catch (e) {
-    _syncFailCount++;
-    console.warn(`[AutoSync] failed (${_syncFailCount}x):`, e);
-    updateSyncStatus();
-  }
-}
-
-async function triggerManualSync() {
-  toast('⏳ 正在同步…');
-  await silentCloudSync();
-  toast('✓ 同步完成');
-}
-
-// Team panel — shows who entered what
 // ═══════════════════════════════════════════════════════════════════════════
 // BILLING PANEL — 账单视图
 // Shows two tables from ticketed orders only:
@@ -23737,7 +23642,7 @@ async function mergeImportData(event) {
     try { setTimeout(() => scrubChineseTextNodes(), 50); } catch(_) {}
     try { startI18nObserver(); } catch(_) {}
   }
-  loadTeamConfig();
+  // (loadTeamConfig removed with team feature)
   _loadCollapsedOrders();
   initKeyboardShortcuts();
   checkAutoBackupReminder();
@@ -23805,9 +23710,7 @@ async function mergeImportData(event) {
     if (pendingCount > 0) toast(`已恢复 ${pendingCount} 单待处理订单`);
   }
 
-  // Cloud sync disabled — skip startup pull
-  await loadCloudConfig();
-  await loadGistConfig();
+  // (Cloud sync + Gist config removed in earlier cleanup — Firebase replaces both)
   loadDeviceName();        // load this device's friendly name from localStorage
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
