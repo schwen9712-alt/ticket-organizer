@@ -3407,6 +3407,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         <input type="checkbox" id="billingShowSettled" onchange="renderBillingPanel()" style="accent-color:var(--accent-deep);">
         显示已结算
       </label>
+      <button class="btn small" onclick="openPaymentImportDialog()" style="background:var(--accent); border-color:var(--accent); color:#fff;">📥 粘贴付款单</button>
       <button class="btn small" onclick="exportBillingExcel()" style="background:var(--green); border-color:var(--green);">📊 导出 Excel</button>
     </div>
   </div>
@@ -5337,6 +5338,11 @@ function newOrder(init = {}) {
     // agentSettled: agent has paid us (revenue amount)
     agentSettled: !!init.agentSettled,
     agentSettledAt: init.agentSettledAt || null,
+    // Payment review: set when imported agent payment didn't match system total.
+    // User must manually review and clear the flag (or proceed to mark settled).
+    paymentReviewFlag: !!init.paymentReviewFlag,
+    paymentReviewNote: init.paymentReviewNote || '',
+    paymentReviewedAt: init.paymentReviewedAt || null,
     ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
     enteredBy: init.enteredBy || '',
     operator: init.operator || '',
@@ -19050,6 +19056,17 @@ function renderBillingPanel() {
   const rate = settings.rate || 7.25;
   const ticketed = settings.ticketed || [];
 
+  // ── Review-flag summary (orders with payment-review印记) ──────────────────
+  const flagged = ticketed.filter(o => o.paymentReviewFlag && !o.agentSettled);
+  const flaggedBanner = flagged.length > 0 ? `
+    <div style="padding:10px 14px; background:rgba(217,119,6,0.1); border:1px solid var(--warning); border-radius:var(--r-sm); margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div style="font-size:13px; color:var(--warning-deep); line-height:1.5;">
+        <strong>⚠ ${flagged.length} 单待人工复核</strong>
+        <span style="color:var(--muted); margin-left:6px;">代理付款与系统计算不一致，请核实后处理</span>
+      </div>
+    </div>
+  ` : '';
+
   // ── 代理应收 ──────────────────────────────────────────────────────────────
   const agentMap = {};
   for (const o of ticketed) {
@@ -19091,7 +19108,9 @@ function renderBillingPanel() {
       const route = (o.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
       const ticketedDate = dateStr(o.ticketedAt);
       const settled = !!o.agentSettled;
-      return `<tr style="${rowStyle(settled)}">
+      const flagged = !!o.paymentReviewFlag && !settled;
+      const flagStyle = flagged ? 'background:rgba(217,119,6,0.07);' : '';
+      return `<tr style="${rowStyle(settled)}${flagStyle}">
         <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);">${o.pnr||o.tkt||'—'}</td>
         <td style="padding:8px 10px; font-size:12px;">${pax}</td>
         <td style="padding:8px 10px; font-size:12px; color:var(--muted);">${route||'—'}</td>
@@ -19099,8 +19118,13 @@ function renderBillingPanel() {
         <td style="padding:8px 10px; font-size:11px; color:var(--muted);">${ticketedDate}</td>
         <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); text-align:right;">${fmtRmb(rev)}</td>
         <td style="padding:8px 10px; text-align:center;">
-          <button onclick="toggleAgentSettled('ticketed', ${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid; ${settled ? 'background:#e8f5e9; border-color:var(--green); color:var(--green);' : 'background:var(--cream); border-color:var(--line); color:var(--muted);'}">${settled ? '✓ 已收款' : '未收款'}</button>
-          ${settled && o.agentSettledAt ? `<div style="font-size:9px; color:var(--muted); margin-top:2px;">${dateStr(o.agentSettledAt)}</div>` : ''}
+          ${flagged ? `
+            <button onclick="clearPaymentReviewFlag(${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid var(--warning); background:rgba(217,119,6,0.15); color:var(--warning-deep);" title="${escapeAttr(o.paymentReviewNote || '点击解除')}">⚠ 待复核</button>
+            <div style="font-size:9px; color:var(--muted); margin-top:2px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(o.paymentReviewNote || '')}">${escapeHtml(o.paymentReviewNote || '')}</div>
+          ` : `
+            <button onclick="toggleAgentSettled('ticketed', ${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid; ${settled ? 'background:#e8f5e9; border-color:var(--green); color:var(--green);' : 'background:var(--cream); border-color:var(--line); color:var(--muted);'}">${settled ? '✓ 已收款' : '未收款'}</button>
+            ${settled && o.agentSettledAt ? `<div style="font-size:9px; color:var(--muted); margin-top:2px;">${dateStr(o.agentSettledAt)}</div>` : ''}
+          `}
         </td>
       </tr>`;
     }).join('');
@@ -19109,7 +19133,9 @@ function renderBillingPanel() {
         <div style="display:flex; align-items:baseline; justify-content:space-between; padding:8px 12px; background:var(--ink); color:#fff; border-radius:var(--r-sm) var(--r-sm) 0 0;">
           <span style="font-weight:700; font-size:14px;">代理 ${escapeHtml(agent)}</span>
           <span style="font-family:'JetBrains Mono',monospace; font-size:13px;">${orders.length} 单 · 应收合计 <strong>${fmtRmb(total)}</strong></span>
-          ${!allSettled ? `<button onclick="markAllAgentSettled('${escapeAttr(agent)}')" style="padding:3px 10px; font-size:11px; font-weight:700; background:var(--green); border:none; color:#fff; border-radius:20px; cursor:pointer; margin-left:10px;">全部标为已收</button>` : ''}
+          <span style="display:flex; gap:6px; margin-left:10px;">
+            ${!allSettled ? `<button onclick="markAllAgentSettled('${escapeAttr(agent)}')" style="padding:3px 10px; font-size:11px; font-weight:700; background:var(--green); border:none; color:#fff; border-radius:20px; cursor:pointer;">全部标为已收</button>` : ''}
+          </span>
         </div>
         <table style="width:100%; border-collapse:collapse; border:1px solid var(--line); border-top:none;">
           <thead><tr style="background:var(--cream); font-size:10.5px; color:var(--muted); font-weight:700; letter-spacing:0.06em;">
@@ -19209,7 +19235,7 @@ function renderBillingPanel() {
     html += `<div style="padding:20px; text-align:center; color:var(--muted); font-size:12px;">✓ 所有卡主款项已结清</div>`;
   }
 
-  el.innerHTML = html;
+  el.innerHTML = flaggedBanner + html;
 
   // Update badge count
   const unsettledCount = (settings.ticketed||[]).filter(o => !o.agentSettled || (!o.chSettled && o.cardholderId)).length;
@@ -19265,6 +19291,261 @@ function markAllAgentSettled(agent) {
   persistOrders();
   renderBillingPanel();
   toast(`✓ 代理 ${agent} 所有款项已标为已收`);
+}
+
+// ─── Import agent payment statement ────────────────────────────────────────
+// Agent sends a WeChat message after paying:
+//   2026-05-08 AA 同行  AA  PNR: KJJBEW
+//   P1: NAME: HU/YIXUAN  001-7440315678  8月2日 AA CDG-JFK   星星 5088.00
+//   ...
+//   总计：89544
+// User pastes that text → we extract PNRs + total, match against ticketed
+// orders, show a confirmation panel, then mark selected orders as agentSettled.
+
+function openPaymentImportDialog() {
+  const overlay = document.createElement('div');
+  overlay.id = 'paymentImportOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div style="background:var(--paper); border-radius:var(--r-lg); padding:24px; max-width:700px; width:100%; max-height:90vh; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:16px; font-weight:700; color:var(--ink);">📥 粘贴代理付款单</div>
+          <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">把代理在微信发的付款明细粘贴到下方，系统自动识别 PNR 并标记已收</div>
+        </div>
+        <button onclick="this.closest('#paymentImportOverlay').remove()" style="background:none; border:none; cursor:pointer; font-size:20px; color:var(--muted);">✕</button>
+      </div>
+      <textarea id="paymentImportInput" placeholder="粘贴付款单（含 PNR: XXXXXX 行）..." style="min-height:180px; padding:12px; font-family:'JetBrains Mono',monospace; font-size:12px; border:1px solid var(--line-strong); border-radius:var(--r-sm); resize:vertical; line-height:1.6;"></textarea>
+      <div style="display:flex; gap:8px; justify-content:flex-end;">
+        <button class="btn ghost small" onclick="this.closest('#paymentImportOverlay').remove()">取消</button>
+        <button class="btn small" onclick="parseImportedPayment()" style="background:var(--accent); border-color:var(--accent); color:#fff;">🔍 解析</button>
+      </div>
+      <div id="paymentImportResult" style="display:none; flex:1; overflow:auto; border-top:1px solid var(--line); padding-top:12px;"></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById('paymentImportInput')?.focus(), 50);
+}
+
+function parseImportedPayment() {
+  const inp = document.getElementById('paymentImportInput');
+  const result = document.getElementById('paymentImportResult');
+  if (!inp || !result) return;
+  const text = inp.value.trim();
+  if (!text) { toast('请先粘贴付款单'); return; }
+
+  // 1. Extract all PNRs (6-character alphanumeric after "PNR:")
+  const pnrMatches = [...text.matchAll(/PNR\s*[:：]\s*([A-Z0-9]{5,8})/gi)];
+  const pnrs = [...new Set(pnrMatches.map(m => m[1].toUpperCase()))];
+
+  // 2. Extract total amount from 总计 / 合计
+  let claimedTotal = null;
+  const totalMatch = text.match(/(?:总计|合计|总额|共计)\s*[:：]?\s*([\d,]+(?:\.\d+)?)/);
+  if (totalMatch) {
+    claimedTotal = parseFloat(totalMatch[1].replace(/,/g, ''));
+  }
+
+  if (pnrs.length === 0) {
+    result.style.display = 'block';
+    result.innerHTML = `<div style="color:var(--red); padding:10px;">⚠️ 没识别到任何 PNR（需要含「PNR: XXXXXX」格式的行）</div>`;
+    return;
+  }
+
+  // 3. Match each PNR against ticketed orders
+  const ticketed = settings.ticketed || [];
+  const matches = pnrs.map(pnr => {
+    const found = ticketed.find(o => (o.pnr || '').toUpperCase() === pnr);
+    return {
+      pnr,
+      order: found,
+      orderIdx: found ? ticketed.indexOf(found) : -1,
+      revenue: found ? (computeFinalPrice(found) || 0) : 0,
+      alreadySettled: found ? !!found.agentSettled : false
+    };
+  });
+
+  const foundCount = matches.filter(m => m.order).length;
+  const missingCount = matches.filter(m => !m.order).length;
+  const settledCount = matches.filter(m => m.alreadySettled).length;
+  const newCount = matches.filter(m => m.order && !m.alreadySettled).length;
+  const computedTotal = matches
+    .filter(m => m.order && !m.alreadySettled)
+    .reduce((s, m) => s + m.revenue, 0);
+  const diff = claimedTotal != null ? (claimedTotal - computedTotal) : null;
+
+  // Detect implied agent (most common agent among matched orders)
+  const agentCounts = {};
+  matches.forEach(m => {
+    if (m.order && !m.alreadySettled) {
+      const a = m.order.agent || '未知';
+      agentCounts[a] = (agentCounts[a] || 0) + 1;
+    }
+  });
+  const impliedAgent = Object.entries(agentCounts).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
+
+  // 4. Render confirmation table
+  const rowsHtml = matches.map((m, i) => {
+    let statusCell, bg = '';
+    if (!m.order) {
+      statusCell = `<span style="color:var(--red);">⚠ 未找到</span>`;
+      bg = 'background:rgba(217,63,63,0.04);';
+    } else if (m.alreadySettled) {
+      statusCell = `<span style="color:var(--muted);">已收过</span>`;
+      bg = 'background:rgba(0,0,0,0.03); opacity:0.65;';
+    } else {
+      statusCell = `<label style="display:inline-flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" class="payment-row-cb" data-idx="${m.orderIdx}" checked style="accent-color:var(--green);"> <span style="color:var(--green); font-weight:600;">将标已收</span></label>`;
+    }
+    const paxName = m.order ? ((m.order.passengers||[])[0]?.name || '—') : '—';
+    const agent = m.order ? (m.order.agent || '—') : '—';
+    return `<tr style="${bg}">
+      <td style="padding:6px 8px; font-family:'JetBrains Mono',monospace; font-size:12px;">${m.pnr}</td>
+      <td style="padding:6px 8px; font-size:11.5px;">${agent}</td>
+      <td style="padding:6px 8px; font-size:11.5px;">${paxName}</td>
+      <td style="padding:6px 8px; font-family:'JetBrains Mono',monospace; font-size:12px; text-align:right;">${m.order ? fmtRmb(m.revenue) : '—'}</td>
+      <td style="padding:6px 8px; font-size:11px;">${statusCell}</td>
+    </tr>`;
+  }).join('');
+
+  const diffHtml = claimedTotal != null ? `
+    <tr>
+      <td colspan="3" style="padding:8px; text-align:right; font-size:12px; color:var(--muted);">代理付款总额</td>
+      <td style="padding:8px; font-family:'JetBrains Mono',monospace; text-align:right;">¥${claimedTotal.toLocaleString()}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td colspan="3" style="padding:8px; text-align:right; font-size:12px; color:var(--muted);">系统计算总额（即将标已收）</td>
+      <td style="padding:8px; font-family:'JetBrains Mono',monospace; text-align:right;">¥${Math.round(computedTotal).toLocaleString()}</td>
+      <td></td>
+    </tr>
+    ${Math.abs(diff) > 0.5 ? `
+    <tr>
+      <td colspan="3" style="padding:8px; text-align:right; font-size:12px; color:${Math.abs(diff)>100?'var(--red)':'var(--warning-deep)'}; font-weight:700;">差额</td>
+      <td style="padding:8px; font-family:'JetBrains Mono',monospace; text-align:right; color:${Math.abs(diff)>100?'var(--red)':'var(--warning-deep)'}; font-weight:700;">${diff>0?'+':''}¥${Math.round(diff).toLocaleString()}</td>
+      <td></td>
+    </tr>` : ''}
+  ` : '';
+
+  result.style.display = 'block';
+  const totalDiffAbs = diff != null ? Math.abs(diff) : 0;
+  const totalsMatch = diff == null || totalDiffAbs < 0.5;
+
+  let actionsHtml = '';
+  if (newCount === 0) {
+    actionsHtml = `<div style="text-align:center; padding:12px; color:var(--muted); font-size:12px;">没有需要标记的新订单</div>`;
+  } else if (totalsMatch) {
+    // Amounts agree → straight confirm
+    actionsHtml = `
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid var(--line);">
+        <button class="btn ghost small" onclick="document.getElementById('paymentImportOverlay').remove()">取消</button>
+        <button class="btn small" onclick="confirmImportedPayment('settle')" style="background:var(--green); border-color:var(--green); color:#fff;">✓ 标记 ${newCount} 单已收</button>
+      </div>`;
+  } else {
+    // Amounts don't agree → require human review
+    actionsHtml = `
+      <div style="margin-top:12px; padding:12px; background:rgba(217,119,6,0.08); border:1px solid var(--warning); border-radius:var(--r-sm);">
+        <div style="font-size:13px; font-weight:700; color:var(--warning-deep); margin-bottom:4px;">⚠ 总额不一致，请人工复核</div>
+        <div style="font-size:11.5px; color:var(--ink); line-height:1.6;">
+          差额 <strong>${diff > 0 ? '+' : ''}¥${Math.round(diff).toLocaleString()}</strong>。请先核对：是否有手续费/汇率差异/漏单/多算？
+        </div>
+      </div>
+      <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); flex-wrap:wrap;">
+        <button class="btn ghost small" onclick="document.getElementById('paymentImportOverlay').remove()">取消</button>
+        <button class="btn small" onclick="confirmImportedPayment('flag')" style="background:var(--warning); border-color:var(--warning); color:#fff;" title="给这些订单加「待复核」印记，暂不标已收">🟡 留下印记 · 等待处理</button>
+        <button class="btn small" onclick="confirmImportedPayment('settleAnyway')" style="background:var(--green); border-color:var(--green); color:#fff;" title="我已确认无误，强行标已收">✓ 已核对，仍标已收</button>
+      </div>`;
+  }
+
+  result.innerHTML = `
+    <div style="padding:10px 12px; background:var(--paper-2); border-radius:var(--r-sm); margin-bottom:10px; font-size:12px; line-height:1.6;">
+      <strong>识别结果</strong>：找到 ${pnrs.length} 个 PNR
+      · <span style="color:var(--green);">✓ ${foundCount} 单匹配</span>
+      ${settledCount > 0 ? `· <span style="color:var(--muted);">${settledCount} 单已收过</span>` : ''}
+      ${missingCount > 0 ? `· <span style="color:var(--red);">${missingCount} 单未找到</span>` : ''}
+      ${impliedAgent ? `<br>主要代理：<strong>${escapeHtml(impliedAgent)}</strong>` : ''}
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:12px;">
+      <thead><tr style="background:var(--paper-2); border-bottom:1px solid var(--line);">
+        <th style="padding:6px 8px; text-align:left;">PNR</th>
+        <th style="padding:6px 8px; text-align:left;">代理</th>
+        <th style="padding:6px 8px; text-align:left;">乘客</th>
+        <th style="padding:6px 8px; text-align:right;">金额</th>
+        <th style="padding:6px 8px; text-align:left;">状态</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+      ${diffHtml ? `<tfoot style="border-top:2px solid var(--line);">${diffHtml}</tfoot>` : ''}
+    </table>
+    ${actionsHtml}
+  `;
+}
+
+function confirmImportedPayment(action) {
+  // action: 'settle' | 'settleAnyway' | 'flag'
+  const checkboxes = document.querySelectorAll('.payment-row-cb:checked');
+  if (checkboxes.length === 0) {
+    toast('没有勾选任何订单');
+    return;
+  }
+
+  if (action === 'flag') {
+    // Prompt for a review note
+    const note = prompt('请简要写一下需要处理的原因（例如「东莞付款少 ¥283，问一下原因」）:', '总额不一致');
+    if (note === null) return;  // user cancelled
+    const now = Date.now();
+    let count = 0;
+    checkboxes.forEach(cb => {
+      const idx = parseInt(cb.dataset.idx, 10);
+      const o = (settings.ticketed || [])[idx];
+      if (o && !o.agentSettled) {
+        o.paymentReviewFlag = true;
+        o.paymentReviewNote = note;
+        o.paymentReviewedAt = now;
+        count++;
+      }
+    });
+    persistOrders();
+    renderBillingPanel();
+    document.getElementById('paymentImportOverlay')?.remove();
+    toast(`🟡 已给 ${count} 单加「待复核」印记`);
+    return;
+  }
+
+  if (action === 'settleAnyway') {
+    if (!confirm('确认强行标已收？建议先核对：是否有手续费/汇率差异/漏单？')) return;
+  }
+
+  const now = Date.now();
+  let count = 0;
+  checkboxes.forEach(cb => {
+    const idx = parseInt(cb.dataset.idx, 10);
+    const o = (settings.ticketed || [])[idx];
+    if (o && !o.agentSettled) {
+      o.agentSettled = true;
+      o.agentSettledAt = now;
+      // Clear review flag if it was set
+      if (o.paymentReviewFlag) {
+        o.paymentReviewFlag = false;
+        o.paymentReviewNote = '';
+      }
+      count++;
+    }
+  });
+  persistOrders();
+  renderBillingPanel();
+  document.getElementById('paymentImportOverlay')?.remove();
+  toast(`✓ 已标记 ${count} 单代理已收款`);
+}
+
+// Clear a review flag (called from billing panel)
+function clearPaymentReviewFlag(orderIdx) {
+  const o = (settings.ticketed || [])[orderIdx];
+  if (!o) return;
+  if (!confirm(`解除「待复核」印记？\n\n备注：${o.paymentReviewNote || '(无)'}\n\n解除后会回到「未收款」状态。`)) return;
+  o.paymentReviewFlag = false;
+  o.paymentReviewNote = '';
+  persistOrders();
+  renderBillingPanel();
+  toast('✓ 已解除待复核印记');
 }
 
 function markAllChSettled(chName) {
