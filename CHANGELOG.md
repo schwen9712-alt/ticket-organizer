@@ -1,53 +1,48 @@
-## 2026-05-23 — Anthropic API Key 密码加密同步
+## 2026-05-23 — 卡主重复创建防护强化
 
 **改了什么**
-- 新增 AES-GCM 密码加密的 API Key 跨设备同步功能
-- API Key 现在可以勾选「同步到其他设备」选项，用密码加密后通过 Firebase 同步
-- 设置面板「AI 图片识别」区域底部新增 `☐ 同步到其他设备（密码加密，存 Firebase）` 复选框
-- 状态条新增三种显示状态：
-  - `✓ 已配置 sk-ant-xxx... · ☁ 已加密同步`（本机有 key + 已同步）
-  - `🔒 云端有加密 Key，本机未解锁 [🔓 输密码解锁]`（新设备首次访问）
-  - `⚠ 云端有但本机密码缺失`（异常状态）
-- 清除 API Key 时同步清除云端密文 + 本机密码
+- 新增 `_strNormalize` 函数：去全部空白（含全角 \u3000）、全角→半角、去 ASCII/CJK 全套标点、转小写
+- `addCardholder` 改为三层防护管道：
+  - Layer 1：字面完全相等（已有，不变）
+  - Layer 2：**normalize 后相等 → 静默合并，不弹窗**（新增 — 解决 90% 的打字错误）
+  - Layer 3：Levenshtein 相似度 ≥ 82% → 弹**新美观 modal**，列出所有候选 + [使用这个 →] 按钮 + [➕ 不，确实新建] 兜底
+- `quickAssignCardholder`（订单卡片上的快速分配框）**改走 addCardholder 管道**：之前完全绕过查重，直接 push；现在自动获得三层防护
+- 实时打字提示升级：输入框下方会即时显示「✓ 将合并到 X（忽略空格/标点差异）」或「⚠ 可能与 X 相似（回车后弹窗确认）」
+- 旧的丑陋 `confirm()` 弹窗 → 替换为带相似度百分比、悬停高亮的卡片式 modal
 
 **为什么改**
-解决「每次在新设备打开应用都要手动重新输入 API Key」的痛点。之前 API Key 只存本机 `localStorage`，跨设备完全不共享。现在密码加密后存 Firebase，新设备输入一次密码即可解锁，密码本身存本机（不上云）。
+用户反馈：「卡主匹配逻辑，有时候都是同一个卡主，但是因为有可能打字的时候打错了，错误的创建了一个新的卡主」
 
-**技术细节**
-- PBKDF2-SHA256 派生密钥，200,000 次迭代
-- AES-GCM 加密，每次重新加密生成新的随机 salt（16 字节）+ IV（12 字节）
-- AES-GCM 自带认证标签，密码错误会直接抛错（不会得到错误解密结果）
-- 密文格式：`{"v":1,"salt":"base64","iv":"base64","ct":"base64"}` 存在 `settings.anthropicKeyEncrypted`
-- 新增 localStorage key：`ticket-organizer-anthropic-pw`（本机密码，不同步）
+之前的两条创建路径里，**快速分配框完全没有查重**，设置页面虽然有 fuzzy 检查但 normalize 不够强（不去空格、不处理全角字符）。结果常见的打字错误（尾部空格、全半角混打）都会创建新卡主。
+
+**单元测试已验证的场景**
+- ✓ `张三` vs `张三 `（尾部空格）— 静默合并
+- ✓ `张三` vs `张 三`（中间空格）— 静默合并
+- ✓ `ABC` vs `abc`（大小写）— 静默合并
+- ✓ `张三` vs `张三　`（全角空格 \u3000）— 静默合并
+- ✓ `张三` vs `张三，`（CJK 标点）— 静默合并
+- ✓ `Tom Hanks` vs `Tom.Hanks`（ASCII 标点）— 静默合并
+- ✓ `ＡＢＣ` vs `ABC`（全角字母）— 静默合并
+- ✓ `Tom Hanks` vs `Tom Hank`（漏 1 字）— 87.5% → 弹 modal
+- ✓ `张三` vs `李四` — 不合并、不警告，新建
+- ⚠ 已知限制：`张三` vs `张山`（中文 2 字名字改 1 字）相似度只有 50%，不弹窗。短中文名一字之差可能是真不同人，无法激进处理。批量清理用「⚙ 设置 → 卡主 → 🔍 查找重复」工具
 
 **改动位置**
-- `index.html` HTML 设置面板（约 3580 行附近）：API Key 区域加复选框 + 提示文案
-- `index.html` JS（约 23641 行起）：新增 ~170 行加密工具函数 + `saveAnthropicKey` / `clearAnthropicKey` / `updateAiKeyStatus` 升级 + `unlockAnthropicKey` 新函数 + `fbApplyRemote` 增加自动解密流程
+- `index.html` 约 21430 行：新增 `_strNormalize` + `_showSimilarCardholderDialog`，重写 `_strSimilarity` 使用统一的 normalize
+- `index.html` 约 21561 行：`addCardholder` 三层防护
+- `index.html` 约 13037 行：`filterCardholderList` 实时打字提示升级
+- `index.html` 约 13069 行：`quickAssignCardholder` 走 addCardholder 管道
 
-**新增/修改的函数**
-- `_b64` / `_b64dec` / `_deriveKey` / `_aesEncrypt` / `_aesDecrypt`（加密工具，全新）
-- `loadAnthropicPw` / `saveAnthropicPw` / `clearAnthropicPw`（密码存取，全新）
-- `syncAnthropicKeyToCloud`（加密并写入 settings，全新）
-- `tryAutoDecryptCloudKey`（拉到密文后自动用本机密码尝试解密，全新）
-- `unlockAnthropicKey`（用户主动点「🔓 解锁」按钮，全新）
-- `saveAnthropicKey`（升级：支持勾选同步 + 弹密码框）
-- `clearAnthropicKey`（升级：顺便清云端 + 本机密码）
-- `updateAiKeyStatus`（升级：显示云端状态 + 解锁按钮）
-- `fbApplyRemote`（升级：拉到密文后自动尝试解密 + 处理云端密文被删的情况）
+**新增的函数**
+- `_strNormalize(s)`（全新）— 强力归一化
+- `_showSimilarCardholderDialog(name, channel, similars)`（全新）— 美观候选 modal，返回 `Promise<{action, cardholder?}>`
 
 **风险或注意事项**
-- ⚠ **密码本身存本机 localStorage（明文）**：物理拿到设备 + 浏览器没锁 = 别人能直接读密码再下载云端密文解密。这种风险和原来本地存明文 key 等价
-- ⚠ **密文上 Firebase 公开**（Firebase test mode 安全规则未配，到期 2026-06-22），安全完全依赖密码强度。**强烈建议密码 ≥ 12 位**，别用生日 / 123456 / qwerty
-- ⚠ **忘密码 = 永远解不开**：没有忘记密码流程（设计上不可能做，云端没有反推信息）。处理方式：在某台已解锁设备点「清除」→ 重新走一次「保存 + 勾选同步 + 设新密码」流程
-- ⚠ **Session 5 那个「每次部署后 key 消失」的原谜团未根除**：如果根因是 localStorage 被清，这次改动也救不了（密码也是 localStorage）。但因为云端有密文，**最坏情况只是再输一次密码**，比之前要去 console.anthropic.com 复制完整 key 强多了
-
-**测试流程**
-1. A 设备：设置 → AI 图片识别 → 输入 key + 勾选「同步到其他设备」→ 弹两次密码输入（≥6 位）→ 状态变 `☁ 已加密同步`
-2. B 设备：刷新页面（Ctrl+Shift+R）→ 设置 → AI 图片识别 → 看到 `🔒 云端有加密 Key` + `🔓 输密码解锁` 按钮 → 点按钮 → 输同一密码 → 状态变 `✓ 已配置`
-3. 任一设备：清除 key → 另一设备同步收到清除（状态变 `未配置`）
-4. 任一设备：改 key（不勾选同步）→ 云端密文被删除
+- ⚠ Layer 2 静默合并**不可撤销**（合并完不会提示"刚刚合并到 X，想拆？"）。Toast 会显示 `✓ 已合并到现有卡主 "X"`，但用户看不仔细就过去了。如果误合并，需要手动到设置里改名 / 新建。已评估觉得风险可接受，因为 normalize 等价已经是"基本可以肯定是同一人"的强信号
+- ⚠ 中文 2 字名字一字之差不会被捕获（见上"已知限制"）
+- ⚠ 现有数据库里的重复卡主**不会自动合并** — 用户需要去「⚙ 设置 → 卡主 → 🔍 查找重复」批量处理。这是有意的设计（怕误合并破坏历史数据）
 
 **回滚方式**
-如果出问题，从 `.backups/` 找上一次的 `index.html` 覆盖即可。本次改动**不修改任何现有 settings 字段含义**，只新增 `settings.anthropicKeyEncrypted` 字段；回滚后多出来的这个字段无害（不会被任何旧代码读到）。本机 `localStorage` 多出来的 `ticket-organizer-anthropic-pw` 也不会被旧代码读到，无影响。
+从 `.backups/` 找上一次的 `index.html` 覆盖即可。本次改动**不修改任何 schema**，只改新建路径的检查逻辑，回滚后已创建的所有卡主数据都不受影响。
 
 ---

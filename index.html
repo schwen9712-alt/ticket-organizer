@@ -13057,16 +13057,33 @@ function filterCardholderList(query) {
     if (!q) {
       hint.textContent = '';
     } else if (exactMatch) {
-      hint.innerHTML = `<span style="color:var(--green, var(--green));">✓ 匹配到已有卡主 "${escapeHtml(exactMatch)}"</span>`;
-    } else if (visibleCount === 0) {
-      hint.innerHTML = `<span style="color:var(--accent-deep);">➕ 按回车会新建卡主 "${escapeHtml(query)}"</span>`;
+      hint.innerHTML = `<span style="color:var(--green);">✓ 匹配到已有卡主 "${escapeHtml(exactMatch)}"</span>`;
     } else {
-      hint.innerHTML = `<span style="color:var(--muted);">${visibleCount} 个匹配结果（按回车确认）</span>`;
+      // Check for normalized match (silent merge target) before declaring "new"
+      const qNorm = _strNormalize(query);
+      const normHit = qNorm ? (settings.cardholders || []).find(c =>
+        _strNormalize(c.name || '') === qNorm) : null;
+      if (normHit) {
+        hint.innerHTML = `<span style="color:var(--green);">✓ 将合并到已有卡主 "${escapeHtml(normHit.name)}"（忽略空格/标点差异）</span>`;
+      } else {
+        // Check for fuzzy similar matches and warn
+        const similars = (settings.cardholders || []).filter(c =>
+          _strSimilarity(c.name || '', query) >= 0.82);
+        if (similars.length > 0) {
+          const names = similars.slice(0, 3).map(c => `"${c.name}"`).join('、');
+          hint.innerHTML = `<span style="color:#e67e22;">⚠ 可能与现有卡主相似：${escapeHtml(names)}（回车后会弹窗确认）</span>`;
+        } else if (visibleCount === 0) {
+          hint.innerHTML = `<span style="color:var(--accent-deep);">➕ 按回车会新建卡主 "${escapeHtml(query)}"</span>`;
+        } else {
+          hint.innerHTML = `<span style="color:var(--muted);">${visibleCount} 个匹配结果（按回车确认）</span>`;
+        }
+      }
     }
   }
 }
 
-// Assign to cardholder by name. If name doesn't exist, create new cardholder first.
+// Assign to cardholder by name. Goes through the unified addCardholder()
+// pipeline so duplicate detection (exact + normalized + fuzzy) applies.
 async function quickAssignCardholder(idx) {
   const inp = document.getElementById('cardholderQuickName');
   if (!inp) return;
@@ -13075,16 +13092,10 @@ async function quickAssignCardholder(idx) {
     toast('请输入卡主名字');
     return;
   }
-  settings.cardholders = settings.cardholders || [];
-  // Case-insensitive exact match to existing
-  let ch = settings.cardholders.find(c => (c.name || '').trim().toLowerCase() === name.toLowerCase());
-  if (!ch) {
-    // Create new cardholder
-    ch = { id: 'ch-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), name };
-    settings.cardholders.push(ch);
-    await storageSet('ticket-organizer-settings', settings);
-    toast(`➕ 新卡主 "${name}" 已创建`);
-  }
+  // addCardholder handles: exact match, normalized match (silent merge),
+  // fuzzy match (modal picker), or create new
+  const ch = await addCardholder('', name);
+  if (!ch) return;  // user cancelled
   await assignCardholder(idx, ch.id);
 }
 
@@ -21427,11 +21438,32 @@ function renderCardholdersList() {
   });
 }
 
+// Aggressive normalization for cardholder name dedup matching.
+// Removes ALL whitespace (incl. full-width \u3000), converts full-width
+// alphanumerics to half-width, strips all punctuation (CJK + ASCII), lowercases.
+// Two names with the same normalized form are treated as the SAME cardholder
+// (auto-merged silently, no confirm dialog).
+function _strNormalize(s) {
+  if (!s) return '';
+  return String(s)
+    // full-width ASCII → half-width
+    .replace(/[\uFF01-\uFF5E]/g, ch =>
+      String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    // ideographic space → regular space (then stripped below)
+    .replace(/\u3000/g, ' ')
+    .toLowerCase()
+    // strip all whitespace
+    .replace(/\s+/g, '')
+    // strip ASCII punctuation
+    .replace(/[\[\]()\-_.,!?'"`~@#$%^&*+={}|\\/<>:;]/g, '')
+    // strip common CJK punctuation
+    .replace(/[，。！？、：；（）【】《》「」『』""''·]/g, '');
+}
+
 // Compute a simple similarity ratio between two strings (0–1).
 // Uses normalized Levenshtein distance. Case-insensitive, strips punctuation.
 function _strSimilarity(a, b) {
-  const norm = s => s.toLowerCase().replace(/[\s\[\]()\-_.,!?'"]/g, '');
-  const sa = norm(a), sb = norm(b);
+  const sa = _strNormalize(a), sb = _strNormalize(b);
   if (!sa && !sb) return 1;
   if (!sa || !sb) return 0;
   if (sa === sb) return 1;
@@ -21450,6 +21482,82 @@ function _strSimilarity(a, b) {
   return 1 - dp[la][lb] / Math.max(la, lb);
 }
 
+// Show a styled modal asking user to either pick an existing similar cardholder
+// or confirm "yes, this is actually a new one".
+// Returns Promise<{ action: 'use'|'create'|'cancel', cardholder?: object }>
+function _showSimilarCardholderDialog(name, channel, similars) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:10000;
+      display:flex; align-items:center; justify-content:center;
+      animation: overlayFadeIn 0.18s ease-out;
+    `;
+    const newLabel = `${name}${channel ? ` [${channel}]` : ''}`;
+    const itemsHtml = similars.map((c, i) => {
+      const sim = Math.round(_strSimilarity(c.name || '', name) * 100);
+      return `
+        <div class="similar-row" data-idx="${i}" style="
+          display:flex; align-items:center; justify-content:space-between;
+          padding:12px 14px; border:1px solid var(--line);
+          border-radius:4px; margin-bottom:8px; background:#fff; cursor:pointer;
+          transition:all 0.15s ease-out;
+        " onmouseover="this.style.background='var(--cream)'; this.style.borderColor='var(--accent-deep)';"
+           onmouseout="this.style.background='#fff'; this.style.borderColor='var(--line)';">
+          <div>
+            <div style="font-weight:600; font-size:14px;">${escapeHtml(c.name || '')}</div>
+            ${c.channel ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">${escapeHtml(c.channel)}</div>` : ''}
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;">${sim}% 相似</span>
+            <button class="btn small" style="background:var(--green); border-color:var(--green); color:#fff;">使用这个 →</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div style="
+        background:#fff; border-radius:6px; padding:24px;
+        max-width:480px; width:90%; max-height:80vh; overflow-y:auto;
+        box-shadow:0 20px 60px rgba(0,0,0,0.25);
+        animation: modalRiseIn 0.22s ease-out;
+      ">
+        <div style="font-size:18px; font-weight:700; margin-bottom:6px;">⚠ 检测到相似卡主</div>
+        <div style="font-size:13px; color:var(--muted); margin-bottom:16px;">
+          你正在新建：<strong style="color:var(--ink);">${escapeHtml(newLabel)}</strong><br>
+          但系统里已有以下相似的卡主，是不是其中某一个？
+        </div>
+        <div id="similarList">${itemsHtml}</div>
+        <div style="display:flex; gap:8px; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+          <button id="btnCreateNew" class="btn small" style="flex:1; background:var(--accent-deep); border-color:var(--accent-deep); color:#fff;">
+            ➕ 不，确实是新卡主，新建 "${escapeHtml(name)}"
+          </button>
+          <button id="btnCancel" class="btn small ghost" style="flex:0 0 auto;">取消</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = (result) => {
+      overlay.remove();
+      resolve(result);
+    };
+
+    overlay.addEventListener('click', e => {
+      if (e.target === overlay) close({ action: 'cancel' });
+    });
+    overlay.querySelectorAll('.similar-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const idx = parseInt(row.dataset.idx);
+        close({ action: 'use', cardholder: similars[idx] });
+      });
+    });
+    overlay.querySelector('#btnCreateNew').addEventListener('click', () => close({ action: 'create' }));
+    overlay.querySelector('#btnCancel').addEventListener('click', () => close({ action: 'cancel' }));
+  });
+}
+
 async function addCardholder(channel, name) {
   if (!name) {
     channel = document.getElementById('ch-channel').value.trim().toUpperCase();
@@ -21457,28 +21565,44 @@ async function addCardholder(channel, name) {
   }
   if (!name) { toast('名字必填'); return null; }
   settings.cardholders = settings.cardholders || [];
-  // Exact dedup: match by name + channel
-  const existing = settings.cardholders.find(c => c.name === name && (c.channel || '') === (channel || ''));
-  if (existing) { toast('已有此卡主'); return existing; }
 
-  // Fuzzy duplicate check: warn if a very similar name already exists
+  // ── Layer 1: exact match (literal) ──
+  const exact = settings.cardholders.find(c => c.name === name && (c.channel || '') === (channel || ''));
+  if (exact) { toast('已有此卡主'); return exact; }
+
+  // ── Layer 2: normalized exact match — silent merge ──
+  // Catches: trailing/leading/internal spaces, full-width chars, mixed punct,
+  // case differences. These are clearly typos, not intentional duplicates.
+  const nNorm = _strNormalize(name);
+  const cNorm = _strNormalize(channel || '');
+  if (nNorm) {
+    const normHit = settings.cardholders.find(c =>
+      _strNormalize(c.name || '') === nNorm &&
+      _strNormalize(c.channel || '') === cNorm
+    );
+    if (normHit) {
+      toast(`✓ 已合并到现有卡主 "${normHit.name}"`);
+      return normHit;
+    }
+  }
+
+  // ── Layer 3: high-similarity fuzzy match — show picker modal ──
   const SIMILARITY_THRESHOLD = 0.82;
   const similar = settings.cardholders.filter(c => {
     const nameSim = _strSimilarity(c.name || '', name);
     return nameSim >= SIMILARITY_THRESHOLD && c.name !== name;
   });
   if (similar.length > 0) {
-    const list = similar.map(c => `• ${c.name}${c.channel ? ' [' + c.channel + ']' : ''}`).join('\n');
-    const proceed = confirm(
-      `⚠️ 检测到相似卡主，可能是重复录入：\n\n${list}\n\n` +
-      `你要新建的卡主：${name}${channel ? ' [' + channel + ']' : ''}\n\n` +
-      `点【确定】= 仍然新建（两个都保留）\n` +
-      `点【取消】= 不新建，使用已有的`
-    );
-    if (!proceed) {
-      // Return the most similar existing cardholder
-      return similar[0];
+    // Sort by similarity descending so the closest match is listed first
+    similar.sort((a, b) =>
+      _strSimilarity(b.name || '', name) - _strSimilarity(a.name || '', name));
+    const result = await _showSimilarCardholderDialog(name, channel, similar);
+    if (result.action === 'cancel') return null;
+    if (result.action === 'use') {
+      toast(`✓ 使用已有卡主 "${result.cardholder.name}"`);
+      return result.cardholder;
     }
+    // result.action === 'create' → fall through to create new
   }
 
   const ch = {
