@@ -37,6 +37,59 @@
 
 ---
 
+## 2026-05-24 01:22 — 全局微交互动画系统
+
+**改了什么**:
+
+**1. 新增统一的 motion 设计 tokens**（CSS 变量）：
+   - `--t-instant: 80ms` — 点击反馈
+   - `--t-fast: 120ms cubic-bezier(0.5, 0, 0.5, 1)` — 颜色变化 / 按钮 hover
+   - `--t-base: 200ms cubic-bezier(0.5, 0, 0.5, 1)` — 默认展开/折叠/hover
+   - `--t-slow: 320ms cubic-bezier(0.16, 1, 0.3, 1)` — toast / modal 入场
+   - `--d-fast / --d-base / --d-slow` — 仅时长（用于自定义 easing 场景）
+   - `--ease-out / --ease-in / --ease-snap` — 标准 easing 曲线
+
+**2. 全局选择器自动 transition**：
+   所有 button、btn、input、select、textarea、section、card、tab、order-card、chip、tag、role=button、summary 元素自动获得 transition，覆盖 background、border、color、box-shadow、transform、opacity。
+
+**3. 按下反馈**：
+   所有按钮和 .btn 在 :active 时 `scale(0.97)`，给人「真的按下了」的感觉。
+
+**4. Disabled 状态**：
+   禁用按钮没有按下动画，opacity 降至 0.5，cursor 改 not-allowed。
+
+**5. @keyframes 动画库**：
+   - `toastIn / toastOut` — toast 上下滑入滑出
+   - `overlayFadeIn` — 模态背景遮罩淡入
+   - `modalRiseIn` — 模态内容轻微 scale + 上移
+   - `tabContentIn` — tab 切换内容淡入
+   - `attentionPulse` — 待复核徽章呼吸光圈（2.4 秒一次）
+   - `spin` — 同步指示器旋转
+   - `checkDraw` — 对勾描边动画（待应用）
+   - `valueFlash` — 数字更新闪烁（待应用）
+
+**6. 实际应用点**：
+   - 「⚠ 待复核」徽章加 `.attention-pulse` 类，会缓慢呼吸提醒用户
+   - 付款单导入弹窗（modal）有入场动画
+   - 截屏弹窗有入场动画
+   - 其他对话框（OFAC）也有入场动画
+
+**7. 兼容性**：
+   - 旧代码用的 `var(--t-fast)` 现在含 timing + easing，可以作为 `transition: prop var(--t-fast)` 简写直接用，向后兼容
+   - `@media (prefers-reduced-motion: reduce)` 完全尊重用户系统设置，关闭动画
+
+**为什么改**:
+- 用户要求加微交互动画
+- 设计原则：一致性 > 多样性。所有动画统一时长 + 曲线，看起来像一个产品而不是大杂烩
+- 高频使用的工具 app 适合不动声色的微交互，不适合明显的成就感动画
+
+**风险或注意事项**:
+- 性能影响：transition 全局应用，但只影响有 hover/active/state-change 的元素，不会持续占用 CPU
+- `.attention-pulse` 一直运行，可能在低端设备上略增电耗，但已限制为 2.4 秒一次循环
+- 老用户首次刷新会觉得「咦怎么所有东西都柔顺了」，这是正常的
+
+---
+
 ## 2026-05-23 23:13 — 付款单导入：差额不一致时强制人工复核
 
 **改了什么**:

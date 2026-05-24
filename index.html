@@ -92,9 +92,123 @@
   --r-lg: 8px;
   --r-xl: 12px;
 
-  /* Transitions */
-  --t-fast: 0.1s ease;
-  --t-base: 0.15s ease;
+  /* Motion system — unified timing + easing for all UI animation.
+     Keep these tight and consistent; consistency > variety. */
+  --t-instant: 80ms;                                  /* tap feedback */
+  /* --t-fast and --t-base include both duration + easing so they work as
+     CSS transition shorthand: `transition: background var(--t-fast);` */
+  --t-fast:    120ms cubic-bezier(0.5, 0, 0.5, 1);
+  --t-base:    200ms cubic-bezier(0.5, 0, 0.5, 1);
+  --t-slow:    320ms cubic-bezier(0.16, 1, 0.3, 1);
+  /* Duration-only variants for cases where you want to combine with custom easing */
+  --d-fast:    120ms;
+  --d-base:    200ms;
+  --d-slow:    320ms;
+  --ease-out:  cubic-bezier(0.16, 1, 0.3, 1);         /* elastic out — for arrivals */
+  --ease-in:   cubic-bezier(0.4, 0, 1, 1);            /* sharp in — for departures */
+  --ease-snap: cubic-bezier(0.5, 0, 0.5, 1);          /* snappy bidirectional */
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   GLOBAL MICRO-INTERACTIONS
+   Everything that can change visually gets a smooth transition by default.
+   This is the single biggest UX upgrade — no per-element animation needed.
+   ────────────────────────────────────────────────────────────────────────── */
+button, .btn, a, input, select, textarea,
+.section, .card, .tab, .order-card, .chip, .tag,
+[role="button"], summary {
+  transition:
+    background-color var(--d-fast) var(--ease-snap),
+    border-color     var(--d-fast) var(--ease-snap),
+    color            var(--d-fast) var(--ease-snap),
+    box-shadow       var(--d-base) var(--ease-snap),
+    transform        var(--t-instant) var(--ease-snap),
+    opacity          var(--d-base) var(--ease-snap);
+}
+
+/* Button press feedback — subtle scale-down */
+button:active, .btn:active, [role="button"]:active {
+  transform: scale(0.97);
+}
+
+/* Disabled state — no transform on press, but still transitions normally */
+button:disabled, .btn:disabled, button[disabled], .btn[disabled] {
+  transform: none !important;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Toast entrance — slide down + fade */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, -16px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translate(-50%, 0); }
+  to   { opacity: 0; transform: translate(-50%, -8px); }
+}
+
+/* Modal/overlay entrance */
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes modalRiseIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Tab content fade — when switching tabs */
+@keyframes tabContentIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Pulse for attention (待复核 badge) */
+@keyframes attentionPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
+  70%      { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+}
+
+/* Spin for sync indicators */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Success check-mark draw-on */
+@keyframes checkDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Value flash — when an amount updates, briefly highlight */
+@keyframes valueFlash {
+  0%   { background: var(--accent-light); }
+  100% { background: transparent; }
+}
+
+/* Apply tab-content fade to the main panel content */
+.tab-content.active, .tab-panel.active, [data-tab].active {
+  animation: tabContentIn var(--t-base) var(--ease-out);
+}
+
+/* Spinning class for sync icons */
+.spinning {
+  animation: spin 0.9s linear infinite;
+  display: inline-block;
+}
+
+/* Pulse class for badges needing attention */
+.attention-pulse {
+  animation: attentionPulse 2.4s ease-in-out infinite;
+}
+
+/* Honor user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -13259,7 +13373,7 @@ function openMergeDialog(idx) {
   const overlay = document.createElement('div');
   overlay.id = 'mergeOrderOverlay';
   overlay.className = 'verify-modal-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;animation:overlayFadeIn var(--d-base) var(--ease-out);';
   overlay.innerHTML = `
     <div class="verify-modal" style="background:#fff;border-radius:10px;padding:24px;max-width:480px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -13597,7 +13711,7 @@ function openStatsDashboard() {
 
   const overlay = document.createElement('div');
   overlay.id = 'statsOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px);';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px);animation:overlayFadeIn var(--d-base) var(--ease-out);';
   const profitOk = totalProfit >= 0;
   overlay.innerHTML = `
     <div class="stats-dashboard" style="background:var(--paper);border-radius:var(--r-lg);width:min(760px,95vw);max-height:92vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.35);">
@@ -19119,7 +19233,7 @@ function renderBillingPanel() {
         <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); text-align:right;">${fmtRmb(rev)}</td>
         <td style="padding:8px 10px; text-align:center;">
           ${flagged ? `
-            <button onclick="clearPaymentReviewFlag(${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid var(--warning); background:rgba(217,119,6,0.15); color:var(--warning-deep);" title="${escapeAttr(o.paymentReviewNote || '点击解除')}">⚠ 待复核</button>
+            <button onclick="clearPaymentReviewFlag(${idx})" class="attention-pulse" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid var(--warning); background:rgba(217,119,6,0.15); color:var(--warning-deep);" title="${escapeAttr(o.paymentReviewNote || '点击解除')}">⚠ 待复核</button>
             <div style="font-size:9px; color:var(--muted); margin-top:2px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(o.paymentReviewNote || '')}">${escapeHtml(o.paymentReviewNote || '')}</div>
           ` : `
             <button onclick="toggleAgentSettled('ticketed', ${idx})" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid; ${settled ? 'background:#e8f5e9; border-color:var(--green); color:var(--green);' : 'background:var(--cream); border-color:var(--line); color:var(--muted);'}">${settled ? '✓ 已收款' : '未收款'}</button>
@@ -19305,10 +19419,10 @@ function markAllAgentSettled(agent) {
 function openPaymentImportDialog() {
   const overlay = document.createElement('div');
   overlay.id = 'paymentImportOverlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;animation:overlayFadeIn var(--d-base) var(--ease-out);';
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
   overlay.innerHTML = `
-    <div style="background:var(--paper); border-radius:var(--r-lg); padding:24px; max-width:700px; width:100%; max-height:90vh; display:flex; flex-direction:column; gap:12px; overflow:hidden;">
+    <div style="background:var(--paper); border-radius:var(--r-lg); padding:24px; max-width:700px; width:100%; max-height:90vh; display:flex; flex-direction:column; gap:12px; overflow:hidden; animation:modalRiseIn var(--d-slow) var(--ease-out);">
       <div style="display:flex; justify-content:space-between; align-items:center;">
         <div>
           <div style="font-size:16px; font-weight:700; color:var(--ink);">📥 粘贴代理付款单</div>
