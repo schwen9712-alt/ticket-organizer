@@ -3570,7 +3570,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="section-title"><span class="num" style="background:#7c3aed;">🤖</span>AI 图片识别 <span class="zh">自动解析行程图片和护照</span></div>
     <div class="hint" style="margin-bottom:12px;">
       配置 Anthropic API Key 后，可直接上传<strong>行程截图</strong>或<strong>护照照片</strong>，AI 自动识别并填入表单。<br>
-      Key 只保存在本设备的浏览器里，<strong>不会进入云同步</strong>。<br>
+      默认<strong>只存本设备</strong>。勾选「同步到其他设备」后会用密码加密上 Firebase，新设备输同一密码即可解锁。<br>
       获取 Key：前往 <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c3aed;">console.anthropic.com</a> → API Keys → Create Key
     </div>
     <div id="aiKeyStatus" style="padding:10px 12px; background:var(--cream); border-radius:3px; margin-bottom:12px; font-family:'JetBrains Mono',monospace; font-size:12px;">
@@ -3579,12 +3579,18 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="setting-row">
       <div>
         <div class="label">Anthropic API Key</div>
-        <div class="desc">格式：sk-ant-api03-…（只存本地，不同步到云端）</div>
+        <div class="desc">格式：sk-ant-api03-…</div>
       </div>
-      <div style="display:flex; gap:4px;">
-        <input type="password" id="s-anthropicKey" placeholder="sk-ant-api03-..." style="width:240px; font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 8px;" autocomplete="off">
-        <button class="btn small" onclick="saveAnthropicKey()" style="background:#7c3aed; border-color:#7c3aed; color:#fff;">保存</button>
-        <button class="btn small ghost" onclick="clearAnthropicKey()">清除</button>
+      <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+        <div style="display:flex; gap:4px;">
+          <input type="password" id="s-anthropicKey" placeholder="sk-ant-api03-..." style="width:240px; font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 8px;" autocomplete="off">
+          <button class="btn small" onclick="saveAnthropicKey()" style="background:#7c3aed; border-color:#7c3aed; color:#fff;">保存</button>
+          <button class="btn small ghost" onclick="clearAnthropicKey()">清除</button>
+        </div>
+        <label style="font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none;">
+          <input type="checkbox" id="s-anthropicKeySync" style="accent-color:#7c3aed; width:14px; height:14px;">
+          <span>同步到其他设备（密码加密，存 Firebase）</span>
+        </label>
       </div>
     </div>
   </div>
@@ -23397,8 +23403,19 @@ async function fbApplyRemote(remote, isInitial) {
       await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
     }
     if (remote.settings) {
+      const remoteHasEncKey = !!remote.settings.anthropicKeyEncrypted;
       Object.assign(settings, remote.settings);
+      // 云端密文被删 → 本机也跟着删（A 设备清除了，B 设备同步）
+      if (!remoteHasEncKey && 'anthropicKeyEncrypted' in settings) {
+        delete settings.anthropicKeyEncrypted;
+      }
       await storageSet('ticket-organizer-settings', settings);
+      // 拉到新密文 → 用本机密码尝试自动解密
+      if (remoteHasEncKey) {
+        try {
+          await tryAutoDecryptCloudKey();
+        } catch(e) { /* 解密失败 = 没密码 / 密码不对，updateAiKeyStatus 会显示「🔓 解锁」按钮 */ }
+      }
     }
     localStorage.setItem('ticket-organizer-last-update', String(remoteTs));
     // Re-render
@@ -23406,6 +23423,8 @@ async function fbApplyRemote(remote, isInitial) {
     if (typeof syncOrderToDOM === 'function') syncOrderToDOM();
     if (typeof renderPreview === 'function') renderPreview();
     if (typeof updateCounts === 'function') updateCounts();
+    if (typeof updateAiKeyStatus === 'function') updateAiKeyStatus();
+    if (typeof refreshAiParseZone === 'function') refreshAiParseZone();
     toast('↓ 已接收远程更新');
   } finally {
     _fbApplyingRemote = false;
@@ -23639,12 +23658,105 @@ function _err(m){return ContentService.createTextOutput(JSON.stringify({success:
 
 
 const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';
+const ANTHROPIC_PW_STORAGE  = 'ticket-organizer-anthropic-pw';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AES-GCM 加密同步 — Anthropic Key 跨设备共享
+//   首次设备：用户设密码 → PBKDF2(200k) 派生 → AES-GCM 加密 key → 上 Firebase
+//   新设备：拉到密文 → 用本机存的密码自动解密 → 写本机明文
+//   首次新设备无密码：状态条显示「🔓 解锁」按钮，用户输密码即可
+//   AES-GCM 自带认证标签，密码错会抛错，无歧义
+// ─────────────────────────────────────────────────────────────────────────────
+function _b64(buf)     { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
+function _b64dec(s)    { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+
+async function _deriveKey(password, salt) {
+  const pwKey = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    pwKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function _aesEncrypt(plaintext, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _deriveKey(password, salt);
+  const ct   = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)
+  );
+  return JSON.stringify({ v: 1, salt: _b64(salt), iv: _b64(iv), ct: _b64(ct) });
+}
+
+async function _aesDecrypt(blobStr, password) {
+  const blob = JSON.parse(blobStr);
+  const key  = await _deriveKey(password, _b64dec(blob.salt));
+  const pt   = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: _b64dec(blob.iv) }, key, _b64dec(blob.ct)
+  );  // 密码错会在这里 throw
+  return new TextDecoder().decode(pt);
+}
+
+function loadAnthropicPw()  { try { return localStorage.getItem(ANTHROPIC_PW_STORAGE) || ''; } catch(e) { return ''; } }
+function saveAnthropicPw(pw){ try { localStorage.setItem(ANTHROPIC_PW_STORAGE, pw); } catch(e) {} }
+function clearAnthropicPw() { try { localStorage.removeItem(ANTHROPIC_PW_STORAGE); } catch(e) {} }
+
+// 用本机密码加密本机 key，写入 settings.anthropicKeyEncrypted（待 fbScheduleWrite 推送）
+async function syncAnthropicKeyToCloud() {
+  const key = loadAnthropicKey();
+  const pw  = loadAnthropicPw();
+  if (!key || !pw) return false;
+  try {
+    settings.anthropicKeyEncrypted = await _aesEncrypt(key, pw);
+    await storageSet('ticket-organizer-settings', settings);
+    return true;
+  } catch(e) { console.warn('encrypt failed:', e); return false; }
+}
+
+// fbApplyRemote 收到云端密文 + 本机有密码 → 自动解密写本机
+async function tryAutoDecryptCloudKey() {
+  const blob = settings.anthropicKeyEncrypted;
+  const pw   = loadAnthropicPw();
+  if (!blob || !pw) return false;
+  try {
+    const key = await _aesDecrypt(blob, pw);
+    if (key && key.startsWith('sk-ant-')) {
+      localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
+      return true;
+    }
+    return false;
+  } catch(e) { return false; }
+}
+
+// 用户点「🔓 解锁」按钮 → 输密码 → 解密 → 同时存 key + pw
+async function unlockAnthropicKey() {
+  const blob = settings.anthropicKeyEncrypted;
+  if (!blob) { toast('云端没有加密 Key'); return; }
+  const pw = prompt('输入同步密码以解锁 API Key:');
+  if (!pw) return;
+  try {
+    const key = await _aesDecrypt(blob, pw);
+    if (!key.startsWith('sk-ant-')) throw new Error('bad plaintext');
+    localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
+    saveAnthropicPw(pw);
+    updateAiKeyStatus();
+    refreshAiParseZone();
+    toast('✓ Key 已解锁并保存到本设备');
+  } catch(e) {
+    toast('✕ 密码错误或数据损坏');
+  }
+}
 
 function loadAnthropicKey() {
   try { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ''; } catch(e) { return ''; }
 }
 
-function saveAnthropicKey() {
+async function saveAnthropicKey() {
   const inp = document.getElementById('s-anthropicKey');
   const key = (inp?.value || '').trim();
   if (!key) { toast('请输入 API Key'); return; }
@@ -23652,20 +23764,66 @@ function saveAnthropicKey() {
     toast('Key 格式不对，应以 sk-ant- 开头');
     return;
   }
+
+  const syncChk = document.getElementById('s-anthropicKeySync');
+  const syncEnabled = !!(syncChk && syncChk.checked);
+
   try {
     localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
-    if (inp) inp.value = '';  // clear from DOM for security
+    if (inp) inp.value = '';  // 清 DOM
+
+    if (syncEnabled) {
+      let pw = loadAnthropicPw();
+      if (!pw) {
+        pw = prompt('设置同步密码（最少 6 个字符，新设备需用此密码解锁）：');
+        if (!pw || pw.length < 6) {
+          toast('密码至少 6 个字符。Key 已保存但未同步。');
+          updateAiKeyStatus(); refreshAiParseZone();
+          return;
+        }
+        if (prompt('再输一次确认：') !== pw) {
+          toast('两次密码不一致。Key 已保存但未同步。');
+          updateAiKeyStatus(); refreshAiParseZone();
+          return;
+        }
+        saveAnthropicPw(pw);
+      }
+      const ok = await syncAnthropicKeyToCloud();
+      if (ok) {
+        if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
+        toast('✓ API Key 已保存并加密同步到云端');
+      } else {
+        toast('✓ Key 已保存本地。云端同步失败（请检查 Firebase）');
+      }
+    } else {
+      // 关闭同步 → 清云端密文 + 本机密码
+      if (settings.anthropicKeyEncrypted) {
+        delete settings.anthropicKeyEncrypted;
+        await storageSet('ticket-organizer-settings', settings);
+        if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
+      }
+      clearAnthropicPw();
+      toast('✓ API Key 已保存（仅本设备）');
+    }
     updateAiKeyStatus();
     refreshAiParseZone();
-    toast('✓ API Key 已保存（仅存本设备）');
   } catch(e) {
     toast('保存失败：' + e.message);
   }
 }
 
-function clearAnthropicKey() {
-  if (!confirm('确认清除 Anthropic API Key？清除后图片识别功能将不可用。')) return;
+async function clearAnthropicKey() {
+  if (!confirm('确认清除 Anthropic API Key？清除后图片识别功能将不可用。\n（若云端有加密 Key，本机也会一并清除）')) return;
   try { localStorage.removeItem(ANTHROPIC_KEY_STORAGE); } catch(e) {}
+
+  // 顺手清云端密文 + 本机密码
+  if (settings.anthropicKeyEncrypted) {
+    delete settings.anthropicKeyEncrypted;
+    await storageSet('ticket-organizer-settings', settings);
+    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
+  }
+  clearAnthropicPw();
+
   updateAiKeyStatus();
   refreshAiParseZone();
   toast('✓ API Key 已清除');
@@ -23870,12 +24028,29 @@ function updateAiKeyStatus() {
   const el = document.getElementById('aiKeyStatusText');
   if (!el) return;
   const key = loadAnthropicKey();
+  const synced = !!settings.anthropicKeyEncrypted;
+  const hasPw  = !!loadAnthropicPw();
+
+  let html = '';
   if (key) {
     const masked = key.slice(0, 12) + '••••••••' + key.slice(-4);
-    el.innerHTML = `<span style="color:#7c3aed; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${masked}</span>`;
+    html = `<span style="color:#7c3aed; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${masked}</span>`;
+    if (synced && hasPw) {
+      html += `  <span style="color:#2da44e; margin-left:8px;">· ☁ 已加密同步</span>`;
+    } else if (synced && !hasPw) {
+      html += `  <span style="color:#e67e22; margin-left:8px;">· ⚠ 云端有但本机密码缺失</span>`;
+    }
+  } else if (synced) {
+    html = `<span style="color:#e67e22; font-weight:700;">🔒 云端有加密 Key，本机未解锁</span>
+      <button class="btn small" onclick="unlockAnthropicKey()" style="margin-left:8px; background:#7c3aed; border-color:#7c3aed; color:#fff;">🔓 输密码解锁</button>`;
   } else {
-    el.innerHTML = `<span style="color:var(--muted);">未配置 · 配置后可上传图片自动识别</span>`;
+    html = `<span style="color:var(--muted);">未配置 · 配置后可上传图片自动识别</span>`;
   }
+  el.innerHTML = html;
+
+  // checkbox 跟随当前同步状态
+  const chk = document.getElementById('s-anthropicKeySync');
+  if (chk) chk.checked = synced;
 }
 
 
