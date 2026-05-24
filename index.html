@@ -8698,7 +8698,7 @@ function splitChunkByProposals(chunkText) {
     // Skip anything looking like a PNR command (QTE/FSI etc) — name blacklist
     if (/^(QTE|FSI|OSI|SSR\s+(?!DOC)|RMK|TKT|FOID)\b/i.test(t)) return false;
     // Name line: starts with "NM{n}name/name" or "{n}. name/name" or "NAME/NAME"
-    if (/^(?:NM\d+)?(?:\d+[\.\s]+)?[A-Z]{2,}\/\s?[A-Z]+/i.test(t)) return true;
+    if (/^(?:NM\d+)?(?:\d+[\.\s]+)?[A-Z]{2,}\/\s*[A-Z]+/i.test(t)) return true;
     // SSR DOCS line
     if (/^SSR\s+DOC/i.test(t)) return true;
     // Bare passport doc line
@@ -9262,9 +9262,9 @@ function parseSingleBooking(raw) {
     // Infant prefix: "婴儿：HOSEL/SUMMER RUBY  女 11MAR25"
     // Forces paxType = INFANT regardless of DOB calculation.
     // Handles multi-word given names (e.g. SUMMER RUBY).
-    const infantPaxMatch = trimmed.match(/^婴儿[：:]\s*([A-Z]{2,}\/[A-Z][A-Z\s]*?)\s+(?:([男女])[童]?)?\s*(\d{1,2}[A-Za-z]{3}\d{2,4})\s*$/i);
+    const infantPaxMatch = trimmed.match(/^婴儿[：:]\s*([A-Z]{2,}\/\s*[A-Z][A-Z\s]*?)\s+(?:([男女])[童]?)?\s*(\d{1,2}[A-Za-z]{3}\d{2,4})\s*$/i);
     if (infantPaxMatch) {
-      const name = infantPaxMatch[1].trim().replace(/\s+/g, ' ');
+      const name = infantPaxMatch[1].trim().replace(/\/\s+/, '/').replace(/\s+/g, ' ');
       const gRaw = infantPaxMatch[2] || '';
       const gender = gRaw === '男' ? 'MALE' : gRaw === '女' ? 'FEMALE' : '';
       const dob = extractDOB(infantPaxMatch[3]);
@@ -9509,7 +9509,7 @@ function parseSingleBooking(raw) {
       }
       return false;
     };
-    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
+    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s*[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
     // ── 乘机人：P/CN/... SSR-style inline: "乘机人：P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
     const paxInlineSSR = trimmed.match(/^(?:乘机人|旅客)[：:\s]+P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
     if (paxInlineSSR) {
@@ -9526,10 +9526,10 @@ function parseSingleBooking(raw) {
     //   "3.RAO/XIANG 男 29N0V77"      (OCR typo: zero instead of O in month)
     //   "1. CHEN/GG 女 1990年5月23日"   (Chinese year-month-day)
     const cnInlinePax = trimmed.match(
-      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s+(.+)$/i
+      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/\s*[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s+(.+)$/i
     );
     if (cnInlinePax) {
-      const name = cnInlinePax[1].trim().toUpperCase();
+      const name = cnInlinePax[1].trim().toUpperCase().replace(/\/\s+/, '/').replace(/\s+/g, ' ');
       const g = cnInlinePax[2];
       const gender = (g.startsWith('男')) ? 'MALE' : 'FEMALE';
       // Hand the entire tail (after gender) to extractDOB, which handles
@@ -9580,7 +9580,7 @@ function parseSingleBooking(raw) {
       if (foundAny) continue;
     }
     // Fallback: original single-name regex (catches lines like "1. SMITH/JOHN MR  男 15MAY80")
-    const nameMatch = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/\s?[A-Z]+(?:\s+[A-Z]+)*)/);
+    const nameMatch = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/\s*[A-Z]+(?:\s+[A-Z]+)*)/);
     if (nameMatch && nameMatch[1].includes('/') && !isMetaName(nameMatch[1])) {
       let name = nameMatch[1].trim().replace(/\/\s+/, '/').replace(/\s+(MR|MRS|MS|MSTR|MISS|DR|CHD|INF)$/i, '').trim();
       if (name.length >= 4) {

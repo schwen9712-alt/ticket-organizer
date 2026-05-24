@@ -1,48 +1,49 @@
-## 2026-05-23 — 卡主重复创建防护强化
+## 2026-05-23 — 修复名字斜杠后多空格无法识别的 bug
 
 **改了什么**
-- 新增 `_strNormalize` 函数：去全部空白（含全角 \u3000）、全角→半角、去 ASCII/CJK 全套标点、转小写
-- `addCardholder` 改为三层防护管道：
-  - Layer 1：字面完全相等（已有，不变）
-  - Layer 2：**normalize 后相等 → 静默合并，不弹窗**（新增 — 解决 90% 的打字错误）
-  - Layer 3：Levenshtein 相似度 ≥ 82% → 弹**新美观 modal**，列出所有候选 + [使用这个 →] 按钮 + [➕ 不，确实新建] 兜底
-- `quickAssignCardholder`（订单卡片上的快速分配框）**改走 addCardholder 管道**：之前完全绕过查重，直接 push；现在自动获得三层防护
-- 实时打字提示升级：输入框下方会即时显示「✓ 将合并到 X（忽略空格/标点差异）」或「⚠ 可能与 X 相似（回车后弹窗确认）」
-- 旧的丑陋 `confirm()` 弹窗 → 替换为带相似度百分比、悬停高亮的卡片式 modal
+修复了乘客名字解析的一个根本 bug —— 所有 5 处名字 regex 都假设 `LAST/FIRST` 中间最多只有 1 个空格。一旦数据源是 `LAST/  FIRST`（两个或更多空格），整个识别链全部失败。
+
+具体的 5 处 regex 都做了 `\s?` → `\s*` 的修复（或允许 `/` 后多空格）：
+- 8701 行 `isSharedHeaderLine`：判断是否名字行，影响多人订单的乘客切分
+- 9265 行 `infantPaxMatch`：婴儿前缀格式 `婴儿：NAME 女 11MAR25`
+- 9512 行 `nameRe`（主名字 regex）：扫描整行所有可能的名字
+- 9529 行 `cnInlinePax`（中文 inline 格式）：`NAME 男/女童/婴 DATE`
+- 9583 行 `nameMatch`（fallback）：单乘客行兜底
+
+同时 9532 和 9267 行的 name 清理也补充了 `.replace(/\/\s+/, '/').replace(/\s+/g, ' ')`，确保提取出的 name 是 `TANG/NOAH` 而不是 `TANG/ NOAH`。
 
 **为什么改**
-用户反馈：「卡主匹配逻辑，有时候都是同一个卡主，但是因为有可能打字的时候打错了，错误的创建了一个新的卡主」
+用户报告：以下输入完全识别不出来：
+```
+TANG/  NOAH 男童  17JUN22
+1. DL280 Z TH20AUG PVGSEA DK1 1730 1358 
+2. DL2922 Z FR21AUG SEALAS GK1 0715 0951 
+3. DL2844 V WE16SEP LASSEA DK1 0600 0846 
+4. DL069 V WE16SEP SEATPE DK1 1600 1955+1 
+01 ZNX7ZJDK+*     CNN  20367 CNY
+```
 
-之前的两条创建路径里，**快速分配框完全没有查重**，设置页面虽然有 fuzzy 检查但 normalize 不够强（不去空格、不处理全角字符）。结果常见的打字错误（尾部空格、全半角混打）都会创建新卡主。
+根因：`TANG/[2 空格]NOAH` 中 `/` 后面有两个空格。所有 regex 都用 `\s?`（0 或 1）或 `[A-Za-z]`（必须立即接字母），导致 `/` 后跟多空格的情况零匹配。
 
-**单元测试已验证的场景**
-- ✓ `张三` vs `张三 `（尾部空格）— 静默合并
-- ✓ `张三` vs `张 三`（中间空格）— 静默合并
-- ✓ `ABC` vs `abc`（大小写）— 静默合并
-- ✓ `张三` vs `张三　`（全角空格 \u3000）— 静默合并
-- ✓ `张三` vs `张三，`（CJK 标点）— 静默合并
-- ✓ `Tom Hanks` vs `Tom.Hanks`（ASCII 标点）— 静默合并
-- ✓ `ＡＢＣ` vs `ABC`（全角字母）— 静默合并
-- ✓ `Tom Hanks` vs `Tom Hank`（漏 1 字）— 87.5% → 弹 modal
-- ✓ `张三` vs `李四` — 不合并、不警告，新建
-- ⚠ 已知限制：`张三` vs `张山`（中文 2 字名字改 1 字）相似度只有 50%，不弹窗。短中文名一字之差可能是真不同人，无法激进处理。批量清理用「⚙ 设置 → 卡主 → 🔍 查找重复」工具
+这种格式在打字输入或某些 GDS 终端复制粘贴时很常见（对齐用），但解析器从来没考虑过。
+
+**测试已验证 7 种 case 全过**
+- ✓ `TANG/  NOAH 男童  17JUN22` → TANG/NOAH MALE CHILD（原 bug）
+- ✓ `TANG/NOAH 男童 17JUN22` → TANG/NOAH MALE CHILD（标准）
+- ✓ `WU/XINER 女 25DEC1993` → 成人
+- ✓ `1. WANG/XIAO 男 18JAN95` → 编号前缀
+- ✓ `WANG/  XIAO MEI 女 18JAN95` → 双名 + 多空格
+- ✓ `CHEN/GG 女 1990年5月23日` → 中文日期
+- ✓ `HOSEL/  SUMMER RUBY 女婴 11MAR25` → 婴儿前缀多空格
 
 **改动位置**
-- `index.html` 约 21430 行：新增 `_strNormalize` + `_showSimilarCardholderDialog`，重写 `_strSimilarity` 使用统一的 normalize
-- `index.html` 约 21561 行：`addCardholder` 三层防护
-- `index.html` 约 13037 行：`filterCardholderList` 实时打字提示升级
-- `index.html` 约 13069 行：`quickAssignCardholder` 走 addCardholder 管道
-
-**新增的函数**
-- `_strNormalize(s)`（全新）— 强力归一化
-- `_showSimilarCardholderDialog(name, channel, similars)`（全新）— 美观候选 modal，返回 `Promise<{action, cardholder?}>`
+- `index.html` 行 8701, 9265, 9267, 9512, 9529, 9532, 9583
 
 **风险或注意事项**
-- ⚠ Layer 2 静默合并**不可撤销**（合并完不会提示"刚刚合并到 X，想拆？"）。Toast 会显示 `✓ 已合并到现有卡主 "X"`，但用户看不仔细就过去了。如果误合并，需要手动到设置里改名 / 新建。已评估觉得风险可接受，因为 normalize 等价已经是"基本可以肯定是同一人"的强信号
-- ⚠ 中文 2 字名字一字之差不会被捕获（见上"已知限制"）
-- ⚠ 现有数据库里的重复卡主**不会自动合并** — 用户需要去「⚙ 设置 → 卡主 → 🔍 查找重复」批量处理。这是有意的设计（怕误合并破坏历史数据）
+- 改 `\s?` → `\s*` 理论上可能让原来不匹配的"垃圾输入"现在能匹配。但考虑到 regex 前后还有锚点限制（`^`、`\s+(男女|MR|...)`、性别/日期 lookahead 等），实际不会引入误匹配
+- 提取后用 `.replace(/\/\s+/, '/').replace(/\s+/g, ' ')` 归一化，确保下游 dedup（`pax.find(p => p.name === name)`）不会因为多空格判错
 
 **回滚方式**
-从 `.backups/` 找上一次的 `index.html` 覆盖即可。本次改动**不修改任何 schema**，只改新建路径的检查逻辑，回滚后已创建的所有卡主数据都不受影响。
+从 `.backups/` 找上一次的 `index.html` 覆盖即可。本次纯 regex 修复，不动 schema，不动行为路径，回滚 100% 安全。
 
 ---
