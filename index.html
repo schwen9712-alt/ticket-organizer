@@ -17798,14 +17798,18 @@ function buildInternalCopy(o) {
              o.miles != null && o.cpmExchange != null) {
     const mult = POINTS_TYPES[o.pointsType].mult;
     const cpp = (o.cpmExchange * 100).toFixed(2).replace(/\.?0+$/, '');
+    const cash = Number(o.cashUsd) || 0;
+    const cashSuffix = cash > 0 ? ` + $${cash.toFixed(2)} 现金` : '';
     if (mult != null && mult !== 1.0) {
-      extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${mult} × ${cpp}CPP [${POINTS_TYPES[o.pointsType].label}]`);
+      extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${mult} × ${cpp}CPP${cashSuffix} [${POINTS_TYPES[o.pointsType].label}]`);
     } else {
-      extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${cpp}CPP [${POINTS_TYPES[o.pointsType].label}]`);
+      extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${cpp}CPP${cashSuffix} [${POINTS_TYPES[o.pointsType].label}]`);
     }
   } else if (o.miles != null && o.cpmRate != null && o.cpmExchange != null) {
     const cpp = (o.cpmExchange * 100).toFixed(2).replace(/\.?0+$/, '');
-    extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${o.cpmRate} × ${cpp}CPP`);
+    const cash = Number(o.cashUsd) || 0;
+    const cashSuffix = cash > 0 ? ` + $${cash.toFixed(2)} 现金` : '';
+    extra.push(`结算: ${Number(o.miles).toLocaleString()} × ${o.cpmRate} × ${cpp}CPP${cashSuffix}`);
   }
 
   if (extra.length) text += '\n\n' + extra.join('\n');
