@@ -1,49 +1,53 @@
-## 2026-05-23 — 修复名字斜杠后多空格无法识别的 bug
+## 2026-05-23 — 积分支付补充现金补差功能
 
 **改了什么**
-修复了乘客名字解析的一个根本 bug —— 所有 5 处名字 regex 都假设 `LAST/FIRST` 中间最多只有 1 个空格。一旦数据源是 `LAST/  FIRST`（两个或更多空格），整个识别链全部失败。
+新增 `cashUsd` 字段（现金补，美金），用于卡主积分不够时用现金补足差额的混合支付场景。
 
-具体的 5 处 regex 都做了 `\s?` → `\s*` 的修复（或允许 `/` 后多空格）：
-- 8701 行 `isSharedHeaderLine`：判断是否名字行，影响多人订单的乘客切分
-- 9265 行 `infantPaxMatch`：婴儿前缀格式 `婴儿：NAME 女 11MAR25`
-- 9512 行 `nameRe`（主名字 regex）：扫描整行所有可能的名字
-- 9529 行 `cnInlinePax`（中文 inline 格式）：`NAME 男/女童/婴 DATE`
-- 9583 行 `nameMatch`（fallback）：单乘客行兜底
+成本公式从：
+```
+cost(USD) = miles × mult × cpp
+```
+变成：
+```
+cost(USD) = miles × mult × cpp + cashUsd
+```
 
-同时 9532 和 9267 行的 name 清理也补充了 `.replace(/\/\s+/, '/').replace(/\s+/g, ' ')`，确保提取出的 name 是 `TANG/NOAH` 而不是 `TANG/ NOAH`。
+`cashUsd` 是**可选字段**，默认 0 / null，不填等于原来的行为（完全兼容）。出票校验**不要求**填写。
 
 **为什么改**
-用户报告：以下输入完全识别不出来：
-```
-TANG/  NOAH 男童  17JUN22
-1. DL280 Z TH20AUG PVGSEA DK1 1730 1358 
-2. DL2922 Z FR21AUG SEALAS GK1 0715 0951 
-3. DL2844 V WE16SEP LASSEA DK1 0600 0846 
-4. DL069 V WE16SEP SEATPE DK1 1600 1955+1 
-01 ZNX7ZJDK+*     CNN  20367 CNY
-```
+用户反馈：「卡主积分进行功能完善，有时候卡主的积分不够，会用不够的部分使用现金计算。比如 AMEX 一个预定需要 16 万的分，卡主可能就是 15 万的分 + 100 美金的现金」
 
-根因：`TANG/[2 空格]NOAH` 中 `/` 后面有两个空格。所有 regex 都用 `\s?`（0 或 1）或 `[A-Za-z]`（必须立即接字母），导致 `/` 后跟多空格的情况零匹配。
-
-这种格式在打字输入或某些 GDS 终端复制粘贴时很常见（对齐用），但解析器从来没考虑过。
-
-**测试已验证 7 种 case 全过**
-- ✓ `TANG/  NOAH 男童  17JUN22` → TANG/NOAH MALE CHILD（原 bug）
-- ✓ `TANG/NOAH 男童 17JUN22` → TANG/NOAH MALE CHILD（标准）
-- ✓ `WU/XINER 女 25DEC1993` → 成人
-- ✓ `1. WANG/XIAO 男 18JAN95` → 编号前缀
-- ✓ `WANG/  XIAO MEI 女 18JAN95` → 双名 + 多空格
-- ✓ `CHEN/GG 女 1990年5月23日` → 中文日期
-- ✓ `HOSEL/  SUMMER RUBY 女婴 11MAR25` → 婴儿前缀多空格
+之前系统只支持纯积分或纯刷卡，混合支付的场景没法准确记录成本。
 
 **改动位置**
-- `index.html` 行 8701, 9265, 9267, 9512, 9529, 9532, 9583
+- `index.html` 行 5489 附近：order schema 新增 `cashUsd` 字段
+- `index.html` 行 8299/8307：`computeSettlement` usesPoints 路径加 cashUsd
+- `index.html` 行 8161 附近：录入表单的 `summary-settlement` 摘要支持显示混合公式
+- `index.html` 行 12695 附近：出票完成表单的「积分 Points」「单价 CPP」之间插入「现金补 USD」字段（可选标签，紫色高亮当有值）
+- `index.html` 行 12771 / 14831 附近：底栏公式预览改成 `m × mult × cpp + $cash = $total`（cash > 0 时才显示 cash 部分）
+- `index.html` 行 13260 附近：分配卡主弹窗的快速利润预览也读 o.cashUsd，避免 profit 算错
+- `index.html` 行 14739：`updatePendingField` 数值字段白名单加入 cashUsd
+
+**UI 行为**
+1. 出票表单 usesPoints 模式下，「单价 CPP」右边出现「现金补 USD（可选）」输入框
+2. 不填或填 0 → 行为完全不变（成本就是 miles × mult × cpp）
+3. 填了正数 → 输入框紫色高亮 + 底部公式从 `X × 0.65 × 1.34CPP = $4393.22` 变成 `X × 0.65 × 1.34CPP + $100.00 = $4493.22`
+4. 分配卡主弹窗的利润预览也跟着分项显示：积分成本 / + 现金补 / 总成本
+
+**测试已验证**
+- ✓ 无现金补（cashUsd = null）：504388 × 0.65 × 0.0134 = $4393.22（与图中数据一致，无 regression）
+- ✓ 15 万分 + $100：150000 × 0.65 × 0.0134 + 100 = $1406.50
+- ✓ cashUsd = "100"（字符串）→ 正确解析为数字
+- ✓ cashUsd = ""（空串）→ 当 0 处理
+- ✓ cashUsd = -50（负数）→ 允许（可用于积分退款场景，比如卡主先用了 100 美金后退了 50）
 
 **风险或注意事项**
-- 改 `\s?` → `\s*` 理论上可能让原来不匹配的"垃圾输入"现在能匹配。但考虑到 regex 前后还有锚点限制（`^`、`\s+(男女|MR|...)`、性别/日期 lookahead 等），实际不会引入误匹配
-- 提取后用 `.replace(/\/\s+/, '/').replace(/\s+/g, ' ')` 归一化，确保下游 dedup（`pax.find(p => p.name === name)`）不会因为多空格判错
+- ⚠ Excel 导出**目前不单独列 cashUsd 一列**：因为成本汇总在 `o.cardholderFee`（= computeSettlement 结果，已含 cash）。如果以后需要 Excel 显示明细，可以再加。现在导出的总成本数字是对的
+- ⚠ 老数据没有 cashUsd 字段，读取时是 `undefined → Number(undefined) = NaN → || 0 → 0`，**完全向后兼容**
+- ⚠ 分配卡主弹窗里**没加 cashUsd 输入框**（保持简洁，cash 是边缘情况）。如果你想在分配卡主时就指定 cash，需要先到主表单填好再分配
+- ⚠ 现金补走的是卡主头上（cardholderFee），跟刷卡折扣模式（B 表）不是一回事。如果你想区分"卡主给的现金"和"客户额外付的现金"，那是另一个 schema 变更
 
 **回滚方式**
-从 `.backups/` 找上一次的 `index.html` 覆盖即可。本次纯 regex 修复，不动 schema，不动行为路径，回滚 100% 安全。
+从 `.backups/` 找上一次的 `index.html` 覆盖即可。新字段 `cashUsd` 即使存在于已有订单里，旧代码读 `undefined` 也不会出错（所有路径都 `Number(x) || 0`）。100% 安全回滚。
 
 ---

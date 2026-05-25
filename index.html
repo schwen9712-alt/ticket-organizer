@@ -5484,6 +5484,10 @@ function newOrder(init = {}) {
     miles: init.miles != null ? init.miles : null,   // points count
     cpmRate: init.cpmRate != null ? init.cpmRate : null,   // legacy multiplier (now derived from pointsType)
     cpmExchange: init.cpmExchange != null ? init.cpmExchange : null,   // CPP as decimal e.g. 0.0130
+    // Cash supplement (USD) added on top of points cost. Used when the cardholder's
+    // points are insufficient and they pay the gap in cash. Optional, defaults to 0.
+    // Only affects usesPoints path:  cost(USD) = miles × mult × cpp + cashUsd
+    cashUsd: init.cashUsd != null ? init.cashUsd : null,
     directDiscount: init.directDiscount != null ? init.directDiscount : null,  // % for 直接折扣 mode
     orderUsdAmount: init.orderUsdAmount != null ? init.orderUsdAmount : null,  // base USD for 直接折扣
     // Card payment mode (used when tableLabel === 'B'):
@@ -8155,12 +8159,18 @@ function updateCollapsibleSummaries() {
   const settEl = document.getElementById('summary-settlement');
   if (settEl) {
     const m = o.miles, r = o.cpmRate, e = o.cpmExchange;
-    if (!m && !r && !e && !o.issuer) {
+    const cash = Number(o.cashUsd) || 0;
+    if (!m && !r && !e && !o.issuer && !cash) {
       settEl.textContent = '未填写（出票后填）';
       settEl.style.color = 'var(--muted)';
     } else if (m && r && e) {
-      const total = m * r * e;
-      settEl.textContent = `${Number(m).toLocaleString()}mi × ${r} × ${e} = ¥${Math.round(total).toLocaleString()}`;
+      const pointsUsd = m * r * e;
+      const totalUsd = pointsUsd + cash;
+      if (cash > 0) {
+        settEl.textContent = `${Number(m).toLocaleString()}mi × ${r} × ${e} + $${cash.toFixed(2)} = $${totalUsd.toFixed(2)}`;
+      } else {
+        settEl.textContent = `${Number(m).toLocaleString()}mi × ${r} × ${e} = $${pointsUsd.toFixed(2)}`;
+      }
       settEl.style.color = 'var(--ink-2)';
     } else {
       // Partial — show what's there
@@ -8288,13 +8298,15 @@ function computeSettlement(o) {
   if (typeConf && typeConf.usesPoints) {
     if (o.miles != null && o.cpmExchange != null) {
       const mult = typeConf.mult != null ? typeConf.mult : 1.0;
-      return o.miles * mult * o.cpmExchange;
+      const cash = Number(o.cashUsd) || 0;
+      return o.miles * mult * o.cpmExchange + cash;
     }
     return null;
   }
   // Legacy fallback
   if (o.miles != null && o.cpmRate != null && o.cpmExchange != null) {
-    return o.miles * o.cpmRate * o.cpmExchange;
+    const cash = Number(o.cashUsd) || 0;
+    return o.miles * o.cpmRate * o.cpmExchange + cash;
   }
   return null;
 }
@@ -12685,6 +12697,7 @@ function renderPendingOrderGroupExtras(group, o, idx) {
       `;
     } else if (usesPoints) {
       const cppDisplay = o.cpmExchange != null ? (o.cpmExchange * 100).toFixed(2).replace(/\.?0+$/, '') : '';
+      const cashHasValue = o.cashUsd != null && o.cashUsd !== '' && Number(o.cashUsd) > 0;
       html += `
         <div class="finalize-field">
           <label>积分 Points</label>
@@ -12693,6 +12706,11 @@ function renderPendingOrderGroupExtras(group, o, idx) {
         <div class="finalize-field">
           <label>单价 CPP (如 1.3)</label>
           <input type="number" step="0.01" value="${cppDisplay}" placeholder="1.3" oninput="updatePendingCPP(${idx}, this.value)">
+        </div>
+        <div class="finalize-field">
+          <label>现金补 USD <span style="color:var(--muted);font-size:9px;font-weight:400;">可选</span></label>
+          <input type="number" step="0.01" value="${o.cashUsd != null ? o.cashUsd : ''}" placeholder="0" oninput="updatePendingField(${idx}, 'cashUsd', this.value)"
+            style="${cashHasValue ? 'border-color:var(--accent-deep); background:#faf5ff;' : ''}">
         </div>
         <div class="finalize-field" style="justify-content:center; align-self:end; padding-bottom:6px; color:var(--muted); font-size:11px; font-family:'JetBrains Mono',monospace;">
           ${builtInMult != null ? `× ${builtInMult}（自动）` : ''}
@@ -12752,7 +12770,14 @@ function renderPendingOrderGroupExtras(group, o, idx) {
       html += `<span style="opacity:0.6;">$${Number(o.swipeUsd).toFixed(2)} × ${o.swipeDiscount}% × ${rate.toFixed(4)} = ¥${(costUsd * rate).toFixed(0)}</span>`;
     } else if (usesPoints && o.miles != null && o.cpmExchange != null && builtInMult != null) {
       const cppShow = (o.cpmExchange * 100).toFixed(2).replace(/\.?0+$/, '');
-      html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP = $${(o.miles * builtInMult * o.cpmExchange).toFixed(2)}</span>`;
+      const cash = Number(o.cashUsd) || 0;
+      const pointsUsd = o.miles * builtInMult * o.cpmExchange;
+      const totalUsd = pointsUsd + cash;
+      if (cash > 0) {
+        html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP + $${cash.toFixed(2)} = $${totalUsd.toFixed(2)}</span>`;
+      } else {
+        html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP = $${pointsUsd.toFixed(2)}</span>`;
+      }
     } else if (isDirectDiscount && o.directDiscount != null) {
       const baseUsd = (o.orderUsdAmount != null && o.orderUsdAmount > 0)
         ? o.orderUsdAmount
@@ -13232,7 +13257,9 @@ function updateProfitPreview(idx) {
     preview.style.background = exch > 0.5 ? 'var(--red-light)' : '#fff';
     return;
   }
-  const cost = miles * mult * exch;  // USD cost
+  const cashUsd = Number(o.cashUsd) || 0;
+  const pointsCost = miles * mult * exch;
+  const cost = pointsCost + cashUsd;  // USD cost (incl. cash supplement if any)
   const revenue = computeFinalPrice(o) || 0;
   const rate = effectiveRate(o) || settings.rate || 6.84;
   const revenueUsd = revenue / rate;
@@ -13246,9 +13273,18 @@ function updateProfitPreview(idx) {
   preview.style.background = isLoss ? 'var(--red-light)' : isWarn ? 'var(--warning-light)' : 'var(--green-light)';
   preview.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--muted);">积分成本</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${cost.toFixed(2)}</span>
+      <span style="font-size:11px;color:var(--muted);">${cashUsd > 0 ? '积分成本' : '积分成本'}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${pointsCost.toFixed(2)}</span>
     </div>
+    ${cashUsd > 0 ? `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--accent-deep);">+ 现金补</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent-deep);">$${cashUsd.toFixed(2)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-top:1px dashed var(--line);padding-top:6px;">
+      <span style="font-size:11px;color:var(--muted);font-weight:600;">总成本</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">$${cost.toFixed(2)}</span>
+    </div>` : ''}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <span style="font-size:11px;color:var(--muted);">收入</span>
       <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${revenueUsd.toFixed(2)}</span>
@@ -14711,7 +14747,7 @@ function buildAirlineLookupURL(airline, pnr, lastName) {
 function updatePendingField(idx, field, value) {
   const o = STATE.orders[idx];
   if (!o) return;
-  if (['miles', 'cpmRate', 'cpmExchange', 'directDiscount', 'orderUsdAmount', 'swipeUsd', 'swipeDiscount'].includes(field)) {
+  if (['miles', 'cpmRate', 'cpmExchange', 'directDiscount', 'orderUsdAmount', 'swipeUsd', 'swipeDiscount', 'cashUsd'].includes(field)) {
     const n = parseFloat(value);
     o[field] = isNaN(n) ? null : n;
   } else if (['tkt', 'issuer', 'commChannel', 'pnr', 'tableLabel', 'branch', 'client', 'swipeCardLast4', 'operator'].includes(field)) {
@@ -14809,7 +14845,14 @@ function refreshPendingOrderPreview(idx) {
   }
   if (usesPoints && o.miles != null && o.cpmExchange != null && builtInMult != null) {
     const cppShow = (o.cpmExchange * 100).toFixed(2).replace(/\.?0+$/, '');
-    html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP = $${(o.miles * builtInMult * o.cpmExchange).toFixed(2)}</span>`;
+    const cash = Number(o.cashUsd) || 0;
+    const pointsUsd = o.miles * builtInMult * o.cpmExchange;
+    const totalUsd = pointsUsd + cash;
+    if (cash > 0) {
+      html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP + $${cash.toFixed(2)} = $${totalUsd.toFixed(2)}</span>`;
+    } else {
+      html += `<span style="opacity:0.6;">${Number(o.miles).toLocaleString()} × ${builtInMult} × ${cppShow}CPP = $${pointsUsd.toFixed(2)}</span>`;
+    }
   } else if (isDirectDiscount && o.directDiscount != null) {
     const baseUsd = (o.orderUsdAmount != null && o.orderUsdAmount > 0)
       ? o.orderUsdAmount
