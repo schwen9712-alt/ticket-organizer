@@ -3428,6 +3428,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         <button onclick="document.getElementById('ticketedSearchInput').value='';filterTicketedOrders('')"
           style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
         <button class="btn small" onclick="openManualTicketDialog()" style="font-size:11px;">＋ 手动补录</button>
+        <button class="btn small ghost" onclick="clearTicketedScreenshots()" style="font-size:11px;" title="清除已出票订单上的所有截图，释放本地存储空间（订单数据不动）">🗑 清除历史截图</button>
       </div>
     </div>
     <div id="ticketedList"></div>
@@ -22248,6 +22249,65 @@ function removeOrderScreenshot(orderIdx, imgIdx) {
   o.screenshots.splice(imgIdx, 1);
   persistOrders();
   renderOrderScreenshots(orderIdx);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Storage relief — clean screenshots from ticketed (archived) orders.
+// Screenshots on already-ticketed orders rarely need to be looked at again,
+// and they're the #1 culprit of localStorage filling up (base64 JPEG bloat).
+// Pending orders' screenshots are NEVER touched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Estimate total screenshot bytes across ticketed orders.
+// base64 → roughly 0.75× the encoded length is the byte size.
+function _estimateTicketedScreenshotsBytes() {
+  const ticketed = (settings.ticketed || []);
+  let bytes = 0, count = 0, orders = 0;
+  ticketed.forEach(o => {
+    const shots = Array.isArray(o.screenshots) ? o.screenshots : [];
+    if (shots.length === 0) return;
+    orders++;
+    shots.forEach(b64 => {
+      // Strip "data:image/jpeg;base64," prefix length if present
+      const payloadLen = b64.length - (b64.indexOf(',') + 1);
+      bytes += payloadLen * 0.75;  // base64 decode size
+      count++;
+    });
+  });
+  return { bytes, count, orders };
+}
+
+function _formatBytes(b) {
+  if (b < 1024) return b.toFixed(0) + ' B';
+  if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+  return (b/1024/1024).toFixed(2) + ' MB';
+}
+
+async function clearTicketedScreenshots() {
+  const est = _estimateTicketedScreenshotsBytes();
+  if (est.count === 0) {
+    toast('已出票订单里没有截图，无需清理');
+    return;
+  }
+  const msg =
+    `准备清除 ${est.count} 张截图（${est.orders} 个已出票订单），约释放 ${_formatBytes(est.bytes)} 本地空间。\n\n` +
+    `⚠ 已出票订单的截图会被删除，无法恢复。\n` +
+    `✓ 订单本身、价格、PNR、票号等数据全部保留。\n` +
+    `✓ 待出票订单的截图不受影响。\n` +
+    `✓ 此操作会同步到 Firebase 云端（其他设备也会跟着清掉）。\n\n` +
+    `确认清除？`;
+  if (!confirm(msg)) return;
+  let cleared = 0;
+  (settings.ticketed || []).forEach(o => {
+    if (Array.isArray(o.screenshots) && o.screenshots.length > 0) {
+      cleared += o.screenshots.length;
+      o.screenshots = [];
+    }
+  });
+  await storageSet('ticket-organizer-settings', settings);
+  if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
+  if (typeof renderTicketed === 'function') renderTicketed();
+  toast(`✓ 已清除 ${cleared} 张截图，释放约 ${_formatBytes(est.bytes)} 空间`);
 }
 
 // Re-render only the screenshots section of a specific order card (no full rebuild)
