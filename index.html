@@ -2896,8 +2896,12 @@ html[data-lang="en"] .zh {
         <span style="font-size:9.5px; letter-spacing:0.1em; color:var(--muted); font-weight:600;" data-i18n="header.city.ny">纽约</span>
         <span id="clock-ny" style="font-size:14px; font-weight:700; color:var(--ink); letter-spacing:0.04em;">--:--</span>
       </div>
+      <span style="color:var(--line-strong); font-size:10px; padding:0 2px;">·</span>
+      <div style="display:flex; align-items:center; gap:5px; padding:3px 10px; background:rgba(12,27,42,0.04); border-radius:var(--r-sm);">
+        <span style="font-size:9.5px; letter-spacing:0.1em; color:var(--muted); font-weight:600;" data-i18n="header.city.tlv">以色列</span>
+        <span id="clock-tlv" style="font-size:14px; font-weight:700; color:var(--ink); letter-spacing:0.04em;">--:--</span>
+      </div>
     </div>
-    <button class="btn ghost small" onclick="refreshAllOrders()" title="用最新逻辑重跑所有订单：重新解析价格/舱位/儿童/航段，并补全乘客信息" data-i18n="header.refreshLogic">🔄 用最新逻辑重跑</button>
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
@@ -6919,9 +6923,11 @@ function updateWorldClocks() {
   const beijing = document.getElementById('clock-beijing');
   const la = document.getElementById('clock-la');
   const ny = document.getElementById('clock-ny');
+  const tlv = document.getElementById('clock-tlv');
   if (beijing) beijing.textContent = fmt('Asia/Shanghai');
   if (la) la.textContent = fmt('America/Los_Angeles');
   if (ny) ny.textContent = fmt('America/New_York');
+  if (tlv) tlv.textContent = fmt('Asia/Jerusalem');
 }
 
 // ============================================
@@ -14962,10 +14968,10 @@ const I18N_DICT = {
   'header.subtitle':  { zh: '订单整理工具', en: 'Ticket Management Tool' },
   'header.today':     { zh: '今日',         en: 'TODAY' },
   'header.fxRate':    { zh: '汇率',         en: 'EXCHANGE RATE' },
-  'header.refreshLogic': { zh: '🔄 用最新逻辑重跑', en: '🔄 Re-run latest logic' },
   'header.city.beijing': { zh: '北京',  en: 'BJS' },
   'header.city.la':      { zh: '洛杉矶', en: 'LAX' },
   'header.city.ny':      { zh: '纽约',  en: 'NYC' },
+  'header.city.tlv':     { zh: '以色列', en: 'TLV' },
 
   // Section titles - subtitles (right-side Chinese)
   'sec.pastePnr':     { zh: '粘贴原始票面（支持多单）', en: 'Paste raw PNR (multi-order supported)' },
