@@ -1,52 +1,49 @@
-## 2026-05-23 — 取消自动出票快照（释放约 4.2 MB 本地存储）
+## 2026-05-23 — 一致性审计：修复 autoCloudPush 未定义 bug
 
 **改了什么**
-1. **移除所有自动 rolling backup 调用**（3 处）：
-   - 出票前快照（22553）：删
-   - 出票后快照（22609）：删
-   - 批量出票快照（18618）：删
-   - 手动补录快照（19066）：删
-2. **快照上限从 5 → 2**：`ROLLING_BACKUP_SLOTS = 2`
-3. **应用加载时一次性 trim 旧 ring buffer**：之前存的 5 个快照会自动截到最新 2 个，立即释放约 60% 空间。F12 Console 会有日志 `[rolling-backup] trimmed 5 → 2 snapshots`
-4. **设置面板 UI 改文案**：「本地自动快照」→「本地手动快照（应急用，最多保留 2 个）」，并加绿色说明告知 Firebase 是主要安全网
+修复一个运行时 bug：`autoCloudPush()` 函数在历史重构中被 `fbScheduleWrite()` 取代，但有 3 处调用没改过来，导致调用一个不存在的函数。
 
-**为什么改**
-诊断结果：
-- 本地 localStorage 总用量 5.06 MB（接近浏览器 5–10 MB 上限）
-- `ticket-organizer-rolling-backup` 占 4.21 MB（83%！）
-- 已出票截图已清空（0 张）— 不是它的问题
-- 真正主数据 settings 才 866 KB（健康）
+3 处全部改为 `if (typeof fbScheduleWrite === 'function') fbScheduleWrite();`：
+- `persistOrders()` 的 debounce 回调（23413）— **影响最大**
+- `restoreFromRollingBackup()`（22482）
+- 5766 行（原本有 typeof 守卫，不会报错但永远不执行 → 同样修正）
 
-用户选择"取消出票快照"方案：彻底关掉自动备份，本地不再因每次出票而膨胀。
+**为什么改 / bug 的真实影响**
+通过一致性审计发现：`autoCloudPush` 定义 0 处，调用 3 处。
 
-**保留了什么**
-- ✅ `saveRollingBackup` 函数本体不删 — 手动按钮还在用，未来想恢复自动也能立刻加回 await 调用
-- ✅ `restoreFromRollingBackup` 完整保留 — 现有快照（trim 后 2 个）仍可恢复
-- ✅ 设置面板的「💾 立即保存一个快照」手动按钮 — 用户应急时仍能手动存
-- ✅ Firebase 云同步、Google Sheets 同步、GitHub Gist 备份全部不动
+最关键的是 `persistOrders()` —— 每次编辑订单后 debounce 400ms 会触发它：
+- ✓ 本地保存正常（`storageSet('ticket-organizer-pending')` 在前一行已执行）
+- ✗ 但紧接着 `autoCloudPush()` 抛 ReferenceError → **编辑订单的改动没有触发 Firebase 同步**
 
-**风险或注意事项**
-- ⚠ **现在唯一的"撤销"机制是 Firebase 历史 + 手动快照**。如果某次操作出错（比如误删订单），不能再像以前那样回到"出票前 10 秒的快照"
-- ⚠ **建议在重大操作前主动点一下「💾 立即保存一个快照」**（设置 → 本地手动快照 区域）。比如批量补录前 / 大规模合并卡主前 / 任何不可逆操作前
-- ⚠ Firebase 端**不保留版本历史**（test mode 规则下没开启 versioning）。如果数据被错误的同步覆盖到云端，本地手动快照是唯一回退路径
-- ⚠ 加载时的 trim 是**自动且不可撤销**的：现有的 5 个快照保留最新 2 个，老的 3 个会被删。如果你想保留某个老快照，下一版部署前先到 Application → Local Storage 手动备份 `ticket-organizer-rolling-backup` 的 JSON
+结果：用户在 A 设备编辑订单（改价格、改卡主、改舱位等），改动只存了本地，**没有及时推送到 Firebase**。要等到下次出票 / 手动操作等其他会调用 fbScheduleWrite 的路径，才会把累积的改动一起推上去。这可能是"多设备同步偶尔慢半拍"的原因之一。
 
-**预期效果**
-- localStorage 总用量从 5.06 MB → 约 1.7 MB（trim 后第一次加载）
-- 出票后局部用量不再随每次出票膨胀
-- 红色 "本地存储已满" 警告消失
-- 出票速度可能略快（少 1 次大文件写入 localStorage）
+修复后：编辑订单 → 本地保存 + Firebase 同步，两件事都正常完成。
+
+**一致性审计的其他结论（本次未改动，仅记录）**
+健康项：
+- ✓ 核心算法 computeSettlement/computeFinalPrice/effectiveRate/extractDOB 等全部唯一定义，无重复
+- ✓ 0 个重复函数定义
+- ✓ POINTS_TYPES 无硬编码 *0.65，全走配置
+- ✓ 10 个 localStorage key 命名规范统一
+- ✓ 无真 TODO/FIXME（XXX 和"临时"都是正常文案/业务术语）
+
+发现但未处理（低优先级，刻意不动以避免引入风险）：
+- IATA 月份字典 {JAN:0...} 重复 8 处（可抽常量但收益小）
+- 空 catch{} 42 处（多为合理兜底）
+- 23 个死函数 248 行（1% 体积，ROI 太低）
+
+发现的 2 个半成品功能（完整实现但没接 UI，待用户决定是否激活）：
+- `checkPassportExpiry` — 护照过期/不足6个月警告（防拒登机）
+- `detectPriceAnomalies` — 同航线价格异常检测（防报错价亏钱）
 
 **改动位置**
-- `index.html` 行 22190：`ROLLING_BACKUP_SLOTS = 5` → `= 2`
-- `index.html` 行 22411 附近：加 `_trimRollingBackupRing()` IIFE
-- `index.html` 行 18618：删 `await saveRollingBackup` (批量)
-- `index.html` 行 19066：删 `await saveRollingBackup` (手动补录)
-- `index.html` 行 22553：删 `await saveRollingBackup` (出票前)
-- `index.html` 行 22609：删 `await saveRollingBackup` (出票后)
-- `index.html` 行 3675-3682：设置面板 hint 文案改写
+- `index.html` 行 5766、22482、23413：autoCloudPush → fbScheduleWrite
+
+**风险或注意事项**
+- ⚠ 修复后编辑订单会更频繁触发 Firebase 写入（之前是炸掉不写）。fbScheduleWrite 本身有 debounce，不会造成请求风暴。但如果你 Firebase 用量敏感，留意一下（test mode 下无所谓）
+- ⚠ 这个修复**增加了**云同步频率（从"编辑时不同步"变成"编辑时同步"），是符合预期的正确行为，不是副作用
 
 **回滚方式**
-从 `.backups/` 找上一版 `index.html` 覆盖即可。注意：**回滚不能恢复被 trim 掉的旧快照**（已物理删除）。如果想恢复"每次出票自动快照"机制，回滚后无需任何改动即可恢复 5-slot 行为；如果想保持函数体但加回自动调用，告诉我下一版部署做。
+从 `.backups/` 找上一版 `index.html` 覆盖即可。注意回滚后会恢复 autoCloudPush bug（编辑订单不触发云同步）。100% 安全回滚但不建议（会带回 bug）。
 
 ---

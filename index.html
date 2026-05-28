@@ -5763,7 +5763,7 @@ async function storageSet(key, value) {
     }
   }
   if (key === 'ticket-organizer-settings' || key === 'ticket-organizer-pending') {
-    if (typeof autoCloudPush === 'function') autoCloudPush();
+    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   }
 }
 
@@ -22479,7 +22479,7 @@ async function restoreFromRollingBackup(slotIdx) {
   renderPendingBanner();
   renderTicketed();
   renderCardholdersList();
-  autoCloudPush();  // Push restored state to cloud too
+  if (typeof fbScheduleWrite === 'function') fbScheduleWrite();  // Push restored state to cloud too
   toast(`✓ 已从 ${d} 的本地备份恢复`);
   renderRollingBackupsList();
 }
@@ -23410,7 +23410,7 @@ function persistOrders() {
       currentIdx: STATE.currentIdx
     };
     await storageSet('ticket-organizer-pending', snapshot);
-    autoCloudPush();
+    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   }, 400);
 }
 
