@@ -3673,8 +3673,12 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 
   <div class="section">
-    <div class="section-title"><span class="num">🛡</span>本地自动快照 <span class="zh">每次出票后自动保存最近 5 个完整快照</span></div>
-    <div class="hint" style="margin-bottom:12px">与云同步无关，纯本地保存。无论网络、云端是否正常，这里永远有最近 5 次出票时的完整数据。点击「恢复」可以回到任意一个历史状态。</div>
+    <div class="section-title"><span class="num">🛡</span>本地手动快照 <span class="zh">应急用，最多保留 2 个</span></div>
+    <div class="hint" style="margin-bottom:12px;line-height:1.6;">
+      <strong style="color:var(--ink);">已改为手动模式</strong>。出票时不再自动保存快照（之前 5 个自动快照占用本地空间约 4MB）。<br>
+      <span style="color:var(--green);">✓ 数据安全由 Firebase 云同步保证</span>，本地快照只是应急用的额外保险。<br>
+      需要时点下方按钮主动保存一个完整状态，最多保留 2 个。
+    </div>
     <div id="rollingBackupsList"><div class="hint">暂无快照</div></div>
     <div style="margin-top:8px;">
       <button class="btn small" onclick="saveRollingBackup('手动'); toast('✓ 已手动保存快照'); renderRollingBackupsList();">💾 立即保存一个快照</button>
@@ -18614,8 +18618,8 @@ async function markAllTicketed() {
   });
   await storageSet('ticket-organizer-settings', settings);
 
-  // SAFETY: Rolling local backup + immediate cloud push after batch ticketing
-  await saveRollingBackup(`批量出票 ${toSave.length} 单`);
+  // SAFETY: cloud push handles persistence. Local rolling backups disabled
+  // to conserve localStorage quota (was ~4 MB for 5 snapshots).
 
   STATE.orders = [newOrder()];
   STATE.currentIdx = 0;
@@ -19063,7 +19067,7 @@ async function submitManualTicket(btn) {
   settings.ticketed = settings.ticketed || [];
   settings.ticketed.unshift(entry);
   await storageSet('ticket-organizer-settings', settings);
-  await saveRollingBackup(`手动补录 ${pnr || paxRaw.split('\n')[0]}`);
+  // Auto rolling backup removed — see saveRollingBackup definition for context.
 
   btn.closest('.verify-modal-overlay').remove();
   renderTicketed();
@@ -22187,7 +22191,7 @@ async function confirmTicketing() {
 // Saves full state after every ticketing action (independent of cloud).
 // If localStorage / cloud is corrupted, any of these 5 slots can restore data.
 // ============================================
-const ROLLING_BACKUP_SLOTS = 5;
+const ROLLING_BACKUP_SLOTS = 2;
 const ROLLING_BACKUP_KEY = 'ticket-organizer-rolling-backup';
 
 // ============================================
@@ -22409,6 +22413,21 @@ async function copyAllScreenshots(orderIdx) {
   }
 }
 
+// One-time cleanup: trim ring buffer down to current ROLLING_BACKUP_SLOTS limit.
+// Older versions saved up to 5 snapshots. After reducing the limit to 2, the
+// existing localStorage might still hold 5 entries (~4 MB). Trim on next load.
+(function _trimRollingBackupRing() {
+  try {
+    const raw = localStorage.getItem(ROLLING_BACKUP_KEY);
+    if (!raw) return;
+    const ring = JSON.parse(raw);
+    if (!Array.isArray(ring) || ring.length <= ROLLING_BACKUP_SLOTS) return;
+    const trimmed = ring.slice(0, ROLLING_BACKUP_SLOTS);
+    localStorage.setItem(ROLLING_BACKUP_KEY, JSON.stringify(trimmed));
+    console.log(`[rolling-backup] trimmed ${ring.length} → ${trimmed.length} snapshots`);
+  } catch (e) { /* ignore */ }
+})();
+
 async function saveRollingBackup(reason) {
   try {
     const payload = {
@@ -22550,7 +22569,7 @@ async function doMarkTicketed(idx) {
     return;
   }
 
-  await saveRollingBackup(`出票前备份 #${idx+1} ${o.pnr || ''}`);
+  // Auto rolling backup removed — Firebase + Google Sheets are the safety nets.
 
   try {
     const rate = effectiveRate(o);
@@ -22605,8 +22624,7 @@ async function doMarkTicketed(idx) {
       }
     }
 
-    // Second rolling backup AFTER write — now captures the post-ticketed state
-    await saveRollingBackup(`出票 #${idx+1} ${entry.pnr || ''}`);
+    // Auto rolling backup removed.
 
     // Push to cloud immediately (bypass debounce)
 
