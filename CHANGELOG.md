@@ -1,65 +1,64 @@
-## 2026-05-23 — 【重大修复】多设备并发覆盖丢单 → 改为 Merge-by-ID 永不丢单
+## 2026-05-23 — 拦截可人工释放 + 全新可视化拦截 UI
 
-**这是什么问题**
-用户每天出 30+ 单，但数据 3 天只涨 15 单（813→828），几十单凭空消失。
+**改了什么**
+1. **所有重复/行程拦截都可人工释放**：之前 STRONG 拦截用 alert() 直接挡死（无法录入），现在每条拦截都有「🔓 我已核实，强制录入」按钮
+2. **全新可视化拦截 modal**：替换掉旧的 alert()/confirm() 纯文字弹窗，改为美观的卡片式 modal
+3. **再次代码审计**：移除未使用的 strongCount 变量，修正 summary 跳过数统计逻辑
 
-**根本原因（第一次审计漏掉的真 bug）**
-Firebase 同步用的是「整体覆盖」模型：
-- `fbPushNow` 把整个 `settings`（含全部 ticketed 数组）一次性写云端
-- `fbApplyRemote` 用 `Object.assign(settings, remote.settings)` 整体替换本地
+**新 modal 长什么样**
+- 顶部：图标 + 标题（行程冲突🚫 / 重复订单⚠️）+ "所有拦截都可人工放行"提示
+- 中部：每个冲突一张卡片
+  - 彩色徽章标明类型：🧭位置冲突 / ⏱时间冲突 / 🔁已出票重复 / 🔁待出票重复 / ✈接续行程 / ❓可能相关
+  - 冲突原因（红/橙色）
+  - 新录入 vs 已存在 的航班对比（等宽字体网格）
+  - **STRONG 卡片**：「🔓 我已核实，强制录入」按钮，点击后卡片变绿显示"✓ 已放行"
+  - **WEAK 卡片**：三个按钮「✓作为新单录入」「↻更新已有单」「跳过」
+- 底部：「🔓 全部放行」+「取消全部」+「确认处理 →」
+- 动画：overlayIn 淡入 + modalIn 弹性入场；颜色全走 CSS 变量（深色模式自适应）
 
-多设备/多标签并发时（用户手机+电脑+多标签同时用）：
-```
-设备A出票→821单→推云端
-设备B还停在820（没收到A的推送，或被 remoteTs<=localTs 判断跳过）
-设备B出票→本地821（820+1）→推云端→覆盖掉A的那单！应为822实为821
-```
-加上 `if (remoteTs <= localTs) return` 这个跳过逻辑 + 多设备时钟差，导致一台设备持续用「缺单的本地版本」覆盖云端。每天几十单只要有任何并发就丢。数据集看起来「干净无重复」恰恰因为丢得干净——被覆盖的单没留痕迹。
+**为什么改**
+用户需求：「增加人工干预功能，所有的拦截都需要可以进行人工手动释放，再次检测优化代码，提升UI的美观」
 
-**怎么修的：Merge-by-ID（并集，永不丢）**
-核心新增 `_mergeById(local, remote, keyField, tsField)`：取两个数组的并集
-- 只在本地有 → 保留
-- 只在远程有 → 加入
-- 两边都有（同id）→ 用 ticketedAt 较新的；平局保留本地（防覆盖刚编辑的）
+旧的 alert() 拦截是死路一条——一旦判定 STRONG（同PNR/全航班相同/同人同日位置冲突），用户只能取消，没法强制录入。但现实中可能有合理的例外（比如系统误判、特殊业务场景），操作员需要能手动放行。
 
-应用到三个层面：
-1. **fbApplyRemote**：收到云端数据时，ticketed/cardholders/knownPax/actions/discountRules 等全部 merge，不再整体替换
-2. **fbPushNow 改 READ-MERGE-WRITE**：推送前先拉云端最新→合并本地进去→再写。即使本地数据不全，也不会覆盖掉云端别的设备刚加的单
-3. **onSnapshot echo 防护精确化**：从「3秒内忽略所有远程」改成「只忽略自己刚写的那条 updatedAt」，避免误杀紧随其后的其他设备更新（merge 安全，echo 即使漏进来也只是自己merge自己=无害）
+**单元测试 8/8 全过（jsdom 真实 DOM 交互）**
+- ✓ modal 渲染到 DOM
+- ✓ strong 释放按钮 + weak 三动作按钮正确生成
+- ✓ 点释放后显示"已放行"标签 + 卡片变绿
+- ✓ weak 选 add 后显示决定
+- ✓ 返回值正确：放行的进 releasedStrong，add 的不进 weakUpdates（作为新单）
+- ✓ 确认后 modal 关闭
 
-**附带修复的 ID 碰撞隐患**
-出票订单 ID 原本是 `tk-{时间戳}-{下标}`，两台设备同毫秒出票同批次第0单 → ID 完全相同 → merge 会误当同一单丢一个。三处 ID 生成全部加 6 位随机后缀：
-- 单单出票（22583）：加 -{6位随机}
-- 批量出票（18595）：随机从3位→6位
-- 手动补录（19053）：原本完全无随机 → 加 -{6位随机}
+**新增函数**
+- `showBlockingModal(strong, weak)` — 返回 Promise<{releasedStrong:Set, weakUpdates:Map, weakSkipped:Set}>
+  - 内部含 routeOf/dateOf/paxOf/whenOf 渲染辅助
+  - 逐卡片事件绑定 + 全部放行 + 取消全部
 
-**单元测试 9/9 全过**（关键场景）
-- ✓ 本地5单 + 空远程 = 5单（防清空，这就是防丢单核心）
-- ✓ 空本地 + 远程5单 = 5单（新设备首次拉取）
-- ✓ A出90单 + B出60单(20重叠) = 130单（模拟真实多设备并发）
-- ✓ 同id取较新时间戳 / 本地较新则保留本地 / 字符串去重合并
+**主流程改动**
+- parsePNR 里删除三段 alert()/confirm() 墙（约 80 行）
+- 改为 `await showBlockingModal(strong, weak)` 一次性处理所有冲突
+- 根据返回的 releasedStrong / weakUpdates / weakSkipped 决定哪些订单录入
 
 **改动位置**
-- index.html 18595, 19053, 22583：ID 加强随机
-- index.html 23527 附近：加 _fbLastWrittenTs 变量
-- index.html 23633 附近：onSnapshot echo 防护精确化
-- index.html 23646 附近：fbApplyRemote 重写为 merge（+新增 _mergeById/_mergeUniqueStrings）
-- index.html 23773 附近：fbPushNow 改 read-merge-write
+- index.html detectDuplicates 后（约 10573）：新增 showBlockingModal 函数（~230行）
+- index.html parsePNR 内（约 10826）：三段 alert/confirm 替换为 modal 调用
+- index.html summary（约 11159）：跳过数改为统计真实未放行的 strong
 
-**🔑 部署后必做的数据抢救（重要！）**
-新 merge 逻辑是双向 loss-safe 的。被覆盖丢失的历史单，只要那台设备的 localStorage 没被清，就还在各设备本地。抢救方法：
-1. 先在「最标准那台设备」部署+打开 → 828单 merge 进云端
-2. 依次打开每一台其他设备/手机/每个浏览器标签（都部署同一份代码）
-3. 每打开一台，它本地存的单自动 merge 进云端，数字只增不减地累加
-4. 最后所有设备的单全部汇总，每台都显示完整总数
+**行为变化总结**
+| 情况 | 旧行为 | 新行为 |
+|---|---|---|
+| STRONG 拦截 | alert() 死挡，只能取消 | 卡片 + 🔓 强制录入按钮 |
+| WEAK 确认 | 连续 confirm() 弹窗 | 卡片 + 三按钮一次看全 |
+| 多个冲突 | 一个个 alert/confirm | 全部在一个 modal 里 |
+| 全部放行 | 不可能 | 一键「全部放行」 |
 
 **风险或注意事项**
-- ⚠ **删除会"复活"**：merge 是并集，如果用户故意删了某单，下次和别的设备（还有这单）merge 时会被加回来。本次未做删除墓碑（deletedIds）机制——因为当前痛点是丢单不是删不掉。如果以后需要"删了就别回来"，要再加墓碑机制
-- ⚠ **fbPushNow 现在每次推送前多一次 getDoc 读取**：增加一点延迟和 Firebase 读配额消耗。但这是 loss-safe 的必要代价。test mode 下无所谓
-- ⚠ **scalar 设置仍是 last-write-wins**：exchangeRate/theme 等标量设置不 merge（也无需 merge），最后写的赢
-- ⚠ **🚨 Firebase test mode 6/22 到期仍未解决**：到期后所有同步失败，这比任何功能都紧急
+- ⚠ **人工放行 = 真的会录入**：点了「强制录入」就会把订单加进待出票，可能造成真重复。这是用户明确要的功能，责任在操作员
+- ⚠ modal 是 Promise-based 异步：parsePNR 会 await 它，用户不点确认/取消就一直等（不会超时）。点遮罩不关闭（强制明确选择）
+- ⚠ 代理暂停拦截（pauseOverride）**未纳入本次改动**：它已经有自己的绕过 confirm，已满足"可释放"。如需统一进这个 modal 风格，下一版做
+- ⚠ 删除/清空等其他 confirm（33处）是正常用途，不在本次范围
 
 **回滚方式**
-从 .backups/ 找上一版覆盖。⚠ 回滚会恢复「整体覆盖」bug，多设备并发会重新开始丢单。强烈不建议回滚。
+从 .backups/ 找上一版覆盖。回滚后恢复 alert()/confirm() 拦截（STRONG 不可放行）。
 
 ---

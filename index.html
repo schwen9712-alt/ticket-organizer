@@ -10277,6 +10277,153 @@ function parseSingleBooking(raw) {
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ITINERARY SANITY CHECK
+// A "person" = same first/last name + dob + gender. For each person we build a
+// timeline of all their flight segments (across pending + ticketed) and check
+// whether a new order's segments fit logically:
+//   • LOCATION continuity: you can only depart from where you currently are.
+//     If you arrive in LAX on Feb-10 AM, departing LAX on Feb-10 PM is FINE,
+//     but departing PVG (China) on Feb-10 PM is IMPOSSIBLE (you're in LAX).
+//   • TIME ordering: a later segment can't depart before an earlier one arrives.
+// This lets legit connecting itineraries through while catching impossible ones.
+// ─────────────────────────────────────────────────────────────────────────────
+const _MONTHS3 = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+
+// Parse an IATA-ish date ("10FEB", "10FEB25", "10FEB2025") + optional "HH:MM"
+// time into a sortable epoch (ms). Returns null if unparseable.
+// dayOffset adds whole days (for "+1"/"+2" arrival markers).
+function _segEpoch(dateStr, timeStr, dayOffset) {
+  if (!dateStr) return null;
+  const m = String(dateStr).toUpperCase().trim().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
+  if (!m) return null;
+  const day = parseInt(m[1]);
+  const mon = _MONTHS3[m[2]];
+  if (mon === undefined) return null;
+  let yr;
+  if (m[3]) yr = m[3].length === 4 ? parseInt(m[3]) : (parseInt(m[3]) < 70 ? 2000 + parseInt(m[3]) : 1900 + parseInt(m[3]));
+  else yr = new Date().getFullYear();
+  let hh = 0, mm = 0;
+  if (timeStr) {
+    const t = String(timeStr).match(/(\d{1,2}):(\d{2})/);
+    if (t) { hh = parseInt(t[1]); mm = parseInt(t[2]); }
+  }
+  return new Date(yr, mon, day + (dayOffset || 0), hh, mm).getTime();
+}
+
+// Pull a day-offset out of an arrival time field that may carry "+1"/"+2".
+function _arrOffset(arrTimeRaw) {
+  const m = String(arrTimeRaw || '').match(/\+(\d+)/);
+  return m ? parseInt(m[1]) : 0;
+}
+
+// Build a sorted list of {dep, arr, from, to, flight} legs for an order.
+// dep/arr are epoch ms. Falls back gracefully when times are missing
+// (uses date-only, so same-day legs compare by date and we lean on location).
+function _orderLegs(o) {
+  const legs = [];
+  for (const s of (o.segments || [])) {
+    const dep = _segEpoch(s.date, s.depTime, 0);
+    // arrival: same date unless time wraps past midnight or has +N marker
+    let arrOff = _arrOffset(s.arrTime);
+    // if arr time looks earlier than dep time and no explicit offset, assume +1 (overnight)
+    if (!arrOff && s.depTime && s.arrTime) {
+      const dEp = _segEpoch(s.date, s.depTime, 0);
+      const aEp = _segEpoch(s.date, s.arrTime, 0);
+      if (dEp != null && aEp != null && aEp < dEp) arrOff = 1;
+    }
+    const arr = _segEpoch(s.date, s.arrTime, arrOff);
+    legs.push({
+      dep, arr,
+      from: (s.from || '').toUpperCase().trim(),
+      to:   (s.to   || '').toUpperCase().trim(),
+      flight: (s.flight || '').toUpperCase().trim(),
+      date: (s.date || '').toUpperCase().trim(),
+    });
+  }
+  // sort by dep epoch (nulls last, keep original order among nulls)
+  legs.sort((a, b) => {
+    if (a.dep == null && b.dep == null) return 0;
+    if (a.dep == null) return 1;
+    if (b.dep == null) return -1;
+    return a.dep - b.dep;
+  });
+  return legs;
+}
+
+// Given a person's EXISTING legs (already sorted) and a NEW order's legs,
+// determine if the new order fits logically. Returns:
+//   { ok: true }                              → fits fine, allow
+//   { ok: false, kind: 'location'|'time', msg } → impossible itinerary
+// Only flags HARD conflicts (impossible), not merely unusual ones.
+function _checkItineraryConflict(existingLegs, newLegs) {
+  // Combine all legs into one timeline, tag source
+  const all = [];
+  existingLegs.forEach(l => all.push({ ...l, src: 'exist' }));
+  newLegs.forEach(l => all.push({ ...l, src: 'new' }));
+
+  // Need at least dep epochs to reason about ordering
+  const timed = all.filter(l => l.dep != null);
+  timed.sort((a, b) => a.dep - b.dep);
+
+  // Walk the timeline tracking current location + time-free.
+  let curLoc = null;     // where the person is after the last leg
+  let freeAt = null;     // epoch when they become free (last arrival)
+  for (let i = 0; i < timed.length; i++) {
+    const leg = timed[i];
+
+    // TIME conflict: this leg departs before the person finished the previous one
+    if (freeAt != null && leg.dep != null && leg.dep < freeAt - 1) {
+      // Only a problem if at least one of the two legs is the NEW order
+      // (we don't re-litigate purely-existing data)
+      if (leg.src === 'new' || (i > 0 && timed[i-1].src === 'new')) {
+        return {
+          ok: false, kind: 'time',
+          msg: `时间冲突：${leg.flight || leg.from+'→'+leg.to} 在上一段行程结束前就起飞了`,
+        };
+      }
+    }
+
+    // LOCATION conflict: this leg departs from somewhere other than where
+    // the person currently is. Skip the very first leg (no prior location).
+    if (curLoc && leg.from && leg.from !== curLoc) {
+      // Allow if there's a plausible gap (≥ 6h) — person could have taken
+      // ground transport / an unlogged flight between cities. Only flag when
+      // it's physically impossible (same-day, tight connection, wrong city).
+      const gapMs = (freeAt != null && leg.dep != null) ? leg.dep - freeAt : Infinity;
+      const SIX_HOURS = 6 * 3600 * 1000;
+      if (gapMs < SIX_HOURS && (leg.src === 'new' || (i > 0 && timed[i-1].src === 'new'))) {
+        return {
+          ok: false, kind: 'location',
+          msg: `位置冲突：${curLoc} 落地后 ${(gapMs/3600000).toFixed(1)}h 内却要从 ${leg.from} 起飞（人不可能同时在两地）`,
+        };
+      }
+    }
+
+    // Advance state
+    if (leg.to) curLoc = leg.to;
+    if (leg.arr != null) freeAt = leg.arr;
+    else if (leg.dep != null) freeAt = leg.dep;  // no arr time → at least dep time
+  }
+
+  return { ok: true };
+}
+
+// Strict person identity: first/last name + dob + gender all match.
+// (Stricter than isSamePerson's fuzzy match — used for itinerary grouping.)
+function _isSamePersonStrict(a, b) {
+  if (!a || !b) return false;
+  const norm = s => String(s || '').toUpperCase().replace(/\s+/g, '').trim();
+  const an = norm(a.name), bn = norm(b.name);
+  if (!an || !bn || an !== bn) return false;
+  const ad = norm(a.dob), bd = norm(b.dob);
+  // If both have DOB, require match. If one missing, fall back to name-only.
+  if (ad && bd && ad !== bd) return false;
+  const ag = norm(a.gender), bg = norm(b.gender);
+  if (ag && bg && ag !== bg) return false;
+  return true;
+}
+
 // Detect potential duplicates: compare new orders against existing pending and ticketed.
 // Match criteria:
 //   STRONG: same PNR (case-insensitive)
@@ -10363,15 +10510,47 @@ function detectDuplicates(newOrders) {
         strongMatch = { existing, where, reason: `${paxLabel} 所有航班完全相同` };
         return;
       }
-      // STRONG 3: same passenger + same departure date (ANY airline/route)
-      // — this is the user-requested rule: if I've already bought a ticket
-      // for this person on this day, block re-buying. Common scenario:
-      // forgot they already booked, picked a different time.
+      // STRONG 3 (REVISED): same person + same departure date.
+      // OLD behavior blocked outright. NEW behavior checks itinerary sanity:
+      //   - legit connection (arrive LAX AM → depart LAX PM) → ALLOW
+      //   - impossible (arrive LAX AM → depart China PM)     → BLOCK as conflict
       if (paxOverlap(newOrder, existing) &&
           nf.date && ef.date && nf.date === ef.date) {
-        const paxLabel = (newOrder.passengers[0] && newOrder.passengers[0].name) || '乘客';
-        strongMatch = { existing, where, reason: `${paxLabel} · 同一出发日 ${nf.date} 已有订单` };
-        return;
+        // Only the SAME person's legs matter for itinerary continuity.
+        // Collect existing legs from orders sharing at least one same-strict person.
+        const sharesStrictPerson = (newOrder.passengers || []).some(np =>
+          (existing.passengers || []).some(ep => _isSamePersonStrict(np, ep)));
+
+        if (sharesStrictPerson) {
+          const exLegs  = _orderLegs(existing);
+          const newLegs = _orderLegs(newOrder);
+          const verdict = _checkItineraryConflict(exLegs, newLegs);
+          const paxLabel = (newOrder.passengers[0] && newOrder.passengers[0].name) || '乘客';
+
+          if (!verdict.ok) {
+            // Impossible itinerary → hard block with specific reason
+            strongMatch = {
+              existing, where,
+              reason: `${paxLabel} · ${verdict.msg}`,
+              itineraryConflict: verdict.kind,
+            };
+            return;
+          }
+          // Itinerary is plausible (e.g. legit same-day connection) → do NOT
+          // block. Fall through to WEAK so the user just gets a heads-up.
+          if (!weakMatch) weakMatch = {
+            existing, where,
+            reason: `${paxLabel} · 同日 ${nf.date} 有接续行程（已确认行程合理）`,
+            plausibleConnection: true,
+          };
+          return;
+        } else {
+          // Same date, overlapping pax by fuzzy match but NOT strict-same-person
+          // (e.g. name typo). Keep old conservative block.
+          const paxLabel = (newOrder.passengers[0] && newOrder.passengers[0].name) || '乘客';
+          strongMatch = { existing, where, reason: `${paxLabel} · 同一出发日 ${nf.date} 已有订单` };
+          return;
+        }
       }
       // WEAK: same passenger + adjacent dates (within 7 days) — possible
       // related itinerary, surface for user review but don't block
@@ -10390,6 +10569,247 @@ function detectDuplicates(newOrders) {
     }
   }
   return { strong, weak };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED BLOCKING MODAL — replaces alert()/confirm() for duplicate & itinerary
+// conflicts. Every block can be manually released by the operator.
+// Returns Promise<{ releasedStrong: Set<order>, weakUpdates: Map<order,existing> }>
+//   releasedStrong: strong-blocked orders the user chose to force-add
+//   weakUpdates:    weak orders the user chose to merge into an existing one
+// Orders NOT in either set are skipped (not added).
+// ─────────────────────────────────────────────────────────────────────────────
+function showBlockingModal(strong, weak) {
+  return new Promise(resolve => {
+    const released = new Set();   // strong orders force-released
+    const weakUpdate = new Map(); // weak order → existing order (merge)
+    const weakSkip = new Set();   // weak orders explicitly skipped
+
+    // Helper: render one order's route compactly
+    function routeOf(o) {
+      const segs = o.segments || [];
+      if (!segs.length) return '无航段';
+      const first = segs[0], last = segs[segs.length - 1];
+      const flights = segs.map(s => s.flight).filter(Boolean).join(' → ');
+      return `${first.from || '?'} → ${last.to || '?'}${flights ? ' · ' + flights : ''}`;
+    }
+    function dateOf(o) {
+      const s = (o.segments || [])[0];
+      return s && s.date ? s.date : '';
+    }
+    function paxOf(o) {
+      return (o.passengers || []).map(p => p.name).join(', ') || '(无姓名)';
+    }
+    function whenOf(o) {
+      if (o.ticketedAt) return new Date(o.ticketedAt).toLocaleDateString('zh-CN') + ' 出票';
+      if (o.createdAt) return new Date(o.createdAt).toLocaleDateString('zh-CN') + ' 录入';
+      return '';
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'block-modal-overlay';
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:rgba(31,35,40,0.45); z-index:11000;
+      display:flex; align-items:center; justify-content:center; padding:20px;
+      animation: overlayIn 0.2s ease-out; backdrop-filter:blur(2px);
+    `;
+
+    const hasItin = strong.some(d => d.itineraryConflict);
+    const headerIcon = hasItin ? '🚫' : '⚠️';
+    const headerText = hasItin ? '检测到行程冲突' : '检测到重复订单';
+    const headerSub = strong.length + weak.length === 1
+      ? '有 1 个订单需要你确认'
+      : `有 ${strong.length + weak.length} 个订单需要你确认`;
+
+    // Build strong cards (blocked, with release button)
+    const strongCards = strong.map((d, i) => {
+      const o = d.newOrder, ex = d.existing;
+      const isItin = !!d.itineraryConflict;
+      const badgeColor = isItin ? 'var(--red)' : '#e67e22';
+      const badgeText = isItin
+        ? (d.itineraryConflict === 'location' ? '🧭 位置冲突' : '⏱ 时间冲突')
+        : (d.where === 'ticketed' ? '🔁 已出票重复' : '🔁 待出票重复');
+      return `
+      <div class="block-card" data-type="strong" data-idx="${i}" style="
+        border:1px solid var(--line); border-left:3px solid ${badgeColor};
+        border-radius:8px; padding:14px 16px; margin-bottom:10px; background:var(--paper);
+        transition:all 0.2s ease-out;
+      ">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+              <span style="font-size:10px; font-weight:700; color:#fff; background:${badgeColor}; padding:2px 8px; border-radius:10px; white-space:nowrap;">${badgeText}</span>
+              <span style="font-weight:700; font-size:15px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxOf(o))}</span>
+            </div>
+            <div style="font-size:12px; color:${badgeColor}; font-weight:600; line-height:1.5;">${escapeHtml(d.reason)}</div>
+          </div>
+        </div>
+        <div style="background:var(--paper-2); border-radius:6px; padding:10px 12px; margin-bottom:10px; font-size:11.5px; line-height:1.7;">
+          <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 10px;">
+            <span style="color:var(--muted);">新录入</span>
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--ink);">${escapeHtml(o.airline||'?')} · ${escapeHtml(dateOf(o))} · ${escapeHtml(routeOf(o))}</span>
+            <span style="color:var(--muted);">已存在</span>
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--ink-2);">${escapeHtml(ex.airline||'?')} · ${escapeHtml(dateOf(ex))} · ${escapeHtml(routeOf(ex))} ${whenOf(ex)?'· '+escapeHtml(whenOf(ex)):''}</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button class="block-release-btn" data-idx="${i}" style="
+            flex:1; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;
+            border:1px solid ${badgeColor}; border-radius:6px; background:#fff; color:${badgeColor};
+            transition:all 0.15s ease-out;
+          ">🔓 我已核实，强制录入</button>
+          <span class="block-released-label" data-idx="${i}" style="display:none; flex:1; text-align:center; font-size:12px; font-weight:600; color:var(--green);">✓ 已放行，将录入</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Build weak cards (need decision: update existing / add new / skip)
+    const weakCards = weak.map((w, i) => {
+      const o = w.newOrder, ex = w.existing;
+      const isPlausible = !!w.plausibleConnection;
+      const badgeColor = isPlausible ? 'var(--green)' : 'var(--blue)';
+      const badgeText = isPlausible ? '✈ 接续行程' : '❓ 可能相关';
+      return `
+      <div class="block-card" data-type="weak" data-idx="${i}" style="
+        border:1px solid var(--line); border-left:3px solid ${badgeColor};
+        border-radius:8px; padding:14px 16px; margin-bottom:10px; background:var(--paper);
+      ">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          <span style="font-size:10px; font-weight:700; color:#fff; background:${badgeColor}; padding:2px 8px; border-radius:10px; white-space:nowrap;">${badgeText}</span>
+          <span style="font-weight:700; font-size:15px; color:var(--ink);">${escapeHtml(paxOf(o))}</span>
+        </div>
+        ${w.reason ? `<div style="font-size:12px; color:${badgeColor}; font-weight:600; margin-bottom:8px;">${escapeHtml(w.reason)}</div>` : ''}
+        <div style="background:var(--paper-2); border-radius:6px; padding:10px 12px; margin-bottom:10px; font-size:11.5px; line-height:1.7;">
+          <div style="display:grid; grid-template-columns:auto 1fr; gap:4px 10px;">
+            <span style="color:var(--muted);">新录入</span>
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--ink);">${escapeHtml(o.airline||'?')} · ${escapeHtml(dateOf(o))} · ${escapeHtml(routeOf(o))}</span>
+            <span style="color:var(--muted);">已存在</span>
+            <span style="font-family:'JetBrains Mono',monospace; color:var(--ink-2);">${escapeHtml(ex.airline||'?')} · ${escapeHtml(dateOf(ex))} · ${escapeHtml(routeOf(ex))}</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="weak-action" data-idx="${i}" data-act="add" style="
+            flex:1; min-width:90px; padding:7px 10px; font-size:11.5px; font-weight:600; cursor:pointer;
+            border:1px solid var(--green); border-radius:6px; background:var(--green); color:#fff;
+          ">✓ 作为新单录入</button>
+          <button class="weak-action" data-idx="${i}" data-act="update" style="
+            flex:1; min-width:90px; padding:7px 10px; font-size:11.5px; font-weight:600; cursor:pointer;
+            border:1px solid var(--blue); border-radius:6px; background:#fff; color:var(--blue);
+          ">↻ 更新已有单</button>
+          <button class="weak-action" data-idx="${i}" data-act="skip" style="
+            flex:0 0 auto; padding:7px 12px; font-size:11.5px; font-weight:600; cursor:pointer;
+            border:1px solid var(--line-strong); border-radius:6px; background:#fff; color:var(--muted);
+          ">跳过</button>
+        </div>
+        <div class="weak-decided" data-idx="${i}" style="display:none; text-align:center; font-size:12px; font-weight:600; padding:4px 0;"></div>
+      </div>`;
+    }).join('');
+
+    overlay.innerHTML = `
+      <div class="block-modal" style="
+        background:var(--paper); border-radius:14px; width:100%; max-width:560px;
+        max-height:88vh; display:flex; flex-direction:column; overflow:hidden;
+        box-shadow:0 24px 70px rgba(0,0,0,0.3); animation: modalIn 0.3s cubic-bezier(0.18,0.89,0.32,1.28);
+      ">
+        <div style="padding:20px 22px 16px; border-bottom:1px solid var(--line);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:24px;">${headerIcon}</span>
+            <div>
+              <div style="font-size:17px; font-weight:700; color:var(--ink);">${headerText}</div>
+              <div style="font-size:12px; color:var(--muted); margin-top:2px;">${headerSub} · 所有拦截都可人工放行</div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding:16px 22px;">
+          ${strong.length ? `<div style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.05em; margin-bottom:10px;">被拦截（默认不录入）</div>${strongCards}` : ''}
+          ${weak.length ? `<div style="font-size:11px; font-weight:700; color:var(--muted); letter-spacing:0.05em; margin:${strong.length?'18px':'0'} 0 10px;">需要确认</div>${weakCards}` : ''}
+        </div>
+        <div style="padding:14px 22px; border-top:1px solid var(--line); display:flex; gap:10px; align-items:center; background:var(--paper-2);">
+          ${strong.length ? `<button id="blockReleaseAll" style="
+            padding:9px 16px; font-size:12.5px; font-weight:600; cursor:pointer;
+            border:1px solid var(--line-strong); border-radius:7px; background:#fff; color:var(--ink-2);
+          ">🔓 全部放行</button>` : ''}
+          <div style="flex:1;"></div>
+          <button id="blockCancel" style="
+            padding:9px 18px; font-size:12.5px; font-weight:600; cursor:pointer;
+            border:1px solid var(--line-strong); border-radius:7px; background:#fff; color:var(--muted);
+          ">取消全部</button>
+          <button id="blockConfirm" style="
+            padding:9px 20px; font-size:12.5px; font-weight:700; cursor:pointer;
+            border:1px solid var(--accent-deep); border-radius:7px; background:var(--accent-deep); color:#fff;
+          ">确认处理 →</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    function finish() {
+      overlay.remove();
+      resolve({ releasedStrong: released, weakUpdates: weakUpdate, weakSkipped: weakSkip });
+    }
+
+    // Strong: release individual
+    overlay.querySelectorAll('.block-release-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        released.add(strong[i].newOrder);
+        btn.style.display = 'none';
+        overlay.querySelector(`.block-released-label[data-idx="${i}"]`).style.display = '';
+        const card = overlay.querySelector(`.block-card[data-type="strong"][data-idx="${i}"]`);
+        if (card) { card.style.borderLeftColor = 'var(--green)'; card.style.background = 'var(--green-light)'; }
+      });
+    });
+
+    // Strong: release all
+    const releaseAllBtn = overlay.querySelector('#blockReleaseAll');
+    if (releaseAllBtn) {
+      releaseAllBtn.addEventListener('click', () => {
+        strong.forEach((d, i) => {
+          released.add(d.newOrder);
+          const btn = overlay.querySelector(`.block-release-btn[data-idx="${i}"]`);
+          const lbl = overlay.querySelector(`.block-released-label[data-idx="${i}"]`);
+          if (btn) btn.style.display = 'none';
+          if (lbl) lbl.style.display = '';
+          const card = overlay.querySelector(`.block-card[data-type="strong"][data-idx="${i}"]`);
+          if (card) { card.style.borderLeftColor = 'var(--green)'; card.style.background = 'var(--green-light)'; }
+        });
+      });
+    }
+
+    // Weak: per-card decision
+    overlay.querySelectorAll('.weak-action').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = parseInt(btn.dataset.idx);
+        const act = btn.dataset.act;
+        weakUpdate.delete(weak[i].newOrder);
+        weakSkip.delete(weak[i].newOrder);
+        if (act === 'update') weakUpdate.set(weak[i].newOrder, weak[i].existing);
+        else if (act === 'skip') weakSkip.add(weak[i].newOrder);
+        // 'add' = leave out of both maps → will be added as new
+        // visual feedback
+        const decided = overlay.querySelector(`.weak-decided[data-idx="${i}"]`);
+        const actions = btn.parentElement;
+        if (decided && actions) {
+          actions.style.display = 'none';
+          decided.style.display = '';
+          decided.textContent = act === 'add' ? '✓ 将作为新单录入'
+                              : act === 'update' ? '↻ 将更新已有单'
+                              : '— 已跳过';
+          decided.style.color = act === 'add' ? 'var(--green)'
+                              : act === 'update' ? 'var(--blue)' : 'var(--muted)';
+        }
+      });
+    });
+
+    overlay.querySelector('#blockCancel').addEventListener('click', () => {
+      released.clear(); weakUpdate.clear();
+      // mark all weak as skipped so nothing gets added
+      weak.forEach(w => weakSkip.add(w.newOrder));
+      finish();
+    });
+    overlay.querySelector('#blockConfirm').addEventListener('click', finish);
+    overlay.addEventListener('click', e => { if (e.target === overlay) { /* require explicit choice */ } });
+  });
 }
 
 async function parsePNR() {
@@ -10642,88 +11062,38 @@ async function parsePNR() {
   const { strong, weak } = detectDuplicates(newOrders);
   const strongDupeSet = new Set(strong.map(d => d.newOrder));
   let filteredOrders = newOrders.filter(o => !strongDupeSet.has(o));
-  const strongCount = strong.length;
 
-  // STRONG: silently block (truly identical, no point asking)
-  if (filteredOrders.length === 0) {
-    const lines = strong.map(d => {
-      const pax = d.newOrder.passengers.map(p => p.name).join(', ') || '(无姓名)';
-      const whereLabel = d.where === 'ticketed' ? '✅ 已出票' : '🕐 待出票';
-      // Show what the existing order looks like for context
-      const ex = d.existing;
-      const exFirstSeg = (ex.segments || [])[0] || {};
-      const exLastSeg = (ex.segments || [])[(ex.segments || []).length - 1] || {};
-      const exRoute = `${exFirstSeg.from || '?'} → ${exLastSeg.to || '?'}`;
-      const exFlights = (ex.segments || []).map(s => s.flight).filter(Boolean).join(' → ') || '?';
-      const exAirline = ex.airline || '?';
-      const exWhen = ex.ticketedAt
-        ? new Date(ex.ticketedAt).toLocaleDateString('zh-CN')
-        : (ex.createdAt ? new Date(ex.createdAt).toLocaleDateString('zh-CN') + ' 录入' : '');
-      return `• ${pax}\n  原因: ${d.reason} [${whereLabel}]\n  已有: ${exAirline} · ${exFlights} · ${exRoute}${exWhen ? ' (' + exWhen + ')' : ''}`;
-    }).join('\n\n');
-    const hasTicketed = strong.some(d => d.where === 'ticketed');
-    const title = hasTicketed
-      ? `⚠️ 重复录入拦截 — 以下乘客已出票`
-      : `⚠️ 重复录入拦截 — 以下乘客已在待出票列表`;
-    alert(`${title}\n\n${lines}\n\n${hasTicketed ? '该乘客已有同日出发的已出票订单。请确认客户是否记错。如确需出第二张请回到「已出票」核对。' : '该乘客已有同日出发的待出票订单。请检查待出票列表，避免重复处理。'}`);
-    return;
-  }
+  // ── UNIFIED BLOCKING MODAL: show all strong+weak conflicts at once, every
+  //    block manually releasable. No more alert()/confirm() walls. ──
+  const ordersToUpdate = [];  // {existingOrder, newOrder, where}
+  if (strong.length > 0 || weak.length > 0) {
+    const decision = await showBlockingModal(strong, weak);
 
-  // If some are blocked but others go through, show a non-blocking toast for the blocked ones
-  if (strongCount > 0) {
-    const blockedLines = strong.map(d => {
-      const pax = d.newOrder.passengers.map(p => p.name).join(', ') || '(无姓名)';
-      const whereLabel = d.where === 'ticketed' ? '已出票' : '待出票';
-      return `${pax}(${whereLabel})`;
-    }).join('、');
-    toast(`⚠ 跳过 ${strongCount} 单重复订单：${blockedLines}`);
-  }
+    // Strong orders the user released → keep in filteredOrders; others removed
+    filteredOrders = newOrders.filter(o => {
+      const isStrong = strongDupeSet.has(o);
+      if (isStrong) return decision.releasedStrong.has(o);  // only released ones survive
+      return true;
+    });
 
-  // WEAK: ask user per order — update existing / add as new / skip
-  // Filter weak to only those still in filteredOrders (strong ones already removed)
-  const weakToAsk = weak.filter(w => filteredOrders.includes(w.newOrder));
-  const ordersToUpdate = [];  // {existingOrder, newOrder}
-  if (weakToAsk.length > 0) {
-    for (const w of weakToAsk) {
-      const newO = w.newOrder;
-      const existO = w.existing;
-      const pax = newO.passengers.map(p => p.name).join(', ') || '(无姓名)';
-      const newRoute = getRouteCode(newO) || '?';
-      const existRoute = getRouteCode(existO) || '?';
-      const newDate = (newO.segments[0] && newO.segments[0].date) || '';
-
-      if (w.where === 'ticketed') {
-        // Already ticketed — strong warning, default is to BLOCK
-        const ticketedAt = existO.ticketedAt ? new Date(existO.ticketedAt).toLocaleString('zh-CN') : '未知时间';
-        const msg = `🚫 重复录入警告！\n\n乘客 ${pax} 已有出票记录：\n\n` +
-          `出票时间: ${ticketedAt}\n` +
-          `航司: ${existO.airline || '?'} · 路线: ${existRoute}\n` +
-          `PNR: ${existO.pnr || '(未填)'}\n\n` +
-          `你确定要重新录入这张已出票的订单吗？\n\n` +
-          `点【确定】= 强制录入（可能造成重复出票！）\n` +
-          `点【取消】= 取消录入（推荐）`;
-        const forceAdd = confirm(msg);
-        if (!forceAdd) {
-          // Block — remove from filteredOrders
-          filteredOrders = filteredOrders.filter(o => o !== newO);
-        }
-        // If forceAdd, leave in filteredOrders (will be added as new)
-      } else {
-        // Pending order — existing behavior: offer to update or add as new
-        const msg = `⚠️ 发现相同乘客的可能相关订单：\n\n` +
-          `👤 乘客: ${pax}\n` +
-          `📅 日期: ${newDate}\n\n` +
-          `【已有订单】\n  航司 ${existO.airline || '?'} · ${existRoute}\n  （待出票）\n\n` +
-          `【新订单】\n  航司 ${newO.airline || '?'} · ${newRoute}\n\n` +
-          `是同一张票的更新吗？\n\n` +
-          `点【确定】= 更新已有订单（用新内容覆盖）\n` +
-          `点【取消】= 作为新订单单独录入`;
-        const shouldUpdate = confirm(msg);
-        if (shouldUpdate) {
-          ordersToUpdate.push({ existingOrder: existO, newOrder: newO, where: w.where });
-          filteredOrders = filteredOrders.filter(o => o !== newO);
-        }
+    // Weak decisions
+    for (const w of weak) {
+      if (!filteredOrders.includes(w.newOrder) && !decision.releasedStrong.has(w.newOrder)) {
+        // could have been a strong too; skip if not in filtered
       }
+      if (decision.weakUpdates.has(w.newOrder)) {
+        ordersToUpdate.push({ existingOrder: w.existing, newOrder: w.newOrder, where: w.where });
+        filteredOrders = filteredOrders.filter(o => o !== w.newOrder);
+      } else if (decision.weakSkipped && decision.weakSkipped.has(w.newOrder)) {
+        filteredOrders = filteredOrders.filter(o => o !== w.newOrder);
+      }
+      // else: 'add as new' → leave in filteredOrders
+    }
+
+    // If user released some strong orders, note it
+    const releasedCount = decision.releasedStrong.size;
+    if (releasedCount > 0) {
+      toast(`🔓 已人工放行 ${releasedCount} 单`);
     }
   }
 
@@ -10785,9 +11155,11 @@ async function parsePNR() {
   const totalSeg = filteredOrders.reduce((s, o) => s + o.segments.length, 0);
   if (totalPax) summaryParts.push(`${totalPax}位乘客`);
   if (totalSeg) summaryParts.push(`${totalSeg}个航段`);
-  if (strongCount > 0) {
-    const skippedNames = strong.map(d => (d.newOrder.passengers[0] ? d.newOrder.passengers[0].name : '?')).join(', ');
-    summaryParts.push(`跳过 ${strongCount}单重复 (${skippedNames})`);
+  // Count actually-skipped strong orders (those NOT released into filteredOrders)
+  const skippedStrong = strong.filter(d => !filteredOrders.includes(d.newOrder));
+  if (skippedStrong.length > 0) {
+    const skippedNames = skippedStrong.map(d => (d.newOrder.passengers[0] ? d.newOrder.passengers[0].name : '?')).join(', ');
+    summaryParts.push(`跳过 ${skippedStrong.length}单 (${skippedNames})`);
   }
   if (existingMeaningful.length > 0) {
     summaryParts.push(`合计 ${STATE.orders.length}单`);
