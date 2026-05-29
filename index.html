@@ -13246,6 +13246,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="markActionDone(${idx}, 'clientReport'); copyOrderCard(${idx}, 'client')" style="${clientReportDone ? doneStyle : ''}" ${!readyToReport ? 'title="填完编码和卡主后可以发送完整报表"' : ''}>${clientReportDone ? checkmark : ''}📋 代理商报表</button>
       <button class="btn ghost small" onclick="markActionDone(${idx}, 'internalReport'); copyOrderCard(${idx}, 'internal')" style="${internalReportDone ? doneStyle : ''}">${internalReportDone ? checkmark : ''}📋 记录员报表</button>
       ${matched.length > 0 ? `<button class="btn ghost small" onclick="markActionDone(${idx}, 'paxCopy'); copyOrderPax(${idx})" style="${paxCopyDone ? doneStyle : ''}">${paxCopyDone ? checkmark : ''}📋 乘客</button>` : ''}
+      <button class="btn ghost small" onclick="copyOrderItinerary(${idx})" title="复制简洁行程文字，直接发给卡主看">✈ 复制行程</button>
       <button class="btn ghost small" onclick="openCardholderDialog(${idx})" style="${chDone ? doneStyle : ''}" title="分配/更换卡主（可查看所有卡主当前负载）">${chDone ? checkmark : ''}💳 分配卡主</button>
       <button class="btn ghost small" onclick="openReparseDialog(${idx})" title="重新粘贴PNR并解析此单的所有字段">⟲ 重新解析</button>
       <button class="btn small" onclick="markOrderTicketed(${idx})" style="background:var(--green); border-color:var(--green); color:#fff;" title="必须先填卡主、积分方式、里程/CPP（或直接折扣金额）">✓ 已出票</button>
@@ -18141,6 +18142,96 @@ function buildClientCopy(o, mode) {
   return lines.join('\n');
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ITINERARY COPY — clean text version of the flight segments, meant to be
+// pasted directly to the cardholder (via WeChat etc.) so they can read the
+// whole trip at a glance. No RMB prices, no PNR/discount internals — just
+// flights, cabin, dates, times, and an approximate USD price.
+// ─────────────────────────────────────────────────────────────────────────────
+function _cabinFullName(cls) {
+  const c = (cls || '').toUpperCase().trim();
+  if (!c) return '';
+  const FIRST    = ['F','A','P'];
+  const BUSINESS = ['J','C','D','I','Z','R'];
+  if (FIRST.includes(c))    return 'FIRST';
+  if (BUSINESS.includes(c)) return 'BUSINESS';
+  return 'ECONOMY';  // most other booking classes are economy buckets
+}
+
+function _orderCabinWord(o) {
+  const zh = (o.cabin || '').trim();
+  if (!zh) return '';
+  if (/头等|first/i.test(zh)) return 'FIRST';
+  if (/商务|公务|business/i.test(zh)) return 'BUSINESS';
+  if (/超级经济|超经|premium/i.test(zh)) return 'PREMIUM ECO';
+  if (/经济|economy/i.test(zh)) return 'ECONOMY';
+  return zh.toUpperCase();
+}
+
+function buildItineraryCopy(o) {
+  const segs = (o.segments || []).filter(s => s.from || s.to || s.flight);
+  const lines = [];
+
+  // TRIP type
+  let tripType = 'MULTI-CITY';
+  if (segs.length === 1) {
+    tripType = 'ONE WAY';
+  } else if (segs.length >= 2) {
+    const firstFrom = (segs[0].from || '').toUpperCase().trim();
+    const lastTo = (segs[segs.length - 1].to || '').toUpperCase().trim();
+    if (firstFrom && lastTo && firstFrom === lastTo) {
+      tripType = segs.length === 2 ? 'ROUND TRIP' : 'ROUND TRIP (MULTI-STOP)';
+    }
+  }
+  lines.push(`TRIP: ${tripType}`);
+  lines.push('');
+
+  const orderCabin = _orderCabinWord(o);
+
+  segs.forEach((s, i) => {
+    const num = String(i + 1).padStart(2, ' ');
+    const flight = (s.flight || '').toUpperCase().trim().padEnd(7, ' ');
+    const cls = (s.cls || '').toUpperCase().trim();
+    const cabinWord = orderCabin || _cabinFullName(cls);
+    const cabinTag = cabinWord ? `${cabinWord}${cls ? '-' + cls : ''}` : (cls || '');
+    const date = (s.date || '').toUpperCase().trim();
+    const from = (s.from || '').toUpperCase().trim();
+    const to = (s.to || '').toUpperCase().trim();
+    const route = `${from}${to}`;
+
+    // Times: detect overnight (+N) — explicit marker wins, else infer if arr<dep
+    let dep = (s.depTime || '').replace(':', '').trim();
+    let arr = (s.arrTime || '').replace(/[^\d:+]/g, '').replace(':', '').trim();
+    let arrSuffix = '';
+    const offM = String(s.arrTime || '').match(/\+(\d+)/);
+    if (offM) { arrSuffix = '+' + offM[1]; arr = arr.replace(/\+\d+/, ''); }
+    else if (dep && arr && /^\d{3,4}$/.test(dep) && /^\d{3,4}$/.test(arr)) {
+      if (parseInt(arr) < parseInt(dep)) arrSuffix = '+1';
+    }
+    const times = (dep || arr) ? `${dep || '----'} ${arr || '----'}${arrSuffix}` : '';
+
+    const parts = [`${num}.`, flight];
+    if (cabinTag) parts.push(cabinTag);
+    if (date) parts.push(date);
+    if (route) parts.push(' ' + route);
+    if (times) parts.push(' ' + times);
+    lines.push(parts.join(' '));
+  });
+
+  // Approx USD price
+  lines.push('');
+  const rate = effectiveRate(o);
+  const fp = computeFinalPrice(o);
+  let usd = null;
+  if (o.usd != null) usd = o.usd;
+  else if (fp != null && rate > 0) usd = fp / rate;
+  if (usd != null) {
+    lines.push(`APPROX. PRICE  $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+  }
+
+  return lines.join('\n');
+}
+
 // Build internal copy (内容2) - includes settlement
 function buildInternalCopy(o) {
   // ── 表G (CHASE TRAVEL) has its own format ──────────────────────────────
@@ -18472,6 +18563,19 @@ async function copyOrderCard(idx, mode) {
   const text = mode === 'internal' ? buildInternalCopy(o) : buildClientCopy(o);
   const ok = await copyText(text);
   toast(ok ? `订单 #${idx+1} 已复制（${mode==='internal'?'完整版':'客户版'}）` : '复制失败');
+}
+
+// Copy clean itinerary text for sending to the cardholder.
+async function copyOrderItinerary(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  if (!(o.segments || []).some(s => s.from || s.to || s.flight)) {
+    toast('此订单暂无航段可复制');
+    return;
+  }
+  const text = buildItineraryCopy(o);
+  const ok = await copyText(text);
+  toast(ok ? `✈ 行程已复制，可直接发卡主` : '复制失败');
 }
 
 // New per-current-order actions for the 录入订单 tab
