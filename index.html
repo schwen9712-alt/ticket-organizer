@@ -13347,6 +13347,26 @@ function openCardholderDialog(idx) {
   const meaningfulList = STATE.orders.filter(o2 => isMeaningfulOrder(o2));
   const displayNum = meaningfulList.indexOf(o) + 1;
 
+  // ── Historical usage frequency per cardholder (from ticketed records) ──
+  // Frequency score = total lifetime tickets + recent-30-day tickets × 3.
+  // Recent activity is weighted heavily so "currently busy" cardholders float up.
+  // This drives both the list order AND the type-ahead match ranking.
+  const freqById = {};      // id → { total, recent, score, lastUsed }
+  const now = Date.now();
+  const THIRTY_DAYS = 30 * 24 * 3600 * 1000;
+  (settings.ticketed || []).forEach(t => {
+    const cid = t.cardholderId;
+    if (!cid) return;
+    if (!freqById[cid]) freqById[cid] = { total: 0, recent: 0, score: 0, lastUsed: 0 };
+    freqById[cid].total++;
+    const ts = t.ticketedAt || 0;
+    if (ts && (now - ts) <= THIRTY_DAYS) freqById[cid].recent++;
+    if (ts > freqById[cid].lastUsed) freqById[cid].lastUsed = ts;
+  });
+  Object.values(freqById).forEach(f => { f.score = f.total + f.recent * 3; });
+  // Max score (for relative "hot" badge threshold)
+  const maxFreqScore = Math.max(1, ...Object.values(freqById).map(f => f.score));
+
   // Sort: 1) currently assigned to any order → top, 2) CHASE for 表G, 3) alphabetical
   const isTableG = o.tableLabel === 'G';
   // Build set of cardholder IDs that are currently assigned to any pending order
@@ -13360,6 +13380,10 @@ function openCardholderDialog(idx) {
       const bChase = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
       if (aChase !== bChase) return aChase ? -1 : 1;
     }
+    // Frequency: more-often-used cardholders rank higher
+    const aFreq = (freqById[a.id] && freqById[a.id].score) || 0;
+    const bFreq = (freqById[b.id] && freqById[b.id].score) || 0;
+    if (aFreq !== bFreq) return bFreq - aFreq;
     return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
   });
 
@@ -13382,16 +13406,32 @@ function openCardholderDialog(idx) {
         const chaseBadge = isChase
           ? `<span style="background:#0070c9; color:#fff; padding:2px 7px; border-radius:3px; font-size:10px; font-weight:700; margin-left:6px; letter-spacing:0.04em;">💳 CHASE</span>`
           : '';
+        // Frequency badge: 🔥 for top-tier (≥60% of max), ⭐ for frequently used
+        const freq = freqById[c.id] || { total: 0, recent: 0, score: 0, lastUsed: 0 };
+        let freqBadge = '';
+        if (freq.score > 0) {
+          if (freq.score >= maxFreqScore * 0.6 && freq.total >= 3) {
+            freqBadge = `<span style="background:linear-gradient(90deg,#f59e0b,#f97316); color:#fff; padding:2px 7px; border-radius:10px; font-size:10px; font-weight:700; margin-left:6px;">🔥 常用</span>`;
+          } else if (freq.recent > 0) {
+            freqBadge = `<span style="background:var(--accent-light); color:var(--accent-deep); padding:2px 7px; border-radius:10px; font-size:10px; font-weight:600; margin-left:6px;">⭐ 近期</span>`;
+          }
+        }
+        // History line: lifetime + recent counts
+        const histText = freq.total > 0
+          ? `<span style="color:var(--muted);">历史 ${freq.total} 单${freq.recent > 0 ? ` · 近30天 <span style="color:var(--accent-deep);font-weight:600;">${freq.recent}</span> 单` : ''}</span>`
+          : `<span style="color:var(--muted); font-style:italic;">暂无出票记录</span>`;
         const rowStyle = isChase && isTableG
           ? 'background:linear-gradient(90deg,#e8f0fe,#f0f5ff); border-left:3px solid #0070c9;'
           : isChase
           ? 'border-left:3px solid #0070c9;'
+          : (freq.score >= maxFreqScore * 0.6 && freq.total >= 3)
+          ? 'border-left:3px solid #f59e0b;'
           : '';
         return `
-          <div class="cardholder-pick-row ${isCurrent ? 'selected' : ''}" data-name="${escapeAttr(c.name || '')}" onclick="assignCardholder(${idx}, '${escapeAttr(c.id)}')" style="${rowStyle}">
+          <div class="cardholder-pick-row ${isCurrent ? 'selected' : ''}" data-name="${escapeAttr(c.name || '')}" data-freq="${freq.score}" onclick="assignCardholder(${idx}, '${escapeAttr(c.id)}')" style="${rowStyle}">
             <div class="cardholder-pick-main">
-              <div class="cardholder-pick-name">${isCurrent ? '✓ ' : ''}${escapeHtml(c.name || '卡主')}${chaseBadge}</div>
-              <div class="cardholder-pick-meta">${load.count} 单 · ${load.usd > 0 ? '$' + load.usd.toLocaleString(undefined, {maximumFractionDigits: 0}) : '—'}${c.notes ? ` · <span style="color:var(--muted);font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}${c.preferredPayMethod ? ` · <span style="color:var(--accent-deep);font-weight:600;">💰${escapeHtml(c.preferredPayMethod)}</span>` : ''}</div>
+              <div class="cardholder-pick-name">${isCurrent ? '✓ ' : ''}${escapeHtml(c.name || '卡主')}${freqBadge}${chaseBadge}</div>
+              <div class="cardholder-pick-meta">${histText}${load.count > 0 ? ` · <span style="color:var(--ink-2);">待出票 ${load.count} 单</span>` : ''}${c.notes ? ` · <span style="color:var(--muted);font-style:italic;">${escapeHtml(c.notes)}</span>` : ''}${c.preferredPayMethod ? ` · <span style="color:var(--accent-deep);font-weight:600;">💰${escapeHtml(c.preferredPayMethod)}</span>` : ''}</div>
             </div>
             <div class="cardholder-pick-orders">${otherOrdersText}</div>
           </div>
@@ -13424,8 +13464,10 @@ function openCardholderDialog(idx) {
           ${o.cardholderId ? `<div style="margin-bottom:10px;">
             <button class="btn ghost small" onclick="assignCardholder(${idx}, '')">✕ 取消当前卡主分配</button>
           </div>` : ''}
-          <div class="hint" style="margin-bottom:8px; font-size:11px;">
-            或点击下方已有卡主：
+          <div class="hint" style="margin-bottom:8px; font-size:11px; display:flex; align-items:center; gap:6px;">
+            <span>或点击下方卡主</span>
+            <span style="color:var(--muted);">·</span>
+            <span style="color:#f59e0b; font-weight:600;">🔥 常用卡主已置顶</span>
           </div>
           <div class="cardholder-pick-list" id="cardholderPickList">
             ${itemsHtml}
@@ -13442,39 +13484,59 @@ function openCardholderDialog(idx) {
   }, 50);
 }
 
-// Filter the cardholder list as user types
+// Filter the cardholder list as user types.
+// Matching rows are re-ordered live: prefix matches first, then by frequency
+// score (most-often-used cardholders bubble to the top of the matches).
 function filterCardholderList(query) {
   const q = (query || '').trim().toLowerCase();
   const list = document.getElementById('cardholderPickList');
   const hint = document.getElementById('cardholderQuickMatchHint');
   if (!list) return;
-  const rows = list.querySelectorAll('.cardholder-pick-row');
+  const rows = Array.from(list.querySelectorAll('.cardholder-pick-row'));
   let visibleCount = 0;
   let exactMatch = null;
+
+  // First pass: decide visibility + collect matched rows with ranking info
+  const matched = [];
   rows.forEach(r => {
     const name = (r.getAttribute('data-name') || '').toLowerCase();
+    const freq = parseFloat(r.getAttribute('data-freq') || '0');
     if (!q || name.includes(q)) {
       r.style.display = '';
       visibleCount++;
       if (name === q) exactMatch = r.getAttribute('data-name');
+      // rank: prefix match (starts with query) ranks above mid-string match
+      const isPrefix = name.startsWith(q) ? 1 : 0;
+      matched.push({ el: r, isPrefix, freq, name });
     } else {
       r.style.display = 'none';
     }
   });
+
+  // Re-order matched rows when the user is actively typing: prefix-first,
+  // then frequency-desc, then alpha. (When query is empty we leave the
+  // original frequency-sorted order untouched.)
+  if (q && matched.length > 1) {
+    matched.sort((a, b) => {
+      if (a.isPrefix !== b.isPrefix) return b.isPrefix - a.isPrefix;
+      if (a.freq !== b.freq) return b.freq - a.freq;
+      return a.name.localeCompare(b.name);
+    });
+    matched.forEach(m => list.appendChild(m.el));  // appendChild moves in place
+  }
+
   if (hint) {
     if (!q) {
       hint.textContent = '';
     } else if (exactMatch) {
       hint.innerHTML = `<span style="color:var(--green);">✓ 匹配到已有卡主 "${escapeHtml(exactMatch)}"</span>`;
     } else {
-      // Check for normalized match (silent merge target) before declaring "new"
       const qNorm = _strNormalize(query);
       const normHit = qNorm ? (settings.cardholders || []).find(c =>
         _strNormalize(c.name || '') === qNorm) : null;
       if (normHit) {
         hint.innerHTML = `<span style="color:var(--green);">✓ 将合并到已有卡主 "${escapeHtml(normHit.name)}"（忽略空格/标点差异）</span>`;
       } else {
-        // Check for fuzzy similar matches and warn
         const similars = (settings.cardholders || []).filter(c =>
           _strSimilarity(c.name || '', query) >= 0.82);
         if (similars.length > 0) {
@@ -13483,7 +13545,7 @@ function filterCardholderList(query) {
         } else if (visibleCount === 0) {
           hint.innerHTML = `<span style="color:var(--accent-deep);">➕ 按回车会新建卡主 "${escapeHtml(query)}"</span>`;
         } else {
-          hint.innerHTML = `<span style="color:var(--muted);">${visibleCount} 个匹配结果（按回车确认）</span>`;
+          hint.innerHTML = `<span style="color:var(--muted);">${visibleCount} 个匹配（常用优先）</span>`;
         }
       }
     }
