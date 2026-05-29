@@ -18592,7 +18592,7 @@ async function markAllTicketed() {
       costRmb = +(costUsd * rate).toFixed(2);
     }
     const entry = {
-      id: 'tk-' + Date.now() + '-' + Math.random().toString(36).slice(2,5),
+      id: 'tk-' + Date.now() + '-' + Math.random().toString(36).slice(2,8),
       tableLabel: o.tableLabel, client: o.client, cabin: o.cabin,
       agent: o.agent, branch: o.branch, airline: o.airline, trip: o.trip,
       pnr: o.pnr, tkt: o.tkt,
@@ -19050,7 +19050,7 @@ async function submitManualTicket(btn) {
   const usd = +(rmb / rate).toFixed(2);
 
   const entry = {
-    id: 'tk-manual-' + Date.now(),
+    id: 'tk-manual-' + Date.now() + '-' + Math.random().toString(36).slice(2,8),
     tableLabel, client: '', cabin, agent, branch: '', airline, trip: '',
     pnr, tkt,
     passengers,
@@ -22580,7 +22580,7 @@ async function doMarkTicketed(idx) {
       costRmb = +(costUsd * rate).toFixed(2);
     }
     const entry = {
-      id: 'tk-' + Date.now() + '-' + idx,
+      id: 'tk-' + Date.now() + '-' + idx + '-' + Math.random().toString(36).slice(2, 8),
       tableLabel: o.tableLabel, client: o.client, cabin: o.cabin,
       agent: o.agent, branch: o.branch, airline: o.airline, trip: o.trip,
       pnr: o.pnr, tkt: o.tkt,
@@ -23529,6 +23529,7 @@ let _fbUnsubscribe = null;   // onSnapshot listener cleanup
 let _fbWriteTimer = null;    // debounce
 let _fbApplyingRemote = false; // guard against echo loops
 let _fbLastWriteAt = 0;      // timestamp of our last write (to ignore echo)
+let _fbLastWrittenTs = 0;    // exact updatedAt we last wrote (precise echo guard)
 
 function loadFbConfig() {
   // Prefer user-overridden config in localStorage (for advanced users who
@@ -23633,8 +23634,11 @@ async function fbInit() {
   _fbUnsubscribe = onSnapshot(docRef, (snap) => {
     if (!snap.exists()) return;
     const remote = snap.data();
-    // Ignore echo of our own write (within 3 seconds)
-    if (Date.now() - _fbLastWriteAt < 3000) return;
+    // Echo guard: only skip the exact snapshot we just wrote (same updatedAt).
+    // Merge is loss-safe, so even if an echo slips through it just merges our
+    // own data into itself (harmless). We must NOT blanket-ignore a time window,
+    // or a second device's update arriving right after ours would be dropped.
+    if (remote.updatedAt && remote.updatedAt === _fbLastWrittenTs) return;
     fbApplyRemote(remote);
   }, (err) => {
     console.warn('Firebase listener error:', err);
@@ -23643,47 +23647,125 @@ async function fbInit() {
   return _fb;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Merge two arrays of records by a stable key, keeping the UNION (never drops).
+//   - records only in `local`  → kept
+//   - records only in `remote` → added
+//   - records in both (same key) → keep the one with the larger `tsField`
+//     (falls back to: keep local, since local may have just been edited)
+// This is the core anti-data-loss primitive. Multiple devices each ticketing
+// concurrently will have their records combined rather than overwriting.
+// ─────────────────────────────────────────────────────────────────────────────
+function _mergeById(local, remote, keyField, tsField) {
+  local  = Array.isArray(local)  ? local  : [];
+  remote = Array.isArray(remote) ? remote : [];
+  const byKey = new Map();
+  // Seed with local first
+  for (const rec of local) {
+    const k = rec && rec[keyField];
+    if (k == null) { byKey.set('__nokey_' + Math.random(), rec); continue; }
+    byKey.set(k, rec);
+  }
+  // Merge remote in
+  for (const rec of remote) {
+    const k = rec && rec[keyField];
+    if (k == null) { byKey.set('__nokey_' + Math.random(), rec); continue; }
+    if (!byKey.has(k)) {
+      byKey.set(k, rec);   // remote-only → add
+    } else if (tsField) {
+      // both have it → keep newer by timestamp; tie → keep existing (local)
+      const existing = byKey.get(k);
+      const lt = Number(existing[tsField]) || 0;
+      const rt = Number(rec[tsField]) || 0;
+      if (rt > lt) byKey.set(k, rec);
+    }
+    // if no tsField, local wins (already in map)
+  }
+  return Array.from(byKey.values());
+}
+
 async function fbApplyRemote(remote, isInitial) {
-  if (!remote || !remote.orders) return;
-  // Skip if remote is older than what we have
-  const remoteTs = remote.updatedAt || 0;
-  const localTs  = parseInt(localStorage.getItem('ticket-organizer-last-update') || '0');
-  if (!isInitial && remoteTs <= localTs) return;
+  if (!remote) return;
 
   _fbApplyingRemote = true;
   try {
-    if (remote.orders) {
-      STATE.orders = remote.orders;
-      STATE.currentIdx = Math.min(remote.currentIdx || 0, remote.orders.length - 1);
-      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
-    }
+    // ── ticketed: MERGE (never overwrite) — this is the historical record ──
     if (remote.settings) {
-      const remoteHasEncKey = !!remote.settings.anthropicKeyEncrypted;
-      Object.assign(settings, remote.settings);
-      // 云端密文被删 → 本机也跟着删（A 设备清除了，B 设备同步）
-      if (!remoteHasEncKey && 'anthropicKeyEncrypted' in settings) {
+      const r = remote.settings;
+
+      // Accumulative arrays: merge by id, keep the union.
+      settings.ticketed = _mergeById(settings.ticketed, r.ticketed, 'id', 'ticketedAt');
+
+      // cardholders / knownPax / others: merge by id (no ts → local wins on conflict,
+      // which preserves any rename the user just did locally).
+      if (r.cardholders)      settings.cardholders      = _mergeById(settings.cardholders,      r.cardholders,      'id', null);
+      if (r.knownPax)         settings.knownPax         = _mergeUniqueStrings(settings.knownPax, r.knownPax);
+      if (r.knownCards)       settings.knownCards       = _mergeUniqueStrings(settings.knownCards, r.knownCards);
+      if (r.actions)          settings.actions          = _mergeById(settings.actions,          r.actions,          'id', null);
+      if (r.discountRules)    settings.discountRules    = _mergeById(settings.discountRules,    r.discountRules,    'id', null);
+      if (r.productDiscounts) settings.productDiscounts = _mergeById(settings.productDiscounts, r.productDiscounts, 'id', null);
+      if (r.operators)        settings.operators        = _mergeById(settings.operators,        r.operators,        'id', null);
+      if (r.presetAgents && Array.isArray(r.presetAgents)) {
+        settings.presetAgents = _mergeUniqueStrings(settings.presetAgents, r.presetAgents);
+      }
+
+      // Scalar / config settings: take remote's value (last-write-wins is fine for these).
+      const scalarKeys = ['exchangeRate', 'defaultTableLabel', 'theme'];
+      scalarKeys.forEach(k => { if (r[k] !== undefined) settings[k] = r[k]; });
+
+      // Encrypted Anthropic key: follow remote (add or remove).
+      const remoteHasEncKey = !!r.anthropicKeyEncrypted;
+      if (remoteHasEncKey) {
+        settings.anthropicKeyEncrypted = r.anthropicKeyEncrypted;
+      } else if ('anthropicKeyEncrypted' in settings) {
         delete settings.anthropicKeyEncrypted;
       }
+
       await storageSet('ticket-organizer-settings', settings);
-      // 拉到新密文 → 用本机密码尝试自动解密
+
       if (remoteHasEncKey) {
-        try {
-          await tryAutoDecryptCloudKey();
-        } catch(e) { /* 解密失败 = 没密码 / 密码不对，updateAiKeyStatus 会显示「🔓 解锁」按钮 */ }
+        try { await tryAutoDecryptCloudKey(); } catch(e) { /* needs password */ }
       }
     }
-    localStorage.setItem('ticket-organizer-last-update', String(remoteTs));
+
+    // ── pending (work-in-progress drafts): merge by id too, so a draft being
+    //    edited on device A isn't wiped by device B's push. ──
+    if (remote.orders && Array.isArray(remote.orders)) {
+      const merged = _mergeById(STATE.orders, remote.orders, 'id', '_lastEdit');
+      // Guard: never end up with an empty work area
+      STATE.orders = merged.length ? merged : (STATE.orders.length ? STATE.orders : [newOrder()]);
+      STATE.currentIdx = Math.min(STATE.currentIdx || 0, STATE.orders.length - 1);
+      if (STATE.currentIdx < 0) STATE.currentIdx = 0;
+      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+    }
+
+    localStorage.setItem('ticket-organizer-last-update', String(remote.updatedAt || Date.now()));
+
     // Re-render
     if (typeof renderPendingList === 'function') renderPendingList();
     if (typeof syncOrderToDOM === 'function') syncOrderToDOM();
     if (typeof renderPreview === 'function') renderPreview();
     if (typeof updateCounts === 'function') updateCounts();
+    if (typeof renderTicketed === 'function') renderTicketed();
     if (typeof updateAiKeyStatus === 'function') updateAiKeyStatus();
     if (typeof refreshAiParseZone === 'function') refreshAiParseZone();
-    toast('↓ 已接收远程更新');
+    if (!isInitial) toast('↓ 已合并远程更新');
   } finally {
     _fbApplyingRemote = false;
   }
+}
+
+// Merge two string arrays, dedup, preserve order (local first).
+function _mergeUniqueStrings(local, remote) {
+  local  = Array.isArray(local)  ? local  : [];
+  remote = Array.isArray(remote) ? remote : [];
+  const seen = new Set();
+  const out = [];
+  for (const s of [...local, ...remote]) {
+    const key = typeof s === 'string' ? s : JSON.stringify(s);
+    if (!seen.has(key)) { seen.add(key); out.push(s); }
+  }
+  return out;
 }
 
 function fbScheduleWrite() {
@@ -23694,13 +23776,50 @@ function fbScheduleWrite() {
 
 async function fbPushNow() {
   if (!_fb) return;
-  const { db, doc, setDoc } = _fb;
+  const { db, doc, setDoc, getDoc } = _fb;
   const now = Date.now();
-  _fbLastWriteAt = now;
-  localStorage.setItem('ticket-organizer-last-update', String(now));
+
   try {
+    // READ-MERGE-WRITE: pull the latest cloud state first and merge our local
+    // data INTO it, so we never overwrite records another device just added.
+    let cloudOrders = [], cloudSettings = {};
+    try {
+      const snap = await getDoc(doc(db, 'ticket-organizer', 'main'));
+      if (snap.exists()) {
+        const r = snap.data();
+        cloudOrders   = Array.isArray(r.orders) ? r.orders : [];
+        cloudSettings = r.settings || {};
+      }
+    } catch(e) { /* offline / first write — proceed with local only */ }
+
+    // Merge ticketed (union by id) so concurrent ticketing from any device survives
+    const mergedTicketed = _mergeById(settings.ticketed, cloudSettings.ticketed, 'id', 'ticketedAt');
+    settings.ticketed = mergedTicketed;
+
+    // Merge other accumulative arrays the same way
+    settings.cardholders      = _mergeById(settings.cardholders,      cloudSettings.cardholders,      'id', null);
+    settings.actions          = _mergeById(settings.actions,          cloudSettings.actions,          'id', null);
+    settings.discountRules    = _mergeById(settings.discountRules,    cloudSettings.discountRules,    'id', null);
+    settings.productDiscounts = _mergeById(settings.productDiscounts, cloudSettings.productDiscounts, 'id', null);
+    settings.operators        = _mergeById(settings.operators,        cloudSettings.operators,        'id', null);
+    settings.knownPax         = _mergeUniqueStrings(settings.knownPax,    cloudSettings.knownPax);
+    settings.knownCards       = _mergeUniqueStrings(settings.knownCards,  cloudSettings.knownCards);
+    if (Array.isArray(cloudSettings.presetAgents)) {
+      settings.presetAgents   = _mergeUniqueStrings(settings.presetAgents, cloudSettings.presetAgents);
+    }
+
+    // Pending drafts: merge by id as well
+    const mergedOrders = _mergeById(STATE.orders, cloudOrders, 'id', '_lastEdit');
+
+    // Persist the merged result locally too (keeps local == cloud)
+    await storageSet('ticket-organizer-settings', settings);
+
+    _fbLastWriteAt = Date.now();
+    _fbLastWrittenTs = now;
+    localStorage.setItem('ticket-organizer-last-update', String(now));
+
     await setDoc(doc(db, 'ticket-organizer', 'main'), {
-      orders     : STATE.orders || [],
+      orders     : mergedOrders.length ? mergedOrders : (STATE.orders || []),
       currentIdx : STATE.currentIdx || 0,
       settings   : settings || {},
       updatedAt  : now,
