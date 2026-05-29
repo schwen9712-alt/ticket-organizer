@@ -8721,7 +8721,7 @@ function splitChunkByProposals(chunkText) {
     // Skip anything looking like a PNR command (QTE/FSI etc) — name blacklist
     if (/^(QTE|FSI|OSI|SSR\s+(?!DOC)|RMK|TKT|FOID)\b/i.test(t)) return false;
     // Name line: starts with "NM{n}name/name" or "{n}. name/name" or "NAME/NAME"
-    if (/^(?:NM\d+)?(?:\d+[\.\s]+)?[A-Z]{2,}\/\s*[A-Z]+/i.test(t)) return true;
+    if (/^(?:NM\d+)?(?:\d+[\.\s]+)?[A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+/i.test(t)) return true;
     // SSR DOCS line
     if (/^SSR\s+DOC/i.test(t)) return true;
     // Bare passport doc line
@@ -9351,15 +9351,37 @@ function parseSingleBooking(raw) {
       continue;
     }
 
+    // ── 证件信息 with leading nationality: "证件信息：USA/565508418/USA/26APR61/M/28FEB28/SABIK III/JOSEPH FRANK/P1"
+    // Format: NATIONALITY/DOCNUM/NATIONALITY/DOB/GENDER/EXPIRY/SURNAME/GIVEN/Pn
+    // (surname & given may contain spaces, e.g. "SABIK III", "JOSEPH FRANK")
+    const docWithNat = trimmed.match(/(?:证件信息|证件)?[：:]?\s*([A-Z]{2,3})\/([A-Z0-9]{5,})\/([A-Z]{2,3})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]*?)\/P(\d+)/i);
+    if (docWithNat) {
+      const dob = docWithNat[4].toUpperCase();
+      const gender = docWithNat[5].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
+      const expiry = docWithNat[6].toUpperCase();
+      const surname = docWithNat[7].trim().toUpperCase().replace(/\s+/g, ' ');
+      const given = docWithNat[8].trim().toUpperCase().replace(/\s+/g, ' ');
+      const name = `${surname}/${given}`;
+      const existing = pax.find(p => p.name === name);
+      if (!existing) {
+        pax.push({ name, gender, dob, passportExpiry: expiry });
+      } else {
+        if (!existing.dob) existing.dob = dob;
+        if (!existing.gender) existing.gender = gender;
+        if (!existing.passportExpiry) existing.passportExpiry = expiry;
+      }
+      continue;
+    }
+
     // Compact 证件信息 line: "EQ5102363/CN/01SEP73/M/14SEP35/WANG/LIJUN/P1"
     // Format: DOCNUM/COUNTRY/DOB/GENDER/EXPIRY/SURNAME/GIVEN/Pn
     // Allow any non-letter prefix (Chinese colon "：", spaces, etc.)
-    const compactDocMatch = trimmed.match(/(?:^|[^A-Z0-9])([A-Z0-9]{6,})\/([A-Z]{2,3})\/(\d{1,2}[A-Z]{3}\d{2})\/([MF])\/\d{1,2}[A-Z]{3}\d{2}\/([A-Z]+)\/([A-Z][A-Z\s]*?)\/P(\d+)/i);
+    const compactDocMatch = trimmed.match(/(?:^|[^A-Z0-9])([A-Z0-9]{6,})\/([A-Z]{2,3})\/(\d{1,2}[A-Z]{3}\d{2})\/([MF])\/\d{1,2}[A-Z]{3}\d{2}\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]*?)\/P(\d+)/i);
     if (compactDocMatch) {
       const dob = compactDocMatch[3].toUpperCase();
       const gender = compactDocMatch[4].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const surname = compactDocMatch[5].trim().toUpperCase();
-      const given = compactDocMatch[6].trim().toUpperCase();
+      const surname = compactDocMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
+      const given = compactDocMatch[6].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = `${surname}/${given}`;
       const existing = pax.find(p => p.name === name);
       if (!existing) {
@@ -9532,7 +9554,7 @@ function parseSingleBooking(raw) {
       }
       return false;
     };
-    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}\/\s*[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
+    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
     // ── 乘机人：P/CN/... SSR-style inline: "乘机人：P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
     const paxInlineSSR = trimmed.match(/^(?:乘机人|旅客)[：:\s]+P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
     if (paxInlineSSR) {
@@ -9603,7 +9625,7 @@ function parseSingleBooking(raw) {
       if (foundAny) continue;
     }
     // Fallback: original single-name regex (catches lines like "1. SMITH/JOHN MR  男 15MAY80")
-    const nameMatch = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}\/\s*[A-Z]+(?:\s+[A-Z]+)*)/);
+    const nameMatch = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+(?:\s+[A-Z]+)*)/);
     if (nameMatch && nameMatch[1].includes('/') && !isMetaName(nameMatch[1])) {
       let name = nameMatch[1].trim().replace(/\/\s+/, '/').replace(/\s+(MR|MRS|MS|MSTR|MISS|DR|CHD|INF)$/i, '').trim();
       if (name.length >= 4) {

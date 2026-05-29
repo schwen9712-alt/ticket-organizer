@@ -1,56 +1,55 @@
-## 2026-05-23 — 新增「✈ 复制行程」：简洁行程文字一键发卡主
+## 2026-05-23 — 修复含空格姓名 + 双国籍证件信息解析失败
 
 **改了什么**
-订单卡片新增「✈ 复制行程」按钮（在「📋 乘客」和「💳 分配卡主」之间），一键复制成简洁的纯文字行程，可直接粘贴发给卡主（微信等），让卡主直观看到整个行程。
-
-**生成格式**
-```
-TRIP: ROUND TRIP (MULTI-STOP)
-
- 1. UA1597  ECONOMY-L 18JUL  CMHSFO  0700 0906
- 2. UA857   ECONOMY-L 18JUL  SFOPVG  1330 1725+1
- 3. UA199   ECONOMY-L 04AUG  PVGLAX  2010 1720+1
- 4. UA1692  ECONOMY-L 05AUG  LAXCMH  1045 1815
-
-APPROX. PRICE  $2,025.06
-```
-
-**特点**
-- **TRIP 类型自动识别**：1段=ONE WAY；2段且首尾同城=ROUND TRIP；闭环多段=ROUND TRIP (MULTI-STOP)；其余=MULTI-CITY
-- **舱位全名**：从订单舱位标签或航段 class 推导 ECONOMY/BUSINESS/FIRST，拼成 `ECONOMY-L` 格式
-- **隔夜标记**：arrTime 带 +N 直接显示；未标但到达时间早于出发时间则自动推断 +1
-- **只含发卡主需要的信息**：航班、舱位、日期、航路、起降时间、USD 约价。不含 RMB 价格/折扣/PNR 等内部信息
-- 美化：等宽对齐，航班号右补齐
+修复两类导致解析失败的格式：
+1. **姓/名含空格**（如 `SABIK III/JOSEPH FRANK`，姓带罗马数字后缀）
+2. **双国籍证件信息行**（如 `证件信息：USA/565508418/USA/26APR61/M/28FEB28/SABIK III/JOSEPH FRANK/P1`）
 
 **为什么改**
-用户需求：「行程可以一键复制，目的是直接用文字形式发给卡主，更好直观看到」
+用户反馈以下行程无法识别：
+```
+1. SABIK III/JOSEPH FRANK
+1.  UA2153  Z   02JUL  CLESFO   0700  0912
+...
+证件信息：USA/565508418/USA/26APR61/M/28FEB28/SABIK III/JOSEPH FRANK/P1
+74538CNY
+```
 
-之前的「代理商报表」「记录员报表」含 PNR/折扣/RMB 等内部信息，不适合直接发卡主。卡主只需要看到飞哪几段、什么舱、大概多少钱。
+诊断结果：
+- **航段全部正常**（pattern[2] 不要求星期前缀，5段含跳号5/6都能识别）
+- **姓名行失败**：`SABIK III/JOSEPH FRANK` 的姓 "SABIK III" 含空格，旧 regex `[A-Z]{2,}\/` 要求斜杠前连续大写字母，只抓到 `III/JOSEPH FRANK`（丢了 SABIK）
+- **证件信息行失败**：格式是 `国籍/护照/国籍/出生/性别/到期/姓/名/Pn`（开头是国籍 USA 而非护照号），旧 compactDocMatch 假设第一段是护照号，不匹配
 
-**测试验证（用户提供的真实订单）**
-- ✓ UA四段 CMH-SFO-PVG-LAX-CMH → 正确生成，隔夜+1（SFOPVG显式、PVGLAX推断）都对
-- ✓ ONE WAY 商务舱 → BUSINESS-J，TRIP: ONE WAY
-- ✓ ROUND TRIP → 首尾同城识别为 ROUND TRIP
-- ✓ USD 价格正确显示
+**修复方案**
+1. 三处姓名 regex 的"姓"部分 `[A-Z]{2,}` → `[A-Z]{2,}(?:\s+[A-Z]+)*`，允许姓含空格（SABIK III、VAN DER BERG、DELA CRUZ 等）
+2. 新增「双国籍证件信息」格式分支：`NATIONALITY/DOCNUM/NATIONALITY/DOB/GENDER/EXPIRY/SURNAME/GIVEN/Pn`，姓名支持空格，并提取护照到期日
+3. 旧 compactDocMatch 的 surname 也从 `[A-Z]+` 放宽为 `[A-Z][A-Z\s]*?`，支持含空格的姓
 
-**新增函数**
-- `_cabinFullName(cls)` — booking class → ECONOMY/BUSINESS/FIRST
-- `_orderCabinWord(o)` — 订单中文舱位 → 英文舱位词（优先于class推导）
-- `buildItineraryCopy(o)` — 生成完整行程文字
-- `copyOrderItinerary(idx)` — 复制到剪贴板 + toast
+**端到端测试全部通过（用户的真实输入）**
+- ✓ 姓名 SABIK III/JOSEPH FRANK（罗马数字后缀完整保留）
+- ✓ DOB 26APR61 · 性别 MALE · 护照到期 28FEB28
+- ✓ 5 段航程全部识别（含跳号的第5、6段）
+- ✓ 总价 ¥74538
+
+**边界测试（确保不误伤）**
+- ✓ 普通姓名 XU/SHENBO 正常
+- ✓ 名含空格 WANG/XIAO MEI 正常
+- ✓ 称谓后缀 SMITH/JOHN MR → 正确截断为 SMITH/JOHN（MR 被 lookahead 挡住）
+- ✓ 航段行不被误判为姓名
 
 **改动位置**
-- index.html buildClientCopy 后（约 18143）：新增 3 个行程生成函数
-- index.html copyOrderCard 后（约 18566）：新增 copyOrderItinerary
-- index.html 订单卡片按钮区（约 13248）：加「✈ 复制行程」按钮
+- index.html 8724：isSharedHeaderLine 检测，姓允许空格
+- index.html 9354 前：新增双国籍证件信息格式分支
+- index.html 9357：compactDocMatch surname 放宽支持空格
+- index.html 9535：主 nameRe，姓允许空格
+- index.html 9606：fallback nameMatch，姓允许空格
 
 **风险或注意事项**
-- ⚠ **舱位推导基于 booking class 字母**：F/A/P→FIRST，J/C/D/I/Z/R→BUSINESS，其余→ECONOMY。不同航司 class 含义略有差异，但订单若有中文舱位标签会优先用它（更准）
-- ⚠ **跨日推断**：arrTime<depTime 时自动+1。绝大多数正确，但若原始数据时间填错可能误判。显式 +N 标记优先
-- ⚠ **TRIP 类型是按首尾城市判断**：你的 CMH→...→CMH 例子会标 "ROUND TRIP (MULTI-STOP)" 而非 "MULTI-CITY"（因为确实回到了起点）。如果你更想统一叫 MULTI-CITY，告诉我改
-- ⚠ USD 价格优先用 o.usd，无则用 computeFinalPrice/汇率换算
+- ⚠ 姓允许空格后理论上可能多吃一个词，但 lookahead（航段号/称谓/中文性别/行尾）能正确截断，边界测试已验证
+- ⚠ 双国籍证件格式的护照到期日现在会被存到 passportExpiry 字段（之前这种格式根本没解析出来）
+- ⚠ 不影响已能识别的其他格式（普通姓名、标准证件行、中文姓名等）
 
 **回滚方式**
-从 .backups/ 找上一版覆盖。纯新增功能，回滚无副作用。
+从 .backups/ 找上一版覆盖。回滚后含空格姓名和双国籍证件行会重新解析失败。
 
 ---
