@@ -11584,10 +11584,11 @@ function renderAirlineUsdPanel(orders) {
       const noAvailBadge = o.noAvailability
         ? `<span style="background:#888; color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:6px; letter-spacing:0.05em;">⏸ 无位</span>`
         : '';
-      // Ticketing-sequence note (先开往返 再开单程) parsed from paste — show it
-      // prominently so the operator follows the coordination requirement.
+      // Ticketing-sequence note (先开往返 再开单程) parsed from paste.
+      // Keep the row CLEAN: show only a compact 📋 icon; full text on hover
+      // (title) and on click (alert). Avoids overflowing the row width.
       const seqNoteBadge = o.ticketSeqNote
-        ? `<span style="background:rgba(217,63,63,0.1); color:var(--red); border:1px solid rgba(217,63,63,0.3); padding:1px 7px; border-radius:3px; font-size:10px; font-weight:700; margin-left:4px;" title="出票顺序要求（从录入文本解析）">📋 ${escapeHtml(o.ticketSeqNote)}</span>`
+        ? `<span onclick="event.stopPropagation(); alert('出票顺序要求：\\n\\n${escapeAttr(o.ticketSeqNote)}')" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; background:rgba(217,63,63,0.1); color:var(--red); border:1px solid rgba(217,63,63,0.3); border-radius:3px; font-size:10px; margin-left:4px; cursor:pointer;" title="出票顺序要求：${escapeAttr(o.ticketSeqNote)}（点击查看）">📋</span>`
         : '';
       const linkedBadge = (() => {
         const manualIds = o.linkedOrderIds || [];
