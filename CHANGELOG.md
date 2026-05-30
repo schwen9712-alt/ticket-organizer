@@ -1,55 +1,59 @@
-## 2026-05-23 — 修复含空格姓名 + 双国籍证件信息解析失败
+## 2026-05-23 — 关联订单组智能识别（内联分隔+顺序+高风险标记）
 
 **改了什么**
-修复两类导致解析失败的格式：
-1. **姓/名含空格**（如 `SABIK III/JOSEPH FRANK`，姓带罗马数字后缀）
-2. **双国籍证件信息行**（如 `证件信息：USA/565508418/USA/26APR61/M/28FEB28/SABIK III/JOSEPH FRANK/P1`）
+针对「有出票顺序依赖的关联订单组」这类复杂录入，新增智能识别与标识：
+1. **内联 ===== 分隔支持**：之前只认独占一行的 =====，现在中间夹在文字里的 ===== 也能切单
+2. **💣/[炸弹] → 自动高风险标记**：识别 💣🚨[炸弹]高风险加急 等关键词，自动设 urgent（置顶+红边）
+3. **"先开/再开" → 出票顺序备注**：解析 ticketSeqNote 字段，订单卡片显示 📋 红色徽章
+4. **多单自动关联+编号**：一次粘贴的关联组自动 linkedOrderIds 互联 + ticketOrder 编号（第1出/第2出）
 
 **为什么改**
-用户反馈以下行程无法识别：
+用户提供的真实场景：
 ```
-1. SABIK III/JOSEPH FRANK
-1.  UA2153  Z   02JUL  CLESFO   0700  0912
-...
-证件信息：USA/565508418/USA/26APR61/M/28FEB28/SABIK III/JOSEPH FRANK/P1
-74538CNY
+产Y+1 PENG/SIDA 男... HU/JINNIMA 男... [4段往返] 37990 CNY 先开往返 再开下面单程💣
+===== HE/FAN 女... [2段单程] 26507 CNY 先开上面往返 再开单程💣
 ```
 
-诊断结果：
-- **航段全部正常**（pattern[2] 不要求星期前缀，5段含跳号5/6都能识别）
-- **姓名行失败**：`SABIK III/JOSEPH FRANK` 的姓 "SABIK III" 含空格，旧 regex `[A-Z]{2,}\/` 要求斜杠前连续大写字母，只抓到 `III/JOSEPH FRANK`（丢了 SABIK）
-- **证件信息行失败**：格式是 `国籍/护照/国籍/出生/性别/到期/姓/名/Pn`（开头是国籍 USA 而非护照号），旧 compactDocMatch 假设第一段是护照号，不匹配
+这是有依赖关系的关联订单组（单程依赖往返先出票）。用户需求：拆成2个独立订单 + 顺序提醒标识，💣=高风险需特别注意。
 
-**修复方案**
-1. 三处姓名 regex 的"姓"部分 `[A-Z]{2,}` → `[A-Z]{2,}(?:\s+[A-Z]+)*`，允许姓含空格（SABIK III、VAN DER BERG、DELA CRUZ 等）
-2. 新增「双国籍证件信息」格式分支：`NATIONALITY/DOCNUM/NATIONALITY/DOB/GENDER/EXPIRY/SURNAME/GIVEN/Pn`，姓名支持空格，并提取护照到期日
-3. 旧 compactDocMatch 的 surname 也从 `[A-Z]+` 放宽为 `[A-Z][A-Z\s]*?`，支持含空格的姓
+之前的问题：=====是内联的（夹在一行文字里），旧逻辑只认独占一行的分隔符，导致两单没被切开。
 
-**端到端测试全部通过（用户的真实输入）**
-- ✓ 姓名 SABIK III/JOSEPH FRANK（罗马数字后缀完整保留）
-- ✓ DOB 26APR61 · 性别 MALE · 护照到期 28FEB28
-- ✓ 5 段航程全部识别（含跳号的第5、6段）
-- ✓ 总价 ¥74538
+**端到端测试（用户真实数据）全部通过**
+- ✓ 内联 ===== 切成 2 单
+- ✓ 单1: PENG/SIDA + HU/JINNIMA 往返4段，urgent=true
+- ✓ 单2: HE/FAN 单程2段，urgent=true
+- ✓ 出票顺序备注提取："先开往返 再开下面单程" / "先开上面往返 再开单程"
+- ✓ 自动关联：单1↔单2 互链
+- ✓ 自动编号：第1出 / 第2出
 
-**边界测试（确保不误伤）**
-- ✓ 普通姓名 XU/SHENBO 正常
-- ✓ 名含空格 WANG/XIAO MEI 正常
-- ✓ 称谓后缀 SMITH/JOHN MR → 正确截断为 SMITH/JOHN（MR 被 lookahead 挡住）
-- ✓ 航段行不被误判为姓名
+**UI 效果**
+订单卡片上显示：
+- `🔗 第1出 → HE` （出票顺序+关联对象，复用已有 linkedBadge）
+- `📋 先开往返 再开下面单程` （顺序要求红色徽章，新增）
+- 💣 加急（urgent 置顶，复用已有机制）
+
+**新增字段**
+- `ticketSeqNote`（出票顺序备注，从文本解析）
 
 **改动位置**
-- index.html 8724：isSharedHeaderLine 检测，姓允许空格
-- index.html 9354 前：新增双国籍证件信息格式分支
-- index.html 9357：compactDocMatch surname 放宽支持空格
-- index.html 9535：主 nameRe，姓允许空格
-- index.html 9606：fallback nameMatch，姓允许空格
+- index.html 8791 附近：splitIntoBookings 支持内联 ===== 分隔
+- index.html 5475 附近：schema 加 ticketSeqNote 字段
+- index.html 10304 附近：parseSingleBooking 返回 urgent + ticketSeqNote
+- index.html 11012 附近：newOrder 组装时应用 urgent/ticketSeqNote
+- index.html 11104 附近：多单含顺序备注时自动关联+编号+全组urgent
+- index.html 11586 附近：订单卡片加 📋 顺序备注徽章
+
+**复用的现有机制（没重复造轮子）**
+- urgent 字段 + 置顶排序 + 🔗 linkedBadge + ticketOrder 编号 + linkedOrderIds 都是已有的，这次只是让解析器自动填充它们
 
 **风险或注意事项**
-- ⚠ 姓允许空格后理论上可能多吃一个词，但 lookahead（航段号/称谓/中文性别/行尾）能正确截断，边界测试已验证
-- ⚠ 双国籍证件格式的护照到期日现在会被存到 passportExpiry 字段（之前这种格式根本没解析出来）
-- ⚠ 不影响已能识别的其他格式（普通姓名、标准证件行、中文姓名等）
+- ⚠ **内联 ===== 要求前后有空格 + 4个以上等号**：避免误伤 "+1"/"---" 等标注。如果你的分隔符少于4个等号或紧贴文字，可能不触发
+- ⚠ **urgent 关键词较宽**：识别"急"字可能误判（如"紧急联系人"）。但宁可多标提醒，不漏。可手动点💣按钮取消
+- ⚠ **自动编号按粘贴顺序**：第1个chunk=第1出。如果你的"先开"指的不是第一个，需手动调整 ticketOrder（点🔗徽章编辑）
+- ⚠ **顺序备注最多取30字**：超长会截断。复杂说明建议精简
+- ⚠ 关联组全部强制 urgent：如果某单其实不急，可单独取消
 
 **回滚方式**
-从 .backups/ 找上一版覆盖。回滚后含空格姓名和双国籍证件行会重新解析失败。
+从 .backups/ 找上一版覆盖。回滚后内联=====不切单、💣不自动标记、顺序备注不解析（但手动功能仍在）。
 
 ---

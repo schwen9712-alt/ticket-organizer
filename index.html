@@ -5473,6 +5473,10 @@ function newOrder(init = {}) {
     paymentReviewNote: init.paymentReviewNote || '',
     paymentReviewedAt: init.paymentReviewedAt || null,
     ticketOrder: init.ticketOrder || null,        // 1=先出, 2=后出, 3=第三出...
+    // Free-text ticketing-sequence note parsed from the paste, e.g.
+    // "先开往返 再开单程" — shown on the order card so the operator sees the
+    // coordination requirement at a glance. Distinct from ticketOrder (numeric).
+    ticketSeqNote: init.ticketSeqNote || '',
     enteredBy: init.enteredBy || '',
     operator: init.operator || '',
     chaseChargeUsd: init.chaseChargeUsd != null ? init.chaseChargeUsd : null,
@@ -8789,6 +8793,14 @@ function splitIntoBookings(raw) {
   // by optional whitespace). This avoids lines like "----方案2" being treated as
   // a booking boundary — that's a user annotation, not a separator.
   const hasSeparator = /^\s*[=\-_*]{3,}\s*$/m.test(raw);
+  // ALSO support inline separators: a long run of ===== embedded mid-text (not on
+  // its own line). Common when the whole booking is pasted as one line/blob.
+  // Require 4+ chars to avoid matching "+1"-style annotations or "---" in notes.
+  const hasInlineSeparator = !hasSeparator && /[^\S\r\n][=]{4,}[^\S\r\n]/.test(raw);
+  if (hasInlineSeparator) {
+    const chunks = raw.split(/[^\S\r\n][=]{4,}[^\S\r\n]/).filter(x => x.trim());
+    if (chunks.length >= 2) return chunks.filter(x => x.trim());
+  }
   if (hasSeparator) {
     const chunks = raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
     // Merge chunks: if a chunk has no confirmed segment (DK/HK) but has fare/pax,
@@ -10289,6 +10301,17 @@ function parseSingleBooking(raw) {
     return true;
   });
 
+  // ── Urgent flag + ticketing-sequence note ──
+  // 💣 / [炸弹] / 🚨 anywhere in the paste marks this as high-risk / needs care.
+  const isUrgent = /💣|🚨|\[炸弹\]|\[爆炸\]|高风险|加急|急/.test(raw);
+  // Ticketing sequence instruction: "先开往返 再开单程", "先开上面...", etc.
+  // Capture the human instruction so the operator sees the coordination rule.
+  let ticketSeqNote = '';
+  const seqMatch = raw.match(/(先开[^\n。]{0,30}|先出[^\n。]{0,30}|后开[^\n。]{0,30}|按顺序[^\n。]{0,30}|顺序[：:][^\n。]{0,30})/);
+  if (seqMatch) {
+    ticketSeqNote = seqMatch[1].replace(/[💣🚨]|\[炸弹\]|\[爆炸\]/g, '').trim();
+  }
+
   return { pax, segs: dedupedSegs, airline, rmb, usd, trip,
     discount: parsedDiscount || null,
     cabin: parsedCabin ?? null,
@@ -10296,6 +10319,8 @@ function parseSingleBooking(raw) {
     customRate: parsedCustomRate ?? null,
     pnr: parsedPnr || null,
     productDiscount, productMarker, productNote,
+    urgent: isUrgent,
+    ticketSeqNote,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
 
@@ -10984,7 +11009,10 @@ async function parsePNR() {
       specialDiscountNote: specialNote,
       proposals,
       selectedProposalIdx: 0,
-      waitingForRelease: primary.waitingForRelease || false
+      waitingForRelease: primary.waitingForRelease || false,
+      urgent: primary.urgent || false,
+      urgentSetAt: primary.urgent ? Date.now() : null,
+      ticketSeqNote: primary.ticketSeqNote || ''
     });
     const bookingText = chunk;
     // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
@@ -11073,6 +11101,27 @@ async function parsePNR() {
       }
     }
     newOrders.push(o);
+  }
+
+  // ── Auto-link & sequence orders that carry a ticketing-sequence note ──
+  // When a single paste yields multiple orders AND any of them has a
+  // ticketSeqNote (先开/再开...), they're a coordinated group: link them all
+  // together and number them 1,2,3... in paste order so the operator sees
+  // which to ticket first. Also force-flag the whole group urgent (high-risk).
+  if (newOrders.length >= 2) {
+    const seqOrders = newOrders.filter(o => o.ticketSeqNote);
+    if (seqOrders.length >= 1) {
+      const allIds = newOrders.map(o => o.id);
+      newOrders.forEach((o, i) => {
+        o.ticketOrder = i + 1;                 // 1-based paste order
+        o.urgent = true;                       // coordinated group = needs care
+        if (!o.urgentSetAt) o.urgentSetAt = Date.now();
+        // link to the others (exclude self)
+        o.linkedOrderIds = allIds.filter(id => id !== o.id);
+        // if this order had no note of its own, give it a group hint
+        if (!o.ticketSeqNote) o.ticketSeqNote = `关联订单组（共 ${newOrders.length} 单，按顺序出票）`;
+      });
+    }
   }
 
   // Persist any newly-discovered known passengers
@@ -11535,6 +11584,11 @@ function renderAirlineUsdPanel(orders) {
       const noAvailBadge = o.noAvailability
         ? `<span style="background:#888; color:#fff; padding:2px 8px; border-radius:10px; font-size:9.5px; font-weight:700; margin-left:6px; letter-spacing:0.05em;">⏸ 无位</span>`
         : '';
+      // Ticketing-sequence note (先开往返 再开单程) parsed from paste — show it
+      // prominently so the operator follows the coordination requirement.
+      const seqNoteBadge = o.ticketSeqNote
+        ? `<span style="background:rgba(217,63,63,0.1); color:var(--red); border:1px solid rgba(217,63,63,0.3); padding:1px 7px; border-radius:3px; font-size:10px; font-weight:700; margin-left:4px;" title="出票顺序要求（从录入文本解析）">📋 ${escapeHtml(o.ticketSeqNote)}</span>`
+        : '';
       const linkedBadge = (() => {
         const manualIds = o.linkedOrderIds || [];
         const autoIds   = (o.autoLinkedOrderIds || []).filter(id => !manualIds.includes(id));
@@ -11600,7 +11654,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
         <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:var(--accent-deep); font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
