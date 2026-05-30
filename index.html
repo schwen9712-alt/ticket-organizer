@@ -11212,25 +11212,56 @@ async function parsePNR() {
     newOrders.push(o);
   }
 
-  // ── Auto-link & sequence orders that carry a ticketing-sequence note ──
-  // When a single paste yields multiple orders AND any of them has a
-  // ticketSeqNote (先开/再开...), they're a coordinated group: link them all
-  // together and number them 1,2,3... in paste order so the operator sees
-  // which to ticket first. Also force-flag the whole group urgent (high-risk).
+  // ── Auto-link ONLY truly-related sequential orders ──
+  // A ticketSeqNote ("先开往返 再开单程") indicates THIS order coordinates with
+  // ANOTHER one — but NOT with every order in the paste. Multiple unrelated
+  // bookings are often pasted together; linking them all was wrong.
+  //
+  // Conservative rule: two orders are linked only if BOTH carry a seq-note AND
+  // they share at least one flight (same flight number + date) OR a passenger.
+  // This captures the real case (PENG/HU round-trip ↔ HE one-way share UA772)
+  // without dragging in unrelated bookings (ZHANG/WANG/TAN/LIN).
   if (newOrders.length >= 2) {
     const seqOrders = newOrders.filter(o => o.ticketSeqNote);
-    if (seqOrders.length >= 1) {
-      const allIds = newOrders.map(o => o.id);
-      newOrders.forEach((o, i) => {
-        o.ticketOrder = i + 1;                 // 1-based paste order
-        o.urgent = true;                       // coordinated group = needs care
-        if (!o.urgentSetAt) o.urgentSetAt = Date.now();
-        // link to the others (exclude self)
-        o.linkedOrderIds = allIds.filter(id => id !== o.id);
-        // if this order had no note of its own, give it a group hint
-        if (!o.ticketSeqNote) o.ticketSeqNote = `关联订单组（共 ${newOrders.length} 单，按顺序出票）`;
+    if (seqOrders.length >= 2) {
+      // Build flight-key & passenger-key sets per seq order
+      const flightKeys = o => new Set((o.segments || []).map(s => `${s.flight}|${s.date}`));
+      const paxKeys = o => new Set((o.passengers || []).map(p => (p.name || '').toUpperCase()));
+      const shares = (a, b) => {
+        const af = flightKeys(a), bf = flightKeys(b);
+        for (const k of af) if (bf.has(k)) return true;       // shared flight
+        const ap = paxKeys(a), bp = paxKeys(b);
+        for (const k of ap) if (k && bp.has(k)) return true;  // shared passenger
+        return false;
+      };
+      // Find connected groups among seqOrders via shared flight/pax
+      const used = new Set();
+      seqOrders.forEach(anchor => {
+        if (used.has(anchor.id)) return;
+        const group = [anchor];
+        used.add(anchor.id);
+        seqOrders.forEach(other => {
+          if (used.has(other.id)) return;
+          if (group.some(g => shares(g, other))) {
+            group.push(other);
+            used.add(other.id);
+          }
+        });
+        // Only link if the group genuinely has 2+ related orders
+        if (group.length >= 2) {
+          // Sort group by paste order (their index in newOrders)
+          group.sort((a, b) => newOrders.indexOf(a) - newOrders.indexOf(b));
+          const groupIds = group.map(g => g.id);
+          group.forEach((g, gi) => {
+            g.ticketOrder = gi + 1;
+            g.linkedOrderIds = groupIds.filter(id => id !== g.id);
+            // urgent stays as parsed (💣); don't force it on the whole group
+          });
+        }
       });
     }
+    // Orders with a 💣/seq-note but NOT in a multi-order group keep their own
+    // urgent flag + note (already set during parse), but get NO ticketOrder/link.
   }
 
   // Persist any newly-discovered known passengers
