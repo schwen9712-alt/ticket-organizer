@@ -11704,15 +11704,24 @@ function renderAirlineUsdPanel(orders) {
         if (!o.ticketOrder && manualIds.length === 0 && autoIds.length === 0) return '';
 
         let parts = '';
-        // Manual link — purple (user-set ticket sequence)
+        // Manual link — purple. Show ticketing ORDER clearly with circled
+        // number + 先出/后出 wording. The linked passengers go in the tooltip,
+        // NOT inline (the old "→ NAME" arrow was misread as "NAME goes first").
         if (o.ticketOrder || manualIds.length > 0) {
-          const seq = o.ticketOrder ? `第${o.ticketOrder}出` : '';
-          const names = manualIds.map(lid => {
+          const linkedNames = manualIds.map(lid => {
             const lo = STATE.orders.find(x => x.id === lid);
             return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
           }).filter(Boolean);
-          const linkStr = names.length ? ` → ${names.join('+')}` : '';
-          parts += `<span class="ui-badge ui-badge--link ui-badge--clickable" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="出票顺序关联（手动）· 点击编辑">🔗 ${seq}${linkStr}</span>`;
+          // Circled number + role word
+          const circled = o.ticketOrder ? ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'][o.ticketOrder - 1] || `(${o.ticketOrder})` : '🔗';
+          let roleWord = '';
+          if (o.ticketOrder === 1) roleWord = '先出';
+          else if (o.ticketOrder >= 2) roleWord = '后出';
+          const label = roleWord ? `${circled} ${roleWord}` : `🔗 关联`;
+          const tip = linkedNames.length
+            ? `出票顺序：第 ${o.ticketOrder} 个出票\\n关联订单：${linkedNames.join('、')}\\n点击编辑`
+            : `出票顺序关联 · 点击编辑`;
+          parts += `<span class="ui-badge ui-badge--link ui-badge--clickable" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="${tip}">${label}</span>`;
         }
         // Auto-link — blue outline (same passenger detected)
         if (autoIds.length > 0) {
