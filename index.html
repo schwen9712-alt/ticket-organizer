@@ -8301,7 +8301,14 @@ function updateCollapsibleSummaries() {
     const base = o.basePrice;
     const disc = o.discount;
     const paxCount = (o.passengers || []).length || 1;
-    if (!base || !disc) {
+    // Flat price (一口价) takes precedence
+    if (o.flatPriceMode && o.flatPriceCny != null && o.flatPriceCny > 0) {
+      const total = o.flatPricePerPax ? o.flatPriceCny * paxCount : o.flatPriceCny;
+      priceEl.textContent = o.flatPricePerPax
+        ? `💰 一口价 ¥${Number(o.flatPriceCny).toLocaleString()}/人 × ${paxCount} = ¥${Math.round(total).toLocaleString()}`
+        : `💰 一口价 ¥${Math.round(total).toLocaleString()}`;
+      priceEl.style.color = 'var(--ink-2)';
+    } else if (!base || !disc) {
       priceEl.textContent = '未填写';
       priceEl.style.color = 'var(--muted)';
     } else {
@@ -17380,6 +17387,100 @@ async function clearDiscountManualOverride(idx) {
   toast(wouldChange ? `✓ 已重置为自动规则 ${autoDiscount}%` : '✓ 已清除人工标记');
 }
 
+// ── Flat-price (一口价) inline editing in the pending list ──
+// Mirrors the discount inline-edit pattern so operators can set/adjust a flat
+// price mid-conversation without opening the entry form.
+
+// Common recompute + re-render after any flat-price change.
+async function _afterFlatPriceChange(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const fp = computeFinalPrice(o);
+  const settle = computeSettlement(o);
+  o.rmb = fp != null ? fp / (o.passengers.length || 1) : null;
+  o.cardholderFee = settle;
+  await persistOrdersNow();
+  renderPendingList();
+  renderPendingBanner();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel(meaningful);
+  if (STATE.currentIdx === idx && typeof loadCurrToDOM === 'function') loadCurrToDOM();
+}
+
+function startEditFlatPrice(idx, evt) {
+  if (evt) evt.stopPropagation();
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const span = document.getElementById(`flatprice-edit-${idx}`);
+  if (!span) return;
+  const cur = o.flatPriceCny != null ? o.flatPriceCny : '';
+  span.innerHTML = `💰 ¥<input type="number" id="flatprice-input-${idx}" value="${cur}" min="0" step="1"
+    style="width:90px; padding:1px 6px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); border:1.5px solid var(--gold); border-radius:4px; background:#fff; outline:none; text-align:right;"
+    onclick="event.stopPropagation()"
+    onblur="commitEditFlatPrice(${idx})"
+    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}else if(event.key==='Escape'){this.dataset.cancel='1';this.blur();}"
+  ><span style="color:var(--muted); font-size:10px; margin-left:6px;">${o.flatPricePerPax ? '每人' : '总价'}</span>`;
+  const input = document.getElementById(`flatprice-input-${idx}`);
+  if (input) { input.focus(); input.select(); }
+}
+
+async function commitEditFlatPrice(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const input = document.getElementById(`flatprice-input-${idx}`);
+  if (!input) return;
+  if (input.dataset.cancel === '1') { renderPendingList(); return; }
+  const raw = input.value.trim();
+  if (raw === '') {
+    // Empty = turn flat price OFF (back to discount)
+    o.flatPriceMode = false;
+    o.flatPriceCny = null;
+    await _afterFlatPriceChange(idx);
+    toast('✓ 已取消一口价，改回折扣');
+    return;
+  }
+  const v = Number(raw);
+  if (isNaN(v) || v < 0) { toast('一口价金额无效'); renderPendingList(); return; }
+  o.flatPriceMode = true;
+  o.flatPriceCny = v;
+  await _afterFlatPriceChange(idx);
+  const total = computeFinalPrice(o);
+  toast(`✓ 一口价 ¥${v.toLocaleString()}${o.flatPricePerPax ? '/人 → 总 ¥'+total.toLocaleString() : ''}`);
+}
+
+// Switch a discount-based order TO flat price. Seeds the flat price with the
+// current computed revenue (so the number doesn't jump), then opens the editor.
+async function switchToFlatPrice(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const curRevenue = computeFinalPrice(o);  // may be null if no discount yet
+  o.flatPriceMode = true;
+  o.flatPricePerPax = false;  // default to total
+  o.flatPriceCny = curRevenue != null ? curRevenue : null;
+  await _afterFlatPriceChange(idx);
+  // Open the inline editor so they can type the agreed price immediately
+  setTimeout(() => startEditFlatPrice(idx), 60);
+}
+
+// Switch a flat-price order back to discount-based pricing.
+async function switchToDiscount(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  o.flatPriceMode = false;
+  o.flatPriceCny = null;
+  await _afterFlatPriceChange(idx);
+  toast('↩ 已改回折扣计价');
+}
+
+// Toggle a flat-price order between total and per-pax.
+async function toggleFlatPerPax(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  o.flatPricePerPax = !o.flatPricePerPax;
+  await _afterFlatPriceChange(idx);
+  toast(o.flatPricePerPax ? '切为每人价（×人数）' : '切为总价');
+}
+
 async function commitEditDiscount(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
@@ -18252,7 +18353,22 @@ function buildCardHTML(o, idx) {
         discountStr = `<span id="discount-edit-${idx}" class="discount-editable" onclick="startEditDiscount(${idx}, event)" title="点击设置折扣" style="cursor:pointer; color:var(--red); font-weight:700; padding:1px 6px; border-radius:4px; border:1px dashed var(--red);">⚠ 折扣未填</span>`;
       }
       const hasPaxPrices = Array.isArray(o.paxPrices) && o.paxPrices.length > 0;
-      if (hasPaxPrices) {
+      const isFlatPrice = o.flatPriceMode && o.flatPriceCny != null && o.flatPriceCny > 0;
+      if (isFlatPrice) {
+        // ── Flat price (一口价) — fixed CNY selling price, overrides discount ──
+        const rate = effectiveRate(o);
+        const perPaxToggle = `<span onclick="event.stopPropagation(); toggleFlatPerPax(${idx})" title="切换 总价/每人价" style="cursor:pointer; font-size:9px; color:var(--muted); margin-left:6px; border:1px dashed var(--line-strong); border-radius:3px; padding:1px 5px;">${o.flatPricePerPax ? '每人价' : '总价'}⇄</span>`;
+        const flatLabel = o.flatPricePerPax
+          ? `💰 <span class="flatprice-editable" onclick="startEditFlatPrice(${idx}, event)" title="点击修改一口价" style="cursor:pointer; padding:1px 6px; border-radius:4px; border:1px dashed transparent; font-weight:700;">¥${Number(o.flatPriceCny).toLocaleString()}</span> / 人 × ${pax}`
+          : `💰 <span class="flatprice-editable" onclick="startEditFlatPrice(${idx}, event)" title="点击修改一口价" style="cursor:pointer; padding:1px 6px; border-radius:4px; border:1px dashed transparent; font-weight:700;">¥${Number(o.flatPriceCny).toLocaleString()}</span>（总价）`;
+        html += `<div class="price-row"><span class="label" style="font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.06em;">PRICE 售价${specialBadge}${tableYPriceBadge}</span><span class="value" style="color:var(--gold); font-weight:700;" id="flatprice-edit-${idx}">${flatLabel}${perPaxToggle}</span></div>`;
+        html += `<div class="price-row total"><span class="label">= 收入 REVENUE</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
+        if (rate > 0) {
+          const flatUsd = fp / rate;
+          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">≈ 总金额 USD (${fp.toLocaleString()} ÷ ${rate.toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${flatUsd.toFixed(2)}</span></div>`;
+        }
+        html += `<div class="price-row" style="padding-top:4px;"><span class="label"></span><span class="value"><span onclick="event.stopPropagation(); switchToDiscount(${idx})" title="改回按折扣计价" style="cursor:pointer; font-size:10px; color:var(--accent-deep); text-decoration:underline dotted;">↩ 改回折扣计价</span></span></div>`;
+      } else if (hasPaxPrices) {
         const rate = effectiveRate(o);
         const firstSegDate2 = displaySegments && displaySegments[0] ? displaySegments[0].date : null;
 
@@ -18322,6 +18438,12 @@ function buildCardHTML(o, idx) {
             }
           }
         }
+      }
+      // ── Entry point: switch any non-flat order TO flat price (一口价) ──
+      // Lets the operator set a flat price right here in the pending list,
+      // mid-conversation, without going back to the entry form.
+      if (!isFlatPrice) {
+        html += `<div class="price-row" style="padding-top:4px;"><span class="label"></span><span class="value"><span onclick="event.stopPropagation(); switchToFlatPrice(${idx})" title="改用一口价（固定金额，覆盖折扣）" style="cursor:pointer; font-size:10px; color:var(--gold); text-decoration:underline dotted; font-weight:600;">💰 改用一口价</span></span></div>`;
       }
     }
     if (st != null) {
