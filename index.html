@@ -3312,6 +3312,24 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         </div>
       </div>
       <div class="hint" id="priceFormula" style="font-family:'JetBrains Mono',monospace; margin-top:8px; color:var(--accent-deep); font-weight:600;"></div>
+      <!-- 一口价 (flat price) override -->
+      <div style="margin-top:10px; padding:10px 12px; background:var(--paper-2); border-radius:var(--r-md); border:1px solid var(--line);">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:12.5px; font-weight:600; color:var(--ink);">
+          <input type="checkbox" id="f-flatPriceMode" onchange="syncDOMToOrder(); toggleFlatPriceUI(); renderPreview(); updateCollapsibleSummaries();" style="width:15px; height:15px; cursor:pointer;">
+          💰 一口价（固定金额，覆盖折扣）
+        </label>
+        <div id="flatPriceFields" style="display:none; margin-top:10px; grid-template-columns:1fr auto; gap:10px; align-items:end;">
+          <div class="field mono" style="margin:0;">
+            <label>一口价 ¥</label>
+            <input type="number" id="f-flatPriceCny" step="0.01" placeholder="13000" oninput="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();">
+          </div>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:12px; color:var(--ink-2); padding-bottom:8px; white-space:nowrap;">
+            <input type="checkbox" id="f-flatPricePerPax" onchange="syncDOMToOrder(); renderPreview(); updateCollapsibleSummaries();" style="width:14px; height:14px; cursor:pointer;">
+            每人价（×人数）
+          </label>
+        </div>
+        <div class="hint" id="flatPriceHint" style="display:none; margin-top:6px; font-size:11px; color:var(--muted);"></div>
+      </div>
     </div>
   </div>
 
@@ -5590,6 +5608,13 @@ function newOrder(init = {}) {
     operator: init.operator || '',
     chaseChargeUsd: init.chaseChargeUsd != null ? init.chaseChargeUsd : null,
     discount: init.discount != null ? init.discount : null,
+    // ── Flat price (一口价) override ──
+    // When flatPriceMode is on, the SELLING price (what we charge the agent) is a
+    // fixed CNY amount instead of basePrice × discount%. Overrides the discount
+    // formula entirely. flatPricePerPax controls total-vs-per-person.
+    flatPriceMode: init.flatPriceMode || false,
+    flatPriceCny: init.flatPriceCny != null ? init.flatPriceCny : null,
+    flatPricePerPax: init.flatPricePerPax || false,  // true = ×pax, false = total
     // Special discount override: when set, replaces the default discount for this order
     isSpecialDiscount: init.isSpecialDiscount || false,
     specialDiscountNote: init.specialDiscountNote || '',
@@ -8143,6 +8168,14 @@ function syncDOMToOrder() {
   }
   o.discount = newDiscount;
 
+  // ── Flat price (一口价) fields ──
+  const flatModeEl = document.getElementById('f-flatPriceMode');
+  if (flatModeEl) o.flatPriceMode = flatModeEl.checked;
+  const flatCny = parseFloat((document.getElementById('f-flatPriceCny') || {}).value);
+  o.flatPriceCny = isNaN(flatCny) ? null : flatCny;
+  const flatPerPaxEl = document.getElementById('f-flatPricePerPax');
+  if (flatPerPaxEl) o.flatPricePerPax = flatPerPaxEl.checked;
+
   o.issuer = document.getElementById('f-issuer').value.trim();
   const miles = parseFloat(document.getElementById('f-miles').value);
   o.miles = isNaN(miles) ? null : miles;
@@ -8326,6 +8359,14 @@ function loadCurrToDOM() {
   document.getElementById('f-tkt').value = o.tkt || '';
   document.getElementById('f-basePrice').value = o.basePrice != null ? o.basePrice : '';
   document.getElementById('f-discount').value = o.discount != null ? o.discount : '';
+  // Flat price fields
+  const flatModeEl = document.getElementById('f-flatPriceMode');
+  if (flatModeEl) flatModeEl.checked = !!o.flatPriceMode;
+  const flatCnyEl = document.getElementById('f-flatPriceCny');
+  if (flatCnyEl) flatCnyEl.value = o.flatPriceCny != null ? o.flatPriceCny : '';
+  const flatPerPaxEl = document.getElementById('f-flatPricePerPax');
+  if (flatPerPaxEl) flatPerPaxEl.checked = !!o.flatPricePerPax;
+  if (typeof toggleFlatPriceUI === 'function') toggleFlatPriceUI();
   document.getElementById('f-issuer').value = o.issuer || '';
   document.getElementById('f-miles').value = o.miles != null ? o.miles : '';
   document.getElementById('f-cpmRate').value = o.cpmRate != null ? o.cpmRate : '';
@@ -8342,6 +8383,11 @@ function loadCurrToDOM() {
 }
 
 function computeFinalPrice(o) {
+  // ── Flat price (一口价) takes precedence over the discount formula ──
+  if (o.flatPriceMode && o.flatPriceCny != null && o.flatPriceCny > 0) {
+    const pax = o.passengers.length || 1;
+    return Math.round(o.flatPricePerPax ? o.flatPriceCny * pax : o.flatPriceCny);
+  }
   if (o.discount == null) return null;
   // If per-pax prices are set, total = Σ(price_i) × discount
   if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
@@ -8352,6 +8398,42 @@ function computeFinalPrice(o) {
   if (o.basePrice == null) return null;
   const pax = o.passengers.length || 1;
   return Math.round(o.basePrice * (o.discount / 100) * pax);
+}
+
+// Flat-price (一口价) UI: show/hide the amount fields + grey out discount inputs
+// when flat-price mode is active (since the discount formula is overridden).
+function toggleFlatPriceUI() {
+  const modeEl = document.getElementById('f-flatPriceMode');
+  const fields = document.getElementById('flatPriceFields');
+  const hint = document.getElementById('flatPriceHint');
+  const baseEl = document.getElementById('f-basePrice');
+  const discEl = document.getElementById('f-discount');
+  if (!modeEl) return;
+  const on = modeEl.checked;
+  if (fields) fields.style.display = on ? 'grid' : 'none';
+  if (hint) hint.style.display = on ? 'block' : 'none';
+  // Dim the discount formula inputs when flat price is in charge
+  [baseEl, discEl].forEach(el => {
+    if (!el) return;
+    el.style.opacity = on ? '0.4' : '1';
+    el.disabled = on;
+    el.title = on ? '一口价模式下，原价×折扣被覆盖' : '';
+  });
+  // Update hint text
+  if (hint && on) {
+    const o = curr();
+    const pax = o ? (o.passengers.length || 1) : 1;
+    const perPax = document.getElementById('f-flatPricePerPax');
+    const isPerPax = perPax && perPax.checked;
+    const cny = parseFloat((document.getElementById('f-flatPriceCny') || {}).value) || 0;
+    if (cny > 0) {
+      hint.textContent = isPerPax
+        ? `每人 ¥${cny.toLocaleString()} × ${pax} 人 = 总售价 ¥${(cny * pax).toLocaleString()}`
+        : `总售价 ¥${cny.toLocaleString()}（${pax} 人共此价）`;
+    } else {
+      hint.textContent = '填入固定金额，将作为对代理的销售价（覆盖折扣公式）';
+    }
+  }
 }
 
 // Special discount: prepended to the parser. When checked + value set, parsePNR will
@@ -8451,11 +8533,20 @@ function renderDerivedFields() {
   if (fp != null) {
     fpEl.value = `¥ ${fp.toLocaleString()}`;
     const pax = o.passengers.length || 1;
-    formulaEl.textContent = `${o.basePrice} × ${o.discount}% × ${pax} = ¥${fp.toLocaleString()}`;
+    if (o.flatPriceMode && o.flatPriceCny != null && o.flatPriceCny > 0) {
+      // Flat price formula
+      formulaEl.textContent = o.flatPricePerPax
+        ? `💰 一口价 ¥${o.flatPriceCny.toLocaleString()}/人 × ${pax} = ¥${fp.toLocaleString()}`
+        : `💰 一口价（总价）= ¥${fp.toLocaleString()}`;
+    } else {
+      formulaEl.textContent = `${o.basePrice} × ${o.discount}% × ${pax} = ¥${fp.toLocaleString()}`;
+    }
   } else {
     fpEl.value = '';
     formulaEl.textContent = '';
   }
+  // Refresh flat-price hint if visible
+  if (typeof toggleFlatPriceUI === 'function' && o.flatPriceMode) toggleFlatPriceUI();
   const st = computeSettlement(o);
   const stEl = document.getElementById('f-settlement');
   if (stEl) {
