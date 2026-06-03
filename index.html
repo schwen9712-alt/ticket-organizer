@@ -10043,6 +10043,44 @@ function parseSingleBooking(raw) {
     }
     if (matched) continue;
 
+    // ── Bare-number CNY fare with Chinese descriptor (no 元/CNY keyword) ──
+    // OTA shorthand where the price LEADS the line, followed by a Chinese
+    // fare-tier descriptor, e.g.:
+    //   "32041    商务大人   4位"   → adult fare 32041 (×4)
+    //   "32000  儿童价格"           → child fare 32000
+    //   "28000 经济成人 2位"        → adult fare 28000
+    // The descriptor must contain a price-context word (大人/成人/儿童/价格/价/
+    // 商务/经济/头等/公务/超经) so we don't grab random numbers. A trailing
+    // "N位/N人" is a passenger COUNT, not the price.
+    const bareNumFare = trimmed.match(/^(\d{4,6})(?:\.\d+)?\s+(?=[\u4e00-\u9fa5])(.{0,20}?(?:大人|成人|儿童|小儿|婴儿|价格|商务|经济|头等|公务|超经|超级经济))/);
+    if (bareNumFare) {
+      const amt = parseFloat(bareNumFare[1]);
+      const desc = bareNumFare[2];
+      if (amt >= 500 && amt <= 500000) {
+        const isChild = /儿童|小儿/.test(desc);
+        const isInfant = /婴儿/.test(desc);
+        if (!parsedFareByType) parsedFareByType = {};
+        if (isInfant) {
+          parsedFareByType.infant = amt;
+        } else if (isChild) {
+          parsedFareByType.child = amt;
+        } else {
+          // adult (default, incl. 商务大人/经济成人/just 商务)
+          parsedFareByType.adult = amt;
+          if (!rmb) rmb = amt;
+        }
+        // Capture cabin hint from descriptor if not already set
+        if (parsedCabin == null) {
+          if (/商务|公务/.test(desc)) parsedCabin = '商务舱';
+          else if (/头等/.test(desc)) parsedCabin = '头等舱';
+          else if (/超经|超级经济/.test(desc)) parsedCabin = '超级经济舱';
+          else if (/经济/.test(desc)) parsedCabin = '经济舱';
+        }
+        matched = true;
+      }
+    }
+    if (matched) continue;
+
     // TYPE-BASED FARE LINES — two formats:
     // 1. Chinese prefix: "大人运价... 43648 CNY", "婴儿运价... INF 3425 CNY"
     // 2. Inline fare code: "01 DNW00KRK       INF  3045 CNY" or "01 ABC  CNN  43558 CNY"
