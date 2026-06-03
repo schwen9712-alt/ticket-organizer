@@ -9579,19 +9579,27 @@ function parseSingleBooking(raw) {
         ssrLine = ssrLine.slice(0, ssrLine.length - ssrTrailingPrice[0].length);
       }
     }
-    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(\d{1,2}[A-Z]{3}\d{2})\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?\s*$/i);
+    // EXPIRY is now OPTIONAL: some SSR lines omit it, e.g.
+    //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
+    // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
+    // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
+    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
     if (ssrMatch) {
       const dob = ssrMatch[1].toUpperCase();
       const gender = ssrMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const surname = ssrMatch[4].trim().toUpperCase();
-      const given = ssrMatch[5].trim().toUpperCase();
+      const expiry = ssrMatch[3] ? ssrMatch[3].toUpperCase() : '';  // optional
+      const surname = ssrMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
+      const given = ssrMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = `${surname}/${given}`;
       const existing = pax.find(p => p.name === name);
       if (!existing) {
-        pax.push({ name, gender, dob });
+        const rec = { name, gender, dob };
+        if (expiry) rec.passportExpiry = expiry;
+        pax.push(rec);
       } else {
         if (!existing.dob) existing.dob = dob;
         if (!existing.gender) existing.gender = gender;
+        if (expiry && !existing.passportExpiry) existing.passportExpiry = expiry;
       }
       continue;
     }
@@ -9600,19 +9608,23 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(\d{1,2}[A-Z]{3}\d{2})\/([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?\s*$/i);
+    const bareDocMatch = trimmed.match(/^P\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
     if (bareDocMatch) {
       const dob = bareDocMatch[1].toUpperCase();
       const gender = bareDocMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const surname = bareDocMatch[4].trim().toUpperCase();
-      const given = bareDocMatch[5].trim().toUpperCase();
+      const expiry = bareDocMatch[3] ? bareDocMatch[3].toUpperCase() : '';
+      const surname = bareDocMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
+      const given = bareDocMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = `${surname}/${given}`;
       const existing = pax.find(p => p.name === name);
       if (!existing) {
-        pax.push({ name, gender, dob });
+        const rec = { name, gender, dob };
+        if (expiry) rec.passportExpiry = expiry;
+        pax.push(rec);
       } else {
         if (!existing.dob) existing.dob = dob;
         if (!existing.gender) existing.gender = gender;
+        if (expiry && !existing.passportExpiry) existing.passportExpiry = expiry;
       }
       continue;
     }
