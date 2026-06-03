@@ -184,6 +184,12 @@
   background: var(--purple);
   color: #fff;
 }
+.ui-badge--link-soft { /* lighter link badge — tinted, not solid */
+  background: var(--purple-light);
+  color: var(--purple);
+  border-color: rgba(124, 58, 237, 0.25);
+  font-weight: 600;
+}
 .ui-badge--autolink { /* auto-detected same passenger — blue outline */
   background: var(--blue-light);
   color: var(--blue);
@@ -11822,44 +11828,41 @@ function renderAirlineUsdPanel(orders) {
       const noAvailBadge = o.noAvailability
         ? `<span class="ui-badge ui-badge--none">⏸ 无位</span>`
         : '';
-      // Ticketing-sequence note (先开往返 再开单程) parsed from paste.
-      // Compact icon only; full text on hover + click.
-      const seqNoteBadge = o.ticketSeqNote
-        ? `<span class="ui-badge ui-badge--icon ui-badge--seq ui-badge--clickable" onclick="event.stopPropagation(); alert('出票顺序要求：\\n\\n${escapeAttr(o.ticketSeqNote)}')" title="出票顺序要求：${escapeAttr(o.ticketSeqNote)}（点击查看）">📋</span>`
-        : '';
+      // Ticketing-sequence note is now MERGED into the linked badge below
+      // (was a separate 📋 icon — redundant when ①②先出后出 already shows).
+      const seqNoteBadge = '';
       const linkedBadge = (() => {
         const manualIds = o.linkedOrderIds || [];
         const autoIds   = (o.autoLinkedOrderIds || []).filter(id => !manualIds.includes(id));
         if (!o.ticketOrder && manualIds.length === 0 && autoIds.length === 0) return '';
 
         let parts = '';
-        // Manual link — purple. Show ticketing ORDER clearly with circled
-        // number + 先出/后出 wording. The linked passengers go in the tooltip,
-        // NOT inline (the old "→ NAME" arrow was misread as "NAME goes first").
+        // Manual link — LIGHT outline style (was heavy purple solid). Circled
+        // number + 先出/后出. Clicking shows the seq-note + lets you edit links.
         if (o.ticketOrder || manualIds.length > 0) {
           const linkedNames = manualIds.map(lid => {
             const lo = STATE.orders.find(x => x.id === lid);
             return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
           }).filter(Boolean);
-          // Circled number + role word
-          const circled = o.ticketOrder ? ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'][o.ticketOrder - 1] || `(${o.ticketOrder})` : '🔗';
-          let roleWord = '';
-          if (o.ticketOrder === 1) roleWord = '先出';
-          else if (o.ticketOrder >= 2) roleWord = '后出';
-          const label = roleWord ? `${circled} ${roleWord}` : `🔗 关联`;
-          const tip = linkedNames.length
-            ? `出票顺序：第 ${o.ticketOrder} 个出票\\n关联订单：${linkedNames.join('、')}\\n点击编辑`
-            : `出票顺序关联 · 点击编辑`;
-          parts += `<span class="ui-badge ui-badge--link ui-badge--clickable" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="${tip}">${label}</span>`;
+          const circled = o.ticketOrder ? ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'][o.ticketOrder - 1] || `${o.ticketOrder}` : '🔗';
+          let roleWord = o.ticketOrder === 1 ? '先出' : (o.ticketOrder >= 2 ? '后出' : '关联');
+          // Build tooltip: include the seq-note if present
+          let tip = linkedNames.length
+            ? `第 ${o.ticketOrder} 个出票 · 关联 ${linkedNames.join('、')}`
+            : `出票顺序关联`;
+          if (o.ticketSeqNote) tip = `${o.ticketSeqNote}\\n\\n${tip}`;
+          tip += ` · 点击编辑`;
+          // Light style: tinted background + colored text + thin border (not solid fill)
+          parts += `<span class="ui-badge ui-badge--link-soft ui-badge--clickable" onclick="event.stopPropagation();openLinkOrderDialog(${originalIdx})" title="${tip}">${circled}${roleWord}</span>`;
         }
-        // Auto-link — blue outline (same passenger detected)
+        // Auto-link — keep light blue outline
         if (autoIds.length > 0) {
           const names = autoIds.map(lid => {
             const lo = STATE.orders.find(x => x.id === lid);
             return lo ? (lo.passengers[0]?.name?.split('/')[0] || '—') : null;
           }).filter(Boolean);
           const nameStr = names.slice(0,2).join('+') + (names.length > 2 ? `+${names.length-2}` : '');
-          parts += `<span class="ui-badge ui-badge--autolink ui-badge--clickable" onclick="event.stopPropagation();scrollToOrderById('${autoIds[0]}')" title="自动关联：检测到相同乘客\n${names.join(' · ')}\n点击跳转到关联订单">👤 ${nameStr}</span>`;
+          parts += `<span class="ui-badge ui-badge--autolink ui-badge--clickable" onclick="event.stopPropagation();scrollToOrderById('${autoIds[0]}')" title="自动关联：检测到相同乘客\n${names.join(' · ')}\n点击跳转">👤 ${nameStr}</span>`;
         }
         return parts;
       })();
@@ -11874,10 +11877,9 @@ function renderAirlineUsdPanel(orders) {
       const historyBadge = firstPax
         ? buildPassengerHistoryBadge(firstPax.name, firstPax.dob, firstPax.passportNo, o.id)
         : '';
-      // 表 Y badge — top-priority order, gold breathing dot.
-      const tableYBadge = o.isTableY
-        ? `<span class="ui-badge ui-badge--y" title="表 Y · 9 折 · 最高优先级出票">⚡</span>`
-        : '';
+      // 表 Y badge — the table-label cell on the LEFT already shows "表A·Y",
+      // so we DON'T repeat a heavy ⚡ badge here. Left cell carries the signal.
+      const tableYBadge = '';
       // In bulk mode, leadCell is a selection checkbox. Normal mode = empty
       // (the manual drag-to-reorder feature was removed; sort is fully automatic).
       const inBulk = _bulkMode;
@@ -11894,7 +11896,7 @@ function renderAirlineUsdPanel(orders) {
         <span class="order-num">#${displayIdx + 1}</span>
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
-        <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:var(--accent-deep); font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
+        <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
         <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
