@@ -9436,6 +9436,37 @@ function parseSingleBooking(raw) {
     const cnPaxMatch = trimmed.match(/^(?:乘机人|旅客|乘客)[：:]\s*(.+)/);
     if (cnPaxMatch) {
       const raw = cnPaxMatch[1].trim();
+      // ── Numbered name + 护照号码 + cert: "1.DENG/YIRUI  护照号码CN/EG7029264/CN/15OCT00/F/01JUL29" ──
+      // Strip a leading sequence number ("1."), pull the NAME (before 护照号码),
+      // and parse the cert block (国籍/护照/国籍/DOB/性别/到期) after 护照号码.
+      const numberedDoc = raw.match(/^\d+\.\s*([A-Z]+(?:\s+[A-Z]+)*\/[A-Z]+(?:\s+[A-Z]+)*)\s+护照(?:号码|号)?\s*([A-Z]{2})\/([A-Z0-9]+)\/([A-Z]{2})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})/i);
+      if (numberedDoc) {
+        const name = numberedDoc[1].trim().toUpperCase().replace(/\s+/g, ' ');
+        const dob = numberedDoc[5].toUpperCase();
+        const gender = numberedDoc[6].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
+        const expiry = numberedDoc[7].toUpperCase();
+        const existing = pax.find(p => p.name === name);
+        if (!existing) {
+          pax.push({ name, dob, gender, passportExpiry: expiry, paxType: 'ADULT' });
+        } else {
+          if (!existing.dob) existing.dob = dob;
+          if (!existing.gender) existing.gender = gender;
+          if (!existing.passportExpiry) existing.passportExpiry = expiry;
+        }
+        continue;
+      }
+      // ── Name + 护照号码 WITHOUT leading number: "DENG/YIRUI 护照号码CN/..." ──
+      const namedDoc = raw.match(/^([A-Z]+(?:\s+[A-Z]+)*\/[A-Z]+(?:\s+[A-Z]+)*)\s+护照(?:号码|号)?\s*([A-Z]{2})\/([A-Z0-9]+)\/([A-Z]{2})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})/i);
+      if (namedDoc) {
+        const name = namedDoc[1].trim().toUpperCase().replace(/\s+/g, ' ');
+        const dob = namedDoc[5].toUpperCase();
+        const gender = namedDoc[6].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
+        const expiry = namedDoc[7].toUpperCase();
+        if (!pax.find(p => p.name === name)) {
+          pax.push({ name, dob, gender, passportExpiry: expiry, paxType: 'ADULT' });
+        }
+        continue;
+      }
       // SSR DOCS style: "P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
       const ssrM = raw.match(/^P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
       if (ssrM) {
