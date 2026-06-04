@@ -5565,6 +5565,10 @@ function newOrder(init = {}) {
     discountManuallyOverridden: !!init.discountManuallyOverridden,
     client: init.client || '',
     cabin: init.cabin || '经济舱',
+    // Basic/non-refundable fare (基础商务舱/特价/不可退改). When true, show a
+    // prominent warning badge — these fares cannot be refunded or changed.
+    basicFare: init.basicFare || false,
+    basicFareLabel: init.basicFareLabel || '',
     agent: init.agent || '',
     branch: init.branch || '',
     airline: init.airline || '',
@@ -9203,6 +9207,8 @@ function parseSingleBooking(raw) {
   let rmb = null, usd = null, parsedDiscount = null;
   // Declare shared parse-result variables upfront to avoid var-hoisting bugs
   let parsedCabin = undefined;
+  let parsedBasicFare = false;       // 基础/特价运价（不可退改）
+  let parsedBasicFareLabel = '';     // 原始标签如"基础商务舱"
   let parsedPaxPrices = undefined;
   let parsedFareByType = undefined;
   let _lastFareType = undefined;
@@ -9710,13 +9716,20 @@ function parseSingleBooking(raw) {
     // would be eaten here and the fare amount would never be parsed. Earlier
     // version allowed "anything after 2pc" which was too greedy.
     if (parsedCabin === undefined) {
-      const standaloneCabin = trimmed.match(/^(?:大人|儿童|婴儿)?[^\u4e00-\u9fa5]*(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)\s*(?:\d+PC|行李(?:\s*\d+\s*kg)?)?\s*$/i);
+      // Allow an optional 基础/特价/促销 prefix that marks a NON-REFUNDABLE
+      // basic fare, e.g. "基础商务舱", "基础经济舱", "特价经济".
+      const standaloneCabin = trimmed.match(/^(?:大人|儿童|婴儿)?\s*(基础|特价|促销)?\s*[^\u4e00-\u9fa5]*(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)\s*(?:\d+PC|行李(?:\s*\d+\s*kg)?)?\s*$/i);
         if (standaloneCabin) {
         const cabMap2 = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱',
           '公务': '商务舱', '公务舱': '商务舱',
           '超经': '超级经济舱', '超级经济': '超级经济舱', '超级经济舱': '超级经济舱',
           '经济': '经济舱', '经济舱': '经济舱' };
-        parsedCabin = cabMap2[standaloneCabin[1]];
+        parsedCabin = cabMap2[standaloneCabin[2]];
+        // Basic/discounted fare → non-refundable, non-changeable. Flag it.
+        if (standaloneCabin[1]) {
+          parsedBasicFare = true;
+          parsedBasicFareLabel = standaloneCabin[1] + standaloneCabin[2];  // e.g. "基础商务舱"
+        }
         continue;
       }
     }
@@ -10608,6 +10621,19 @@ function parseSingleBooking(raw) {
   // ── Urgent flag + ticketing-sequence note ──
   // 💣 / [炸弹] / 🚨 anywhere in the paste marks this as high-risk / needs care.
   const isUrgent = /💣|🚨|\[炸弹\]|\[爆炸\]|高风险|加急|急/.test(raw);
+
+  // Basic/non-refundable fare detection (fallback): catch "基础X舱" / "特价" /
+  // "不可退改" anywhere in the paste, even if not on its own cabin line.
+  if (!parsedBasicFare) {
+    const basicM = raw.match(/(基础|特价|促销)(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)/);
+    if (basicM) {
+      parsedBasicFare = true;
+      parsedBasicFareLabel = basicM[1] + basicM[2];
+    } else if (/不可退改|不可退|不可改|不退不改|无法退改/.test(raw)) {
+      parsedBasicFare = true;
+      parsedBasicFareLabel = '不可退改';
+    }
+  }
   // Ticketing sequence instruction: "先开往返 再开单程", "先开上面...", etc.
   // Capture the human instruction so the operator sees the coordination rule.
   let ticketSeqNote = '';
@@ -10625,6 +10651,8 @@ function parseSingleBooking(raw) {
     productDiscount, productMarker, productNote,
     urgent: isUrgent,
     ticketSeqNote,
+    basicFare: parsedBasicFare,
+    basicFareLabel: parsedBasicFareLabel,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
 
@@ -11316,7 +11344,9 @@ async function parsePNR() {
       waitingForRelease: primary.waitingForRelease || false,
       urgent: primary.urgent || false,
       urgentSetAt: primary.urgent ? Date.now() : null,
-      ticketSeqNote: primary.ticketSeqNote || ''
+      ticketSeqNote: primary.ticketSeqNote || '',
+      basicFare: primary.basicFare || false,
+      basicFareLabel: primary.basicFareLabel || ''
     });
     const bookingText = chunk;
     // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
@@ -11921,6 +11951,10 @@ function renderAirlineUsdPanel(orders) {
         : '';
       // Ticketing-sequence note is now MERGED into the linked badge below
       // (was a separate 📋 icon — redundant when ①②先出后出 already shows).
+      // Basic/non-refundable fare warning — RED, prominent (cannot refund/change)
+      const basicFareBadge = o.basicFare
+        ? `<span class="ui-badge ui-badge--warn ui-badge--clickable" onclick="event.stopPropagation(); alert('⚠ 基础运价（${escapeAttr(o.basicFareLabel || '基础舱')}）\\n\\n此票为基础/特价运价，通常不可退票、不可改签。\\n出票前请向客户确认！')" title="基础运价 · 不可退改（点击详情）" style="color:#fff; background:var(--red); border-color:var(--red);">🚫 不可退改</span>`
+        : '';
       const seqNoteBadge = '';
       const linkedBadge = (() => {
         const manualIds = o.linkedOrderIds || [];
@@ -11988,7 +12022,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
         <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
