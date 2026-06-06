@@ -9362,13 +9362,21 @@ function parseSingleBooking(raw) {
   const expandedLines = [];
   for (const ln of lines) {
     const dateCount = (ln.match(/\d{1,2}月\d{1,2}日/g) || []).length;
+    // Count English GDS segment heads on one line: "AA1005 S TU25AUG", "UA888 P MO13JUL"
+    // Pattern: 2-char carrier + flight num + space + class + space + DOW+date.
+    const gdsSegRe = /\b[A-Z]{2}\s*\d{1,4}\s+[A-Z]\s+(?:MO|TU|WE|TH|FR|SA|SU)\d{1,2}[A-Z]{3}/g;
+    const gdsSegCount = (ln.match(gdsSegRe) || []).length;
     if (dateCount >= 2) {
-      // Multiple date markers — split before each one (except the first)
       const splitRe = /(?<=\s)(?=\d{1,2}月\d{1,2}日)/g;
       const parts = ln.split(splitRe).filter(p => p && p.trim());
       parts.forEach(p => expandedLines.push(p));
+    } else if (gdsSegCount >= 2) {
+      // Two+ GDS segments glued on one line — split before each segment head
+      // (the optional leading "1." / "2." index is kept with its segment).
+      const splitRe = /\s+(?=(?:\d{1,2}\.\s*)?[A-Z]{2}\s*\d{1,4}\s+[A-Z]\s+(?:MO|TU|WE|TH|FR|SA|SU)\d{1,2}[A-Z]{3})/g;
+      const parts = ln.split(splitRe).filter(p => p && p.trim());
+      parts.forEach(p => expandedLines.push(p));
     } else if (/\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b/i.test(ln)) {
-      // TOTAL on same line — split it off
       const splitRe = /(?=\bTOTAL\s+(?:CNY|RMB|人民币|USD|美金|美元)\b)/gi;
       const parts = ln.split(splitRe).filter(p => p && p.trim());
       parts.forEach(p => expandedLines.push(p));
@@ -10088,6 +10096,22 @@ function parseSingleBooking(raw) {
           else if (/头等/.test(desc)) parsedCabin = '头等舱';
           else if (/超经|超级经济/.test(desc)) parsedCabin = '超级经济舱';
           else if (/经济/.test(desc)) parsedCabin = '经济舱';
+        }
+        matched = true;
+      }
+    }
+    if (matched) continue;
+
+    // ── Cabin-word + glued price (no space, no keyword): "普通经济6129" ──
+    // Chinese cabin descriptor immediately followed by the fare amount.
+    const cabinGluedFare = trimmed.match(/^(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(\d{4,6})(?:\.\d+)?\s*$/);
+    if (cabinGluedFare) {
+      const amt = parseFloat(cabinGluedFare[2]);
+      if (amt >= 500 && amt <= 500000) {
+        if (!rmb) rmb = amt;
+        if (parsedCabin === undefined) {
+          const _cm = {'普通经济':'经济舱','经济':'经济舱','经济舱':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱','商务':'商务舱','商务舱':'商务舱','公务':'商务舱','公务舱':'商务舱','头等':'头等舱','头等舱':'头等舱'};
+          parsedCabin = _cm[cabinGluedFare[1]] || null;
         }
         matched = true;
       }
