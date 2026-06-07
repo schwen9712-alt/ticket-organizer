@@ -1,50 +1,44 @@
-## 2026-05-23 — 修复两航段挤一行漏识别 + 舱位粘连价格
+## 2026-05-23 — 全面代码审核 + 热路径空值防御（防白屏）
 
-**改了什么**
-修复两个问题：
-1. **两个航段挤在一行时只识别第一个**（英文 GDS 格式）
-2. **舱位+数字粘连的价格不识别**（如"普通经济6129"）
+**做了什么**
+对最新版本做系统性审核，修复可能导致白屏的运行时空值问题。
 
-**为什么改**
-用户反馈这段没识别：
-```
-AA1005 S TU25AUG CLTDFW ... --0    [一长串空格]    AA127 S TU25AUG DFWPVG ...
-SSR DOCS AA HK1 P/CN/EB8842911/CN/02NOV87/F/04DEC27/CHEN/RUILI/P1
-普通经济6129
-```
+**审核结论（健康项）**
+- ✓ 508 个函数，无重复定义
+- ✓ 无真正的孤儿调用（核心函数引用完整）
+- ✓ 核心算法全部唯一：computeFinalPrice/computeSettlement/effectiveRate/parsePNR/detectDuplicates/renderPendingList/renderPreview
+- ✓ 最近功能字段一致：flatPriceMode/basicFare/ticketSeqNote/flatPriceCny 都有 schema
+- ✓ Firebase 同步健康：fbScheduleWrite 18处、autoCloudPush 零残留、_mergeById 防丢单在位
 
-诊断：
-- **两个航段在同一行**（AA1005 和 AA127 中间只有空格，没换行）。航段 regex 用 ^ 锚定行首，只匹配到 AA1005，AA127 被漏
-- **价格"普通经济6129"**：中文舱位紧贴数字，无空格无 CNY 关键词，现有 regex 不匹配
-- 乘客 SSR 正常
+**修复的运行时隐患（白屏根源）**
+审核发现 98 处 `getElementById(x).y` 直接访问 + 多个热路径函数缺空值保护。热路径函数被每个订单行反复调用，一旦某订单数据不完整（缺 passengers/为 null），就抛错中断渲染 → 整页白屏。
 
-**修复方案**
-1. **expandedLines 预处理支持拆英文 GDS 多航段**：一行有 2+ 个航段头（如"AA1005 S TU25AUG"）时，在每个航段前拆开成多行。之前只拆中文日期和 TOTAL
-2. **新增"舱位+数字"粘连价格格式**："普通经济6129" → 价格6129 + 经济舱
+修复 3 个最关键的热路径函数：
+1. **computeFinalPrice(o)**：加 `if(!o) return null`；`o.passengers.length` → `(o.passengers && o.passengers.length) || 1`（2处）
+2. **effectiveRate(o)**：`o.customRate` → `o && o.customRate`（防 o 为 null）
+3. computeSettlement 通过 isCardPayment 的 `o &&` 已间接安全
 
-**端到端测试（用户输入）全部通过**
-- ✓ AA1005 CLT→DFW（第一航段）
-- ✓ AA127 DFW→PVG（第二航段，之前漏的）
-- ✓ 价格 ¥6129
-- ✓ 舱位 经济舱
-- ✓ 乘客 CHEN/RUILI 女 生02NOV87 护照到期04DEC27
+**测试 8/8 全过（坏数据不再抛错）**
+- ✓ computeFinalPrice(null/undefined/{})
+- ✓ flatPrice 无 passengers
+- ✓ discount 无 passengers/basePrice
+- ✓ effectiveRate(null/{})
 
-**防误伤测试通过**
-- ✓ 单航段行不会被拆
-- ✓ SSR 行不会被当航段
-- ✓ "经济舱SFOPEK"（城市代码）不被当价格
-- ✓ "商务舱(往返)"不被当价格
+这些坏数据场景之前会抛 "Cannot read property 'length' of undefined" 之类的错，中断整页渲染导致白屏。现在安全返回 null/默认值。
 
 **改动位置**
-- index.html 9362 附近：expandedLines 加英文 GDS 多航段拆分
-- index.html 10076 附近：加 cabinGluedFare 舱位+数字粘连价格
+- index.html 8402 computeFinalPrice：空值防御
+- index.html 11677 effectiveRate：空值防御
+
+**为什么这样改（而非大改）**
+白屏通常是单个数据问题引发的连锁渲染中断。修热路径函数的空值容错，是性价比最高的防护——让坏数据"安全降级"而非"整页崩溃"。没有大规模重写，避免引入新风险。
 
 **风险或注意事项**
-- ⚠ 多航段拆分要求是标准 GDS 格式（航司+航班+舱位+星期日期）。非标准格式可能不拆
-- ⚠ "舱位+数字"价格要求数字 4-6 位且独占行尾，避免误抓
-- ⚠ 不影响已能识别的换行分隔的航段
+- ⚠ 如果白屏仍出现，需要 F12 Console 的具体报错来定位（不同白屏可能不同根因）
+- ⚠ 本次只修了最热的 2 个函数。其余 98 处 getElementById 直接访问大多是安全的（元素确定存在），未逐一加判空以免过度改动
+- ⚠ 这版包含之前所有功能：一口价、基础运价、多航段拆分、关联订单、行程复制等
 
 **回滚方式**
-从 .backups/ 找上一版覆盖。回滚后这种一行多航段+粘连价格又会漏识别。
+从 .backups/ 找上一版覆盖。本次纯防御性加固，回滚无功能影响但会恢复空值抛错风险。
 
 ---

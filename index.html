@@ -8400,9 +8400,10 @@ function loadCurrToDOM() {
 }
 
 function computeFinalPrice(o) {
+  if (!o) return null;
   // ── Flat price (一口价) takes precedence over the discount formula ──
   if (o.flatPriceMode && o.flatPriceCny != null && o.flatPriceCny > 0) {
-    const pax = o.passengers.length || 1;
+    const pax = (o.passengers && o.passengers.length) || 1;
     return Math.round(o.flatPricePerPax ? o.flatPriceCny * pax : o.flatPriceCny);
   }
   if (o.discount == null) return null;
@@ -8413,7 +8414,7 @@ function computeFinalPrice(o) {
     return Math.round(sum * (o.discount / 100));
   }
   if (o.basePrice == null) return null;
-  const pax = o.passengers.length || 1;
+  const pax = (o.passengers && o.passengers.length) || 1;
   return Math.round(o.basePrice * (o.discount / 100) * pax);
 }
 
@@ -11674,8 +11675,8 @@ SUN/KAILAI MS 女 28SEP08
 // ============================================
 
 function effectiveRate(o) {
-  if (o.customRate != null) return o.customRate;
-  if (o.rate != null) return o.rate;
+  if (o && o.customRate != null) return o.customRate;
+  if (o && o.rate != null) return o.rate;
   return settings.rate;
 }
 
