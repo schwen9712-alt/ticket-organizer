@@ -10105,7 +10105,11 @@ function parseSingleBooking(raw) {
 
     // ── Cabin-word + glued price (no space, no keyword): "普通经济6129" ──
     // Chinese cabin descriptor immediately followed by the fare amount.
-    const cabinGluedFare = trimmed.match(/^(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(\d{4,6})(?:\.\d+)?\s*$/);
+    // Also handles an optional 官网/官方 prefix and a trailing *N / ×N quantity:
+    //   "官网超经18929*2"  → 超级经济舱, fare 18929 (the *2 is a passenger count)
+    //   "官网商务25000×3"  → 商务舱, fare 25000
+    //   "普通经济6129"      → 经济舱, fare 6129
+    const cabinGluedFare = trimmed.match(/^(?:官网|官方|官)?\s*(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(\d{4,6})(?:\.\d+)?\s*(?:[\*xX×]\s*\d+)?\s*$/);
     if (cabinGluedFare) {
       const amt = parseFloat(cabinGluedFare[2]);
       if (amt >= 500 && amt <= 500000) {

@@ -1,44 +1,51 @@
-## 2026-05-23 — 全面代码审核 + 热路径空值防御（防白屏）
+## 2026-05-23 — 识别「官网超经18929*2」价格格式
 
-**做了什么**
-对最新版本做系统性审核，修复可能导致白屏的运行时空值问题。
+**改了什么**
+价格识别支持"官网/官方"前缀 + "*N/×N"数量后缀，如「官网超经18929*2」。
 
-**审核结论（健康项）**
-- ✓ 508 个函数，无重复定义
-- ✓ 无真正的孤儿调用（核心函数引用完整）
-- ✓ 核心算法全部唯一：computeFinalPrice/computeSettlement/effectiveRate/parsePNR/detectDuplicates/renderPendingList/renderPreview
-- ✓ 最近功能字段一致：flatPriceMode/basicFare/ticketSeqNote/flatPriceCny 都有 schema
-- ✓ Firebase 同步健康：fbScheduleWrite 18处、autoCloudPush 零残留、_mergeById 防丢单在位
+**为什么改**
+用户反馈这段没识别：
+```
+1.  UA772  R   MO22JUN  PEKLAX ...
+2.  UA771  R   TU08SEP  LAXPEK ...
+LYU/CHUNZHU   女    1964年3月22
+TIAN/JUN     男    1964年4月15
+官网超经18929*2
+```
 
-**修复的运行时隐患（白屏根源）**
-审核发现 98 处 `getElementById(x).y` 直接访问 + 多个热路径函数缺空值保护。热路径函数被每个订单行反复调用，一旦某订单数据不完整（缺 passengers/为 null），就抛错中断渲染 → 整页白屏。
+诊断结果：
+- ✓ 航段正常（UA772/UA771）
+- ✓ **乘客其实能识别**（中文出生日期"1964年3月22"缺"日"字也能正确解析为 22MAR64，extractDOB 的"日"本来就是可选的）
+- ✗ **唯一问题：价格"官网超经18929*2"不识别** —— 前面有"官网"，后面有"*2"，现有 cabinGluedFare 不匹配
 
-修复 3 个最关键的热路径函数：
-1. **computeFinalPrice(o)**：加 `if(!o) return null`；`o.passengers.length` → `(o.passengers && o.passengers.length) || 1`（2处）
-2. **effectiveRate(o)**：`o.customRate` → `o && o.customRate`（防 o 为 null）
-3. computeSettlement 通过 isCardPayment 的 `o &&` 已间接安全
+**修复方案**
+扩展 cabinGluedFare：
+- 加可选"官网/官方/官"前缀
+- 加可选"*N / ×N / xN"数量后缀（数量是乘客数，价格才是 18929）
 
-**测试 8/8 全过（坏数据不再抛错）**
-- ✓ computeFinalPrice(null/undefined/{})
-- ✓ flatPrice 无 passengers
-- ✓ discount 无 passengers/basePrice
-- ✓ effectiveRate(null/{})
+**端到端测试（用户输入）全部通过**
+- ✓ 2 航段（UA772 PEK→LAX + UA771 LAX→PEK）
+- ✓ 2 乘客（LYU/CHUNZHU 女 22MAR64 + TIAN/JUN 男 15APR64）
+- ✓ 价格 ¥18929（官网前缀 + *2 数量正确剥离）
+- ✓ 舱位 超级经济舱（从"超经"识别）
 
-这些坏数据场景之前会抛 "Cannot read property 'length' of undefined" 之类的错，中断整页渲染导致白屏。现在安全返回 null/默认值。
+**支持的格式**
+- 官网超经18929*2、官网商务25000×3、官方经济5000、超经18929、普通经济6129
+
+**防误伤测试通过**
+- ✓ "经济舱SFOPEK"（城市）不误判
+- ✓ "商务舱(往返)"不误判
+- ✓ 航段行不误判
 
 **改动位置**
-- index.html 8402 computeFinalPrice：空值防御
-- index.html 11677 effectiveRate：空值防御
-
-**为什么这样改（而非大改）**
-白屏通常是单个数据问题引发的连锁渲染中断。修热路径函数的空值容错，是性价比最高的防护——让坏数据"安全降级"而非"整页崩溃"。没有大规模重写，避免引入新风险。
+- index.html 10108 附近：cabinGluedFare 加官网前缀 + *数量后缀
 
 **风险或注意事项**
-- ⚠ 如果白屏仍出现，需要 F12 Console 的具体报错来定位（不同白屏可能不同根因）
-- ⚠ 本次只修了最热的 2 个函数。其余 98 处 getElementById 直接访问大多是安全的（元素确定存在），未逐一加判空以免过度改动
-- ⚠ 这版包含之前所有功能：一口价、基础运价、多航段拆分、关联订单、行程复制等
+- ⚠ "*N/×N"被识别为乘客数量（剥离），价格是数字部分
+- ⚠ 中文出生日期（X年X月X，缺"日"）本来就支持，本次未改
+- ⚠ 不影响其他价格格式
 
 **回滚方式**
-从 .backups/ 找上一版覆盖。本次纯防御性加固，回滚无功能影响但会恢复空值抛错风险。
+从 .backups/ 找上一版覆盖。回滚后"官网超经18929*2"这种格式又会漏识别价格。
 
 ---
