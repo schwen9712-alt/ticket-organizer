@@ -3024,7 +3024,7 @@ html[data-lang="en"] .zh {
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
       document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
       document.getElementById('panel-settings').classList.add('active');
-      renderRollingBackupsList(); renderOperatorsList();
+      renderRollingBackupsList(); renderOperatorsList(); renderBlacklistList();
       const g=document.getElementById('settingsGearBtn');
       g.style.background='rgba(12,27,42,0.08)'; g.style.color='var(--ink)'; g.style.borderColor='var(--ink)';
     " title="设置" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="if(document.getElementById('panel-settings').classList.contains('active'))return; this.style.background='transparent'; this.style.color='var(--muted)'">⚙</button>
@@ -3844,6 +3844,16 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="row" style="grid-template-columns: 2fr 1fr;">
       <div class="field"><label>新代理名称</label><input id="pa-name" placeholder="季凯 / 东莞 / 罗 …"></div>
       <div class="field" style="justify-content:flex-end;"><button class="btn small" onclick="addPresetAgent()">＋ 添加</button></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><span class="num">⛔</span>BLACKLIST <span class="zh">黑名单乘客</span></div>
+    <div class="hint" style="margin-bottom:12px">录入订单时，如果乘客姓名命中黑名单，会弹窗强提醒（订单仍会照常录入）。只按姓名匹配，格式如 <code>ZHANG/SAN</code>。</div>
+    <div id="blacklistList" style="margin-bottom:8px;"></div>
+    <div class="row" style="grid-template-columns: 2fr 1fr;">
+      <div class="field"><label>乘客姓名（姓/名）</label><input id="bl-name" placeholder="ZHANG/SAN" onkeydown="if(event.key==='Enter'){event.preventDefault();addBlacklistName();}"></div>
+      <div class="field" style="justify-content:flex-end;"><button class="btn small" onclick="addBlacklistName()">＋ 加入黑名单</button></div>
     </div>
   </div>
 
@@ -5768,6 +5778,10 @@ const DEFAULT_SETTINGS = {
   presetAgents: ['季凯', '东莞', '罗', '南京', '向红'],
   operators: ['林', '郑'],
   knownCards: [],  // previously used card last-4 digits: [{ last4, label }]
+  // Blacklisted passenger names — when a parsed/entered passenger matches one of
+  // these (by normalized name), show a prominent warning (but still allow it).
+  // Shape: array of normalized name strings, e.g. ["ZHANG/SAN", "WANG/WU"].
+  blacklist: [],
   agentDiscounts: { '罗': 87, '南京': 88 },  // legacy: agent → discount (still used as fallback)
   // Paused agents — blocks ticketing for orders of these agents until unpaused.
   // Useful for handling payment disputes, refund issues, or contractual problems.
@@ -6873,6 +6887,9 @@ async function loadSettings() {
   if (!Array.isArray(settings.cardholders)) {
     settings.cardholders = [];
   }
+  if (!Array.isArray(settings.blacklist)) {
+    settings.blacklist = [];
+  }
   if (!Array.isArray(settings.knownPax)) {
     settings.knownPax = [...DEFAULT_SETTINGS.knownPax];
   }
@@ -7094,7 +7111,7 @@ document.querySelectorAll('.tab').forEach(t => {
     t.classList.add('active');
     document.getElementById('panel-' + t.dataset.tab).classList.add('active');
     // Refresh rolling backups list when settings tab opens
-    if (t.dataset.tab === 'settings') { renderRollingBackupsList(); renderOperatorsList(); }
+    if (t.dataset.tab === 'settings') { renderRollingBackupsList(); renderOperatorsList(); renderBlacklistList(); }
     // Highlight gear icon when settings is active
     const gear = document.getElementById('settingsGearBtn');
     if (gear) {
@@ -8397,6 +8414,46 @@ function loadCurrToDOM() {
   (o.passengers || []).forEach((p, i) => {
     if (p.name) checkOFACDebounced(p.name, (key) => updateOFACBar(i));
   });
+}
+
+// ── Blacklist (问题乘客名单) ──────────────────────────────────────────────
+// Match by NAME only (normalized: uppercase, single-spaced, slash kept).
+// On match we WARN prominently but still allow the order through.
+function normalizeBlacklistName(name) {
+  return String(name || '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')      // collapse whitespace
+    .replace(/\s*\/\s*/, '/')  // tighten the surname/given slash
+    .trim();
+}
+function isBlacklisted(name) {
+  const n = normalizeBlacklistName(name);
+  if (!n) return false;
+  const list = (settings.blacklist || []).map(normalizeBlacklistName);
+  return list.includes(n);
+}
+// Return the list of blacklisted passenger names found in an order (if any).
+function orderBlacklistHits(o) {
+  if (!o || !Array.isArray(o.passengers)) return [];
+  return o.passengers
+    .map(p => p && p.name)
+    .filter(name => name && isBlacklisted(name))
+    .map(normalizeBlacklistName);
+}
+function addToBlacklist(name) {
+  const n = normalizeBlacklistName(name);
+  if (!n) return false;
+  if (!Array.isArray(settings.blacklist)) settings.blacklist = [];
+  if (settings.blacklist.some(x => normalizeBlacklistName(x) === n)) return false; // dup
+  settings.blacklist.push(n);
+  storageSet('ticket-organizer-settings', settings);
+  return true;
+}
+function removeFromBlacklist(name) {
+  const n = normalizeBlacklistName(name);
+  if (!Array.isArray(settings.blacklist)) return;
+  settings.blacklist = settings.blacklist.filter(x => normalizeBlacklistName(x) !== n);
+  storageSet('ticket-organizer-settings', settings);
 }
 
 function computeFinalPrice(o) {
@@ -11523,6 +11580,17 @@ async function parsePNR() {
 
   if (newOrders.length === 0) { toast('没解析到内容，请手动填写'); return; }
 
+  // ── Blacklist check: warn (but allow) if any parsed passenger is blacklisted ──
+  const blacklistFound = [];
+  newOrders.forEach(o => {
+    orderBlacklistHits(o).forEach(name => {
+      if (!blacklistFound.includes(name)) blacklistFound.push(name);
+    });
+  });
+  if (blacklistFound.length > 0) {
+    alert(`⚠️ 黑名单提醒\n\n以下乘客在黑名单中：\n\n${blacklistFound.map(n => '  • ' + n).join('\n')}\n\n请谨慎处理！（订单仍会照常录入）`);
+  }
+
   // Two-tier duplicate detection
   const { strong, weak } = detectDuplicates(newOrders);
   const strongDupeSet = new Set(strong.map(d => d.newOrder));
@@ -11981,6 +12049,11 @@ function renderAirlineUsdPanel(orders) {
       // Ticketing-sequence note is now MERGED into the linked badge below
       // (was a separate 📋 icon — redundant when ①②先出后出 already shows).
       // Basic/non-refundable fare warning — RED, prominent (cannot refund/change)
+      // Blacklist warning — RED, prominent. Click to manage.
+      const blacklistHits = orderBlacklistHits(o);
+      const blacklistBadge = blacklistHits.length > 0
+        ? `<span class="ui-badge ui-badge--clickable" onclick="event.stopPropagation(); alert('⛔ 黑名单乘客\\n\\n${escapeAttr(blacklistHits.join('、'))}\\n\\n此乘客在黑名单中，请谨慎处理。')" title="黑名单乘客：${escapeAttr(blacklistHits.join('、'))}" style="color:#fff; background:#1a1a1a; border-color:#000; font-weight:800;">⛔ 黑名单</span>`
+        : '';
       const basicFareBadge = o.basicFare
         ? `<span class="ui-badge ui-badge--warn ui-badge--clickable" onclick="event.stopPropagation(); alert('⚠ 基础运价（${escapeAttr(o.basicFareLabel || '基础舱')}）\\n\\n此票为基础/特价运价，通常不可退票、不可改签。\\n出票前请向客户确认！')" title="基础运价 · 不可退改（点击详情）" style="color:#fff; background:var(--red); border-color:var(--red);">🚫 不可退改</span>`
         : '';
@@ -12051,7 +12124,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
         <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -23808,6 +23881,41 @@ async function removeOperator(idx) {
   settings.operators.splice(idx, 1);
   await storageSet('ticket-organizer-settings', settings);
   renderOperatorsList();
+}
+
+// ── Blacklist management UI ──
+function renderBlacklistList() {
+  const list = document.getElementById('blacklistList');
+  if (!list) return;
+  const bl = settings.blacklist || [];
+  if (bl.length === 0) {
+    list.innerHTML = '<div class="hint">暂无黑名单乘客。</div>';
+    return;
+  }
+  list.innerHTML = bl.map((name) => `
+    <div style="display:inline-flex; align-items:center; gap:6px; background:#1a1a1a; color:#fff; border:1px solid #000; border-radius:3px; padding:3px 10px; margin:2px 4px 2px 0; font-size:13px; font-family:'JetBrains Mono',monospace;">
+      <span>⛔ ${escapeHtml(name)}</span>
+      <button onclick="removeBlacklistName('${escapeAttr(name)}')" style="background:none; border:none; cursor:pointer; color:#ff8a8a; font-size:12px; padding:0 2px;">✕</button>
+    </div>`).join('');
+}
+
+async function addBlacklistName() {
+  const inp = document.getElementById('bl-name');
+  const name = inp ? inp.value.trim() : '';
+  if (!name) { toast('请填写乘客姓名'); return; }
+  const added = addToBlacklist(name);  // normalizes + dedups + persists
+  if (!added) { toast('该姓名已在黑名单中'); return; }
+  if (inp) inp.value = '';
+  renderBlacklistList();
+  renderPendingList();  // re-render so existing orders show the badge
+  toast(`⛔ 已加入黑名单：${normalizeBlacklistName(name)}`);
+}
+
+async function removeBlacklistName(name) {
+  removeFromBlacklist(name);
+  renderBlacklistList();
+  renderPendingList();
+  toast('✓ 已移出黑名单');
 }
 
 async function setChasePanelField(idx, field, value) {
