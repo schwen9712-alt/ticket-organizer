@@ -9443,6 +9443,71 @@ function parseSingleBooking(raw) {
     }
   }
 
+  // ── Passport-card multi-line pax merge ──────────────────────────────────
+  // Some pastes list each passenger as a 2-3 line "card":
+  //   GAO,PENG          (surname,given — comma not slash)
+  //   男/M               (gender, optional)
+  //   21 MAY 1989        (DOB with spaces, optional)
+  // Detect a "SURNAME,GIVEN" line and fold the following gender/DOB lines into
+  // one synthetic "GAO/PENG 男 21MAY89" line that the normal pax parser handles.
+  {
+    const MON = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const merged = [];
+    for (let i = 0; i < expandedLines.length; i++) {
+      const cur = expandedLines[i].trim();
+      // "SURNAME,GIVEN" — letters, a comma, letters (allow spaces in given e.g. "GAO,PENG FEI")
+      const nameCard = cur.match(/^([A-Z]{2,}(?:\s+[A-Z]+)*)\s*,\s*([A-Z]{2,}(?:\s+[A-Z]+)*)$/);
+      // Guard: skip obvious non-name phrases (tax/fare boilerplate) even if they
+      // happen to contain a comma. Real names won't contain these tokens.
+      const NON_NAME = /\b(INCL|TAX|TAXES|FEE|FEES|TOTAL|FARE|CNY|RMB|USD|EUR|PNR|TICKET|TKT|CLASS|CABIN|SEAT|BAG|PC|KG|ECONOMY|BUSINESS|FIRST|ADULT|CHILD|INFANT)\b/i;
+      if (nameCard && !NON_NAME.test(cur)) {
+        const surname = nameCard[1].trim().replace(/\s+/g, ' ');
+        const given = nameCard[2].trim().replace(/\s+/g, ' ');
+        let gender = '';
+        let dob = '';
+        let consumed = 0;
+        // Look at up to the next 3 lines for gender / DOB
+        for (let k = 1; k <= 3 && i + k < expandedLines.length; k++) {
+          const nxt = expandedLines[i + k].trim();
+          // gender line: 男/M, 女/F, 男, 女, M, F, MALE, FEMALE
+          const gm = nxt.match(/^(?:性别\s*[：:]?\s*)?(男|女|MALE|FEMALE|M|F)\s*(?:\/\s*(男|女|M|F|MALE|FEMALE))?$/i);
+          // DOB line: "21 MAY 1989", "21MAY1989", "21MAY89", "1989-05-21", "1989年5月21日"
+          const dm = nxt.match(/^(\d{1,2})\s*([A-Z]{3})\s*(\d{2,4})$/i)
+                  || nxt.match(/^(\d{4})[\-\/\.](\d{1,2})[\-\/\.](\d{1,2})$/)
+                  || nxt.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?$/);
+          if (gm && !gender) {
+            const tok = (gm[1] || '').toUpperCase();
+            gender = (tok === '男' || tok === 'M' || tok === 'MALE') ? '男' : '女';
+            consumed = k;
+          } else if (dm && !dob) {
+            if (dm[2] && /^[A-Z]{3}$/i.test(dm[2])) {
+              // "21 MAY 1989" form
+              const mi = MON.indexOf(dm[2].toUpperCase());
+              if (mi >= 0) dob = String(dm[1]).padStart(2,'0') + MON[mi] + String(dm[3]).slice(-2);
+            } else if (String(dm[1]).length === 4) {
+              // YYYY-MM-DD or 年月日
+              const mi = parseInt(dm[2],10);
+              if (mi>=1 && mi<=12) dob = String(dm[3]).padStart(2,'0') + MON[mi-1] + String(dm[1]).slice(-2);
+            }
+            consumed = k;
+          } else {
+            // stop scanning at first non-gender/non-DOB line
+            break;
+          }
+        }
+        if (gender || dob) {
+          // Build a synthetic standard line: "GAO/PENG 男 21MAY89"
+          merged.push(`${surname}/${given} ${gender || ''} ${dob || ''}`.replace(/\s+/g,' ').trim());
+          i += consumed; // skip the lines we folded in
+          continue;
+        }
+      }
+      merged.push(expandedLines[i]);
+    }
+    expandedLines.length = 0;
+    expandedLines.push(...merged);
+  }
+
   // ── Debug log setup ──────────────────────────────────────────────────────
   const _dbg = _parseDebugMode ? [] : null;
   const _d = _parseDebugMode
@@ -9927,22 +9992,21 @@ function parseSingleBooking(raw) {
     //   "2. WANG/XIAO 男 18JAN95"     (compact, 2-digit year)
     //   "3.RAO/XIANG 男 29N0V77"      (OCR typo: zero instead of O in month)
     //   "1. CHEN/GG 女 1990年5月23日"   (Chinese year-month-day)
-    //   "3.LIU/QINGHE 儿童 女10JAN2022" (儿童/婴儿 tag BEFORE gender; gender glued to date)
-    //   "4.WANG/JIAYAN 儿童 男 24JUL2015"
     const cnInlinePax = trimmed.match(
-      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/\s*[A-Za-z][A-Za-z\s]*?)\s+(?:(儿童|婴儿|成人|大人)\s+)?([男女](?:童|婴)?)\s*(.+)$/i
+      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/\s*[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s+(.+)$/i
     );
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim().toUpperCase().replace(/\/\s+/, '/').replace(/\s+/g, ' ');
-      const typeTag = cnInlinePax[2] || '';   // 儿童/婴儿/成人 (optional, before gender)
-      const g = cnInlinePax[3];
+      const g = cnInlinePax[2];
       const gender = (g.startsWith('男')) ? 'MALE' : 'FEMALE';
       // Hand the entire tail (after gender) to extractDOB, which handles
       // YYYY年M月D / YYYY-MM-DD / DDMMMYY / DD MMMYYYY / OCR-typo months / etc.
-      const dob = extractDOB(cnInlinePax[4]) || '';
-      // Type from either the explicit tag OR the gender suffix (男童/女婴)
-      const isInfant = typeTag === '婴儿' || g === '男婴' || g === '女婴';
-      const isChild  = typeTag === '儿童' || g === '男童' || g === '女童';
+      const dob = extractDOB(cnInlinePax[3]) || '';
+      const isInfant = g === '男婴' || g === '女婴';
+      const isChild = g === '男童' || g === '女童';
+      // Only commit if we actually got a name AND (dob OR no other branch will
+      // claim this line). Since this matcher is quite specific (NAME + 男/女 + tail)
+      // we commit unconditionally when matched.
       if (name && name.includes('/') && !isMetaName(name) && !pax.find(p => p.name === name)) {
         pax.push({ name, gender, dob, ...(isInfant ? { forcedType: 'INFANT' } : isChild ? { forcedType: 'CHILD' } : {}) });
         continue;
