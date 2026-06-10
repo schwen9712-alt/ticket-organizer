@@ -5579,6 +5579,9 @@ function newOrder(init = {}) {
     // prominent warning badge — these fares cannot be refunded or changed.
     basicFare: init.basicFare || false,
     basicFareLabel: init.basicFareLabel || '',
+    // Tiered fares parsed from the paste (per-person, CNY): { adult, child, infant }
+    // e.g. "TOTAL CNY 17365 成人运价 / TOTAL CNY 16845 儿童运价" or "32041 商务大人 / 32000 儿童价格"
+    fareByType: init.fareByType || null,
     agent: init.agent || '',
     branch: init.branch || '',
     airline: init.airline || '',
@@ -10257,8 +10260,10 @@ function parseSingleBooking(raw) {
       && trimmed.match(/^\d{1,2}\s+[A-Z0-9]+[+*]?\s+(\d{3,6})\s*(?:CNY|RMB|人民币)\s*$/i);
 
     // TOTAL CNY line: "TOTAL CNY 13555" — this is the authoritative fare (base + tax)
+    // The fare TYPE may come from a PRECEDING line (大人运价...) via _lastFareType,
+    // OR be appended on the SAME line: "TOTAL CNY 17365 成人运价" / "TOTAL CNY 16845 儿童运价".
     const totalCnyMatch = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch && !inlineAdultFare
-      && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
+      && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})(?:\.\d+)?\s*(成人|大人|儿童|小儿|婴儿)?/i);
 
     // GDS FARE line: "FARE  USD 1370.00  EQUIV CNY 9350" — treat as adult fare, wait for TOTAL
     const gdsfareLine = !fareTypeMatch && !totalCnyMatch
@@ -10274,13 +10279,19 @@ function parseSingleBooking(raw) {
       const equivM = trimmed.match(/EQUIV\s+(?:CNY|RMB|人民币)\s+(\d{3,6})/i);
       if (equivM) { _equivFareAmt = parseFloat(equivM[1]); _equivFareType = _lastFareType; }
     }
-    if (totalCnyMatch && _lastFareType) {
+    if (totalCnyMatch && (_lastFareType || totalCnyMatch[2])) {
       const amt = parseFloat(totalCnyMatch[1]);
       if (amt >= 100 && amt <= 500000) {
+        // Inline type word (same line) wins over the carried-over _lastFareType
+        const inlineKind = totalCnyMatch[2];
+        const kind = inlineKind
+          ? ((inlineKind === '大人' || inlineKind === '成人') ? 'ADULT'
+            : (inlineKind === '儿童' || inlineKind === '小儿') ? 'CHILD' : 'INFANT')
+          : _lastFareType;
         if (!parsedFareByType) parsedFareByType = {};
-        if (_lastFareType === 'ADULT') { parsedFareByType.adult = amt; if (!rmb) rmb = amt; }
-        else if (_lastFareType === 'CHILD') parsedFareByType.child = amt;
-        else if (_lastFareType === 'INFANT') parsedFareByType.infant = amt;
+        if (kind === 'ADULT') { parsedFareByType.adult = amt; if (!rmb) rmb = amt; }
+        else if (kind === 'CHILD') parsedFareByType.child = amt;
+        else if (kind === 'INFANT') parsedFareByType.infant = amt;
         _lastFareType = null;
         continue;
       }
@@ -10804,6 +10815,7 @@ function parseSingleBooking(raw) {
     ticketSeqNote,
     basicFare: parsedBasicFare,
     basicFareLabel: parsedBasicFareLabel,
+    fareByType: parsedFareByType || null,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
 
@@ -11497,7 +11509,8 @@ async function parsePNR() {
       urgentSetAt: primary.urgent ? Date.now() : null,
       ticketSeqNote: primary.ticketSeqNote || '',
       basicFare: primary.basicFare || false,
-      basicFareLabel: primary.basicFareLabel || ''
+      basicFareLabel: primary.basicFareLabel || '',
+      fareByType: primary.fareByType || null
     });
     const bookingText = chunk;
     // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
@@ -18733,6 +18746,15 @@ function buildCardHTML(o, idx) {
           }
         }
       }
+      // ── Tiered fares (成人/儿童/婴儿分档) parsed from the paste ──
+      // Show as an info line so the operator can verify each pax's tier price.
+      if (o.fareByType && (o.fareByType.child != null || o.fareByType.infant != null)) {
+        const tiers = [];
+        if (o.fareByType.adult != null) tiers.push(`成人 ¥${Number(o.fareByType.adult).toLocaleString()}`);
+        if (o.fareByType.child != null) tiers.push(`儿童 ¥${Number(o.fareByType.child).toLocaleString()}`);
+        if (o.fareByType.infant != null) tiers.push(`婴儿 ¥${Number(o.fareByType.infant).toLocaleString()}`);
+        html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--warning-deep); font-weight:600;">📊 分档运价（请核对各乘客适用价）</span><span class="value" style="color:var(--warning-deep); font-weight:700; font-size:11px;">${tiers.join(' · ')}</span></div>`;
+      }
       // ── Entry point: switch any non-flat order TO flat price (一口价) ──
       // Lets the operator set a flat price right here in the pending list,
       // mid-conversation, without going back to the entry form.
@@ -19583,6 +19605,13 @@ function _quickTicketValidate() {
 async function _confirmQuickTicket(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
+  // Blacklist second-chance reminder at ticketing time (parse-time alert may
+  // have been days ago). Confirm() so the operator consciously proceeds.
+  const blHits = (typeof orderBlacklistHits === 'function') ? orderBlacklistHits(o) : [];
+  if (blHits.length > 0) {
+    const ok = confirm(`⛔ 黑名单提醒\n\n此订单包含黑名单乘客：\n${blHits.map(n => '  • ' + n).join('\n')}\n\n确定要出票吗？`);
+    if (!ok) return;
+  }
   const tkt = (document.getElementById('quickTktInput')?.value || '').trim();
   const pnr = (document.getElementById('quickPnrInput')?.value || '').trim();
   if (!tkt && !pnr) {
@@ -23688,7 +23717,6 @@ async function copyAllScreenshots(orderIdx) {
     if (!Array.isArray(ring) || ring.length <= ROLLING_BACKUP_SLOTS) return;
     const trimmed = ring.slice(0, ROLLING_BACKUP_SLOTS);
     localStorage.setItem(ROLLING_BACKUP_KEY, JSON.stringify(trimmed));
-    console.log(`[rolling-backup] trimmed ${ring.length} → ${trimmed.length} snapshots`);
   } catch (e) { /* ignore */ }
 })();
 
