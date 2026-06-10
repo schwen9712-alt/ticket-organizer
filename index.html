@@ -9446,6 +9446,42 @@ function parseSingleBooking(raw) {
     }
   }
 
+  // ── SSR continuation-line merge ──────────────────────────────────────────
+  // GDS terminals wrap long SSR lines. A wrapped SSR looks like:
+  //   SSR DOCS MU HK1 P/USA/.../KRAFT/CHRISTINE      ← no /Pn terminator
+  //   TIANTIAN/P1                                     ← continuation fragment
+  // Real name: KRAFT/CHRISTINE TIANTIAN. Without merging, the fragment becomes
+  // a phantom passenger ("TIANTIAN/P") and the real name loses its second word.
+  // Rule: if an SSR DOC line does NOT end with /Pn (or a child/infant tag), and
+  // the NEXT line is a short uppercase fragment ending in /Pn (or just letters),
+  // glue them together with a space.
+  {
+    const merged0 = [];
+    for (let i = 0; i < expandedLines.length; i++) {
+      const cur = expandedLines[i];
+      const curT = cur.trim();
+      const isSSRDoc = /^SSR\s+DOC[SA]?\b/i.test(curT);
+      const endsWithPn = /\/P\d+\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT)?\s*$/i.test(curT);
+      if (isSSRDoc && !endsWithPn && i + 1 < expandedLines.length) {
+        const nxtT = expandedLines[i + 1].trim();
+        // Continuation looks like: "TIANTIAN/P1", "MARIE/P2 儿童", or a bare
+        // uppercase word(s) fragment "TIANTIAN" (≤ 30 chars, only A-Z / space / slash-Pn)
+        const isContinuation = /^[A-Z][A-Z\s]*(?:\/P\d+)?\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT)?\s*$/.test(nxtT)
+          && nxtT.length <= 30
+          && !/^SSR\b/i.test(nxtT)
+          && !/^(?:MO|TU|WE|TH|FR|SA|SU)\d/.test(nxtT);
+        if (isContinuation) {
+          merged0.push(cur.replace(/\s+$/, '') + ' ' + nxtT);
+          i++; // consume continuation line
+          continue;
+        }
+      }
+      merged0.push(cur);
+    }
+    expandedLines.length = 0;
+    expandedLines.push(...merged0);
+  }
+
   // ── Passport-card multi-line pax merge ──────────────────────────────────
   // Some pastes list each passenger as a 2-3 line "card":
   //   GAO,PENG          (surname,given — comma not slash)
