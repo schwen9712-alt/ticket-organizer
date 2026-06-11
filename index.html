@@ -10000,14 +10000,18 @@ function parseSingleBooking(raw) {
       'TKOK','ETKT','TKTL','FP','FF','FT','FV','FE','FS','PE','RM','RA','PNR',
       'CTCM','CTCE','CTCT','DOCS','DOCO','DOCA','XN','RF','PR'
     ]);
-    const isMetaName = (n) => {
+    const isMetaName = (n, hasStrongPaxContext = false) => {
       const surname = (n.split('/')[0] || '').trim().toUpperCase();
       // Exact match
       if (PNR_META_TOKENS.has(surname)) return true;
       // FSI variants: FSICH, FSIP1, FSIXXX etc.
       if (surname.startsWith('FSI') && surname.length > 3) return true;
       // Single letter after slash like "FSICH/CA" → surname=FSICH, first=CA (airline code)
-      if (/^[A-Z]{2,3}$/.test(n.split('/')[1] || '')) {
+      // hasStrongPaxContext: caller saw 男/女 + birthdate on the SAME line — that is a
+      // real passenger whose given name merely collides with an airline code
+      // (e.g. GONG/KE, 柯 → KE = Korean Air). Meta tokens never carry gender+DOB,
+      // so the airline-code heuristic is skipped under strong context.
+      if (!hasStrongPaxContext && /^[A-Z]{2,3}$/.test(n.split('/')[1] || '')) {
         // If "first name" is a 2-3 letter airline code, likely a meta token
         const first = (n.split('/')[1] || '').trim().toUpperCase();
         const AIRLINE_CODES = new Set(['CA','UA','AA','DL','AS','WN','CX','MH','KE','OZ','JL','NH','SQ','TG','QR','EK','LH','AF','BA','KL']);
@@ -10046,7 +10050,7 @@ function parseSingleBooking(raw) {
       // Only commit if we actually got a name AND (dob OR no other branch will
       // claim this line). Since this matcher is quite specific (NAME + 男/女 + tail)
       // we commit unconditionally when matched.
-      if (name && name.includes('/') && !isMetaName(name) && !pax.find(p => p.name === name)) {
+      if (name && name.includes('/') && !isMetaName(name, true) && !pax.find(p => p.name === name)) {
         pax.push({ name, gender, dob, ...(isInfant ? { forcedType: 'INFANT' } : isChild ? { forcedType: 'CHILD' } : {}) });
         continue;
       }
