@@ -1,3 +1,70 @@
+## 2026-06-11 — 解析器修复×2：行李件数复合运价行 + 类型裸金额行
+
+**改了什么**
+1. **pBagFare 扩展**：`2PC 16046  2pc *4`（前缀件数 + 金额 + 重复件数 + *人数）此前两个严格锚定正则都不匹配 → rmb 为空。现支持可选尾部 `\d+pc` 与 `[*xX×]N` 人数后缀，并兼容 pc 前空格。同时该分支金额镜像写入 `fareByType.adult`（与 TOTAL CNY 分支行为一致），保证成人+婴儿混贴时分型完整。
+2. **类型运价提取链加第 5 模式**：`婴儿 1713  0pc` 此前被 `^(婴儿|…)` 分支吃掉但 4 个金额模式全要求 CNY/价格关键词/冒号 → 金额静默丢失，只设了 `_lastFareType`。新模式：类型词后裸金额 + 可选 pc/人数后缀，整行锚定（`婴儿 2026年1月1日` 日期行、`成人 2 儿童 1` 人数行不会误中），复用既有赋值代码（rmb/fareByType/范围校验）。
+
+**为什么改**
+用户粘贴 AS120 ICN-SEA 订单（4成人+1婴儿）解析不出价格。新上线的"未识别行"提示直接点名 `2PC 16046  2pc *4`；`婴儿 1713` 则是被吞型故障（不在未识别名单里，靠对比 fareByType 为空发现）。
+
+**端到端结果（用户输入）**
+- ✓ 4 乘客全解析（含 SSR `航司` 中文占位、USA 护照）
+- ✓ rmb=16046，fareByType={adult:16046, infant:1713}
+- ✓ 末尾截断行 `SSR DOCS CA HK1 P/SAS/A8` 正确拒绝（未造假乘客）且被未识别提示报告——婴儿证件行不完整，需人工补
+
+**防误伤测试通过（8项）**
+- ✓ 旧式 `2pc 16046` / `16046 2pc` 不变
+- ✓ `婴儿 2026年1月1日` 日期行、`成人 2 儿童 1` 人数行不误判
+- ✓ 传统 CNY 链（大人运价 ADT 43648 CNY / 婴儿运价 INF 3425 CNY）不变
+- ✓ TOTAL CNY 17365 成人运价 链不变
+- ✓ `儿童 8200` 裸价 → child 不占 rmb；`成人 16046 2pc *4` → adult+rmb
+- ✓ GONG/KE 套件、未识别行套件 全部保持通过
+
+**改动位置**
+- pBagFare 正则 + 处理块（~10619/~10668）
+- fareTypeMatch 的 equivMatch 提取链尾部追加模式（~10310 附近）
+
+**风险或注意事项**
+- ⚠ 类型词后裸 3-6 位数字现在会被当运价（整行锚定保护下）。若出现"婴儿 1234"实为非价格语义的行，会误收——目前未见此类格式
+- 婴儿乘客本体因源数据截断无法生成，需手动添加该婴儿
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
+## 2026-06-11 — 代码审查：清理387行死代码 + 解析"未识别行"自动提示
+
+**改了什么**
+1. 删除 19 个从未被调用的死函数（共 387 行，文件 26146→25789 行）：_speedColor、orderSummary、getEffectiveMultiplier、scrollToOrderCard、showBackToTopButton、checkPassportExpiry、detectPriceAnomalies、buildOverflowMenu、highlightNextStep、getAutoAgeClass、displayCabin、updatePendingCardholder、refreshAllOrders、getViewModeFilter、promptChaseCardNumber、moveOrderToActionsByIdx、moveTicketedToActionsByIdx、setChasePanelField、tt
+2. 删除孤儿变量 `_parseDebugLog`（声明后从未读写——路线图遗留项闭环）
+3. **新功能**：解析"未识别行"自动提示——任何解析分支都没消费的行，解析完成 2.4 秒后 toast 警告（显示前 2 行 + 总数），**不需要开 🔍 调试**。噪音过滤：纯数字/符号行、短标签行（如"乘机人："）、不足 4 字符的行不报。
+4. `toast()` 支持可选时长参数 `toast(msg, ms)`，默认 2200ms 行为不变
+
+**为什么改**
+用户要求整体审查优化。死函数是历次功能迭代的残留（最大的 refreshAllOrders 有 119 行）。未识别行提示直接针对 GONG/KE 静默丢失这类问题——以后粘贴时立即可见，不用等对账才发现少了人。
+
+**审查中确认正常、未改动的**
+- 每日备份提醒 / 滚动快照清理：是 IIFE 自执行，工作正常（检测误报，非死代码）
+- updatePricing 等 5 个一行函数：注释明确标注的兼容垫片，保留
+- doPost/doGet：是给用户复制到 Apps Script 的模板字符串内容，非死代码
+- 🔍 调试面板：已完整接通，开启后正常显示逐行解析日志（旧记录"面板恒空"已过时）
+- console.warn×11 / console.error×3：诊断用途，按规范保留
+
+**测试通过**
+- 回归：GONG/KE 端到端 + 6 项防误伤全部保持通过
+- 新功能 3 组：正常输入无误报 / 垃圾行捕获 / 纯符号与标签行已过滤
+- 审计：语法 ✅ 重复函数 0 console.log 0 死函数残留引用 0
+
+**改动位置**
+- ~7534 删孤儿变量；~9551 `_d` 双轨改造（调试日志照旧 + 未识别常开收集）；parseSingleBooking 返回对象加 `unrecognizedLines`；parsePNR 聚合 + 延迟 toast；`toast()` 签名；19 处函数整体删除
+
+**风险或注意事项**
+- ⚠ 未识别行提示初期可能偏敏感（如自由文本备注行会被报）——遇到烦人的告诉我，加过滤词即可
+- ⚠ 若有极老缓存页面引用被删函数会报错，Ctrl+Shift+R 后无此问题
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+
+---
 ## 2026-06-11 — 修复乘客名撞航司代码被误删（GONG/KE 丢失）
 
 **改了什么**

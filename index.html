@@ -1564,7 +1564,6 @@ textarea.raw-input:focus {
 }
 
 
-
 /* ── Order card status left border ─────────────────────────────── */
 .preview-order-group { position: relative; border-left: 4px solid transparent; transition: border-color 0.2s; }
 .preview-order-group.status-unassigned { border-left-color: #ddd; }
@@ -3802,7 +3801,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <button class="btn small ghost" onclick="gsPushAllTicketed()">⬆ 补推全部</button>
     </div>
   </div>
-
 
 
   <div class="section">
@@ -6239,17 +6237,6 @@ function _humanDuration(ms) {
   return `${(hours / 24).toFixed(1)} 天`;
 }
 
-// Color for a speed value (ms): green=fast, gold=ok, orange=slow, red=very slow
-function _speedColor(ms, allMedians) {
-  if (ms == null || allMedians.length < 3) return 'var(--ink)';
-  const sorted = [...allMedians].sort((a, b) => a - b);
-  const q1 = sorted[Math.floor(sorted.length * 0.25)];
-  const q3 = sorted[Math.floor(sorted.length * 0.75)];
-  if (ms <= q1) return 'var(--green)';
-  if (ms <= q3) return 'var(--accent-deep)';
-  if (ms <= q3 * 1.5) return 'var(--warning-deep)';
-  return 'var(--red)';
-}
 
 function renderSpeedAnalysis() {
   const area = document.getElementById('speedAnalysisArea');
@@ -7532,7 +7519,6 @@ let _bulkMode = false;
 // into #parseDebugPanel so the user can see exactly which rule matched (or
 // didn't) for every input line. Activated via the 🔍 调试 button.
 let _parseDebugMode = false;
-let _parseDebugLog = [];
 
 function toggleParseDebug() {
   _parseDebugMode = !_parseDebugMode;
@@ -8085,19 +8071,6 @@ async function confirmDeleteOrderFinal() {
 }
 // ─── end delete modal ─────────────────────────────────────────────────────
 
-function orderSummary(o) {
-  const names = (o.passengers||[]).map(p => p.name.split('/')[0] || '').filter(Boolean).join('/');
-  const route = [];
-  if (o.segments.length) {
-    route.push((o.segments[0]||{}).from);
-    route.push(o.segments[o.segments.length-1].to);
-  }
-  const r = route.filter(Boolean).join('→');
-  if (names && r) return `${names} ${r}`;
-  if (names) return names;
-  if (r) return r;
-  return '空订单';
-}
 
 function renderOrderTabs() {
   const wrap = document.getElementById('orderTabs');
@@ -8595,12 +8568,6 @@ function computeSettlement(o) {
   return null;
 }
 
-// Returns the multiplier currently in effect (for display in copy format)
-function getEffectiveMultiplier(o) {
-  const typeConf = POINTS_TYPES[o.pointsType];
-  if (typeConf && typeConf.mult != null) return typeConf.mult;
-  return o.cpmRate != null ? o.cpmRate : null;
-}
 
 function renderDerivedFields() {
   const o = curr();
@@ -9549,9 +9516,20 @@ function parseSingleBooking(raw) {
 
   // ── Debug log setup ──────────────────────────────────────────────────────
   const _dbg = _parseDebugMode ? [] : null;
-  const _d = _parseDebugMode
-    ? (line, rule, detail='') => _dbg.push({ line, rule, detail })
-    : () => {};
+  // Unrecognized-line collector — ALWAYS on, independent of debug mode.
+  // Lines that no parser branch consumed get surfaced as a toast after parsing,
+  // so silent drops (e.g. a passenger line rejected by a filter) become visible
+  // immediately instead of being discovered at reconciliation time.
+  const _unrec = [];
+  const _isReportableUnrec = (s) =>
+    s.length >= 4
+    && /[A-Za-z\u4e00-\u9fa5]/.test(s)                          // must contain letters/Chinese
+    && !/^[\d\s.,，。\-*×xX/\\¥$￥€:：;；()（）|｜~—_=+'"「」【】\[\]]+$/.test(s)  // not pure numbers/symbols
+    && !/^[\u4e00-\u9fa5]{1,6}[:：]$/.test(s);                  // not a bare label like "乘机人："
+  const _d = (line, rule, detail='') => {
+    if (_dbg) _dbg.push({ line, rule, detail });
+    if (rule.startsWith('⬜') && _isReportableUnrec(line)) _unrec.push(line);
+  };
 
   for (const line of expandedLines) {
     // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
@@ -10354,7 +10332,12 @@ function parseSingleBooking(raw) {
         // "成人运价：10785" / "儿童运价 ：8510" — bare number after colon
         || trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]\s*(\d{4,6})\s*$/)
         // "大人价格 39410 *1" / "儿童价格 39256 *2" — price + count multiplier (no CNY)
-        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)价格\s+(\d{4,6})\s*\*\s*\d/);
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)价格\s+(\d{4,6})\s*\*\s*\d/)
+        // "婴儿 1713  0pc" / "成人 16046 2pc *4" / "儿童 8200" — bare amount right
+        // after the type word; optional baggage-pc and *N pax-count suffixes, no
+        // CNY keyword required. Full-line anchor prevents date lines ("婴儿 2026年…")
+        // and pax-count lines ("成人 2 儿童 1") from matching.
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s+(\d{3,6})(?:\.\d+)?\s*(?:\d+\s*pc)?\s*(?:[\*xX×]\s*\d+)?\s*$/i);
       if (equivMatch) {
         const amt = parseFloat(equivMatch[1]);
         if (amt >= 100 && amt <= 500000) {
@@ -10639,7 +10622,8 @@ function parseSingleBooking(raw) {
     //   "2pc  48596"  (baggage first) / "32392   2pc" (fare first)
     const pCabin = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabinMulti && trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)[^\d\n]*?(\d{3,6})\b/);
     const pBagFare = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin
-      && (trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i) || trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i));
+      && (trimmed.match(/^\d+\s*pc\s+(\d{3,6})(?:\.\d+)?(?:\s+\d+\s*pc)?(?:\s*[\*xX×]\s*\d+)?\s*$/i)
+        || trimmed.match(/^(\d{3,6})(?:\.\d+)?\s+\d+\s*pc(?:\s*[\*xX×]\s*\d+)?\s*$/i));
     // Bare price line: "24568", "24568  *2"
     const pC = !pA && !pB && !pPrefix && !pYunjia && !pCO && !pCabin && !pBagFare && trimmed.match(/^(\d{3,6})\s*\*?\s*\d{0,2}\s*$/);
     // TravelSky fare line (no currency suffix): "02 XHX00NM6              9847"
@@ -10688,10 +10672,17 @@ function parseSingleBooking(raw) {
       const amt = parseFloat(pC[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
     } else if (pBagFare) {
-      const m1 = trimmed.match(/^\d+pc\s+(\d{3,6})\s*$/i);
-      const m2 = trimmed.match(/^(\d{3,6})\s+\d+pc\s*$/i);
-      const amt = parseFloat((m1 || m2)[1]);
-      if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
+      // pBagFare group 1 is the amount in both alternatives (prefix-pc / suffix-pc),
+      // including the extended "2PC 16046  2pc *4" combined form.
+      const amt = parseFloat(pBagFare[1]);
+      if (amt >= 500 && amt <= 500000 && !rmb) {
+        rmb = amt;
+        // Baggage-pc fare lines are adult fares — mirror into fareByType so mixed
+        // adult+infant pastes ("2PC 16046 2pc *4" + "婴儿 1713 0pc") yield a
+        // complete per-type breakdown.
+        if (!parsedFareByType) parsedFareByType = {};
+        if (!parsedFareByType.adult) parsedFareByType.adult = amt;
+      }
     } else if (pTravelSkyFare) {
       const amt = parseFloat(pTravelSkyFare[1]);
       if (amt >= 500 && amt <= 500000 && !rmb) rmb = amt;
@@ -10856,6 +10847,7 @@ function parseSingleBooking(raw) {
     basicFare: parsedBasicFare,
     basicFareLabel: parsedBasicFareLabel,
     fareByType: parsedFareByType || null,
+    unrecognizedLines: _unrec,
     waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw) };
 }
 
@@ -11451,6 +11443,7 @@ async function parsePNR() {
   // itinerary proposals (方案1/方案2) — these stay in ONE order with all options
   // stored in o.proposals[]. The user picks one; o.segments mirrors the selected.
   const newOrders = [];
+  const _allUnrecognized = [];  // lines no parser branch consumed, across all chunks
   for (const chunk of bookings) {
     const chunkProposals = splitChunkByProposals(chunk);
 
@@ -11461,6 +11454,10 @@ async function parsePNR() {
       .map(sb => ({ ...parseSingleBooking(sb.text), proposalLabel: sb.proposalLabel }))
       .filter(p => p.pax.length > 0 || p.segs.length > 0);
     if (parsedProposals.length === 0) continue;
+    // Accumulate unrecognized lines across all proposals/chunks (deduped)
+    parsedProposals.forEach(p => (p.unrecognizedLines || []).forEach(l => {
+      if (!_allUnrecognized.includes(l)) _allUnrecognized.push(l);
+    }));
 
     const primary = parsedProposals[0];
     let { pax, segs, airline, rmb, usd, trip, discount, cabin, paxPrices, productDiscount, productMarker, productNote } = primary;
@@ -11707,6 +11704,18 @@ async function parsePNR() {
   });
   if (blacklistFound.length > 0) {
     alert(`⚠️ 黑名单提醒\n\n以下乘客在黑名单中：\n\n${blacklistFound.map(n => '  • ' + n).join('\n')}\n\n请谨慎处理！（订单仍会照常录入）`);
+  }
+
+  // ── Unrecognized-line notice: lines no parser branch consumed ──
+  // Delayed 2.4s so the standard "✓ 解析" success toast shows first, then this
+  // warning replaces it and stays 6s. Full per-line detail: 🔍 调试 panel.
+  if (_allUnrecognized.length > 0) {
+    const _shown = _allUnrecognized.slice(0, 2)
+      .map(l => '「' + (l.length > 22 ? l.slice(0, 22) + '…' : l) + '」').join(' ');
+    setTimeout(() => toast(
+      `⚠ ${_allUnrecognized.length} 行未被识别 ${_shown}${_allUnrecognized.length > 2 ? ' 等' : ''}（开🔍调试重新解析可看全部）`,
+      6000
+    ), 2400);
   }
 
   // Two-tier duplicate detection
@@ -12566,35 +12575,6 @@ function scrollAndFlash(target) {
   }, 1600);
 }
 
-function scrollToOrderCard(displayNum) {
-  // Legacy entry point — resolves displayNum (1-based) to an order.id then
-  // delegates to the precise scrollToOrderById. The resolution uses THE SAME
-  // sort the pending list uses so display numbers always agree with cards.
-  if (typeof displayNum === 'string' && displayNum.startsWith('id:')) {
-    return scrollToOrderById(displayNum.slice(3));
-  }
-  const meaningful = STATE.orders
-    .filter(o => isMeaningfulOrder(o) && o.tableLabel !== 'G');
-  // Match the display sort used by renderAirlineUsdPanel (which uses indexed.findIndex)
-  // and renderPendingList. The display number = its index in the meaningful array + 1,
-  // since both panels sort identically (by agent first-seen then original order).
-  // Reproduce the same sort so we resolve to the correct order.
-  const agentFirstSeen = {};
-  meaningful.forEach((o, i) => {
-    const k = o.agent || '(未指定代理)';
-    if (agentFirstSeen[k] === undefined) agentFirstSeen[k] = i;
-  });
-  const sorted = meaningful.slice().sort((a, b) => {
-    const aKey = a.agent || '(未指定代理)';
-    const bKey = b.agent || '(未指定代理)';
-    const aRank = agentFirstSeen[aKey];
-    const bRank = agentFirstSeen[bKey];
-    if (aRank !== bRank) return aRank - bRank;
-    return meaningful.indexOf(a) - meaningful.indexOf(b);
-  });
-  const target = sorted[displayNum - 1];
-  if (target && target.id) scrollToOrderById(target.id);
-}
 
 // Ensure the back-to-top button exists in the DOM (created on first need)
 function ensureBackToTopButton() {
@@ -12616,10 +12596,6 @@ function ensureBackToTopButton() {
   return btn;
 }
 
-// (legacy alias used by older code paths)
-function showBackToTopButton() {
-  ensureBackToTopButton().classList.add('visible');
-}
 
 // Auto-show button when scrolled past a threshold on the pending tab.
 // Hides when scrolled back near the top.
@@ -14682,44 +14658,6 @@ function orderMatchesSearch(o, q) {
   return q.split(/\s+/).every(token => hay.includes(token));
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2. PASSPORT EXPIRY CHECK — warn when passport expires before or too close to flight
-// ═══════════════════════════════════════════════════════════════════════════════
-function checkPassportExpiry(o) {
-  const warnings = [];
-  const segs = o.segments || [];
-  if (segs.length === 0) return warnings;
-  const lastSeg = segs[segs.length - 1];
-  const flightDateStr = lastSeg.date || segs[0].date;
-  if (!flightDateStr) return warnings;
-
-  const MONTHS = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
-  function parseIATADate(s) {
-    const m = String(s).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
-    if (!m) return null;
-    const mon = MONTHS[m[2]];
-    if (mon === undefined) return null;
-    const yr = m[3] ? (m[3].length === 4 ? parseInt(m[3]) : (parseInt(m[3]) < 30 ? 2000+parseInt(m[3]) : 1900+parseInt(m[3]))) : new Date().getFullYear();
-    return new Date(yr, mon, parseInt(m[1]));
-  }
-
-  const flightDate = parseIATADate(flightDateStr);
-  if (!flightDate) return warnings;
-
-  for (const p of (o.passengers || [])) {
-    if (!p.passportExpiry) continue;
-    const expiry = parseIATADate(p.passportExpiry);
-    if (!expiry) continue;
-    const diffDays = Math.floor((expiry - flightDate) / 86400000);
-    const name = (p.name || '').split('/')[0] || '乘客';
-    if (diffDays < 0) {
-      warnings.push({ level: 'error', msg: `⚠️ ${name} 护照已过期（${p.passportExpiry}）` });
-    } else if (diffDays < 180) {
-      warnings.push({ level: 'warn', msg: `⚠️ ${name} 护照 ${p.passportExpiry} 不足6个月（剩${diffDays}天）` });
-    }
-  }
-  return warnings;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 3. PRICE ANOMALY DETECTION — flag orders where price deviates >20% on same route
@@ -14731,24 +14669,6 @@ function buildRouteKey(o) {
   return `${o.airline || '?'}:${first.from || '?'}${last.to || '?'}:${o.cabin || '?'}`;
 }
 
-function detectPriceAnomalies(orders) {
-  const routeGroups = {};
-  for (const o of orders) {
-    const key = buildRouteKey(o);
-    const price = o.basePrice;
-    if (!key || !price || price <= 0) continue;
-    if (!routeGroups[key]) routeGroups[key] = [];
-    routeGroups[key].push(price);
-  }
-  const anomalyRoutes = {};
-  for (const [key, prices] of Object.entries(routeGroups)) {
-    if (prices.length < 2) continue;
-    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
-    const threshold = avg * 0.25; // ±25%
-    anomalyRoutes[key] = { avg, threshold };
-  }
-  return anomalyRoutes;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4. AUTO BACKUP REMINDER — every 50 ticketed orders prompt export
@@ -15018,38 +14938,6 @@ function animateBadgeIfChanged(id, newCount) {
   _prevCounts[id] = newCount;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// OVERFLOW ACTION MENU — collapses secondary buttons into "···"
-// ═══════════════════════════════════════════════════════════════════════════════
-function buildOverflowMenu(id, items) {
-  // items = [{label, onclick, danger}]
-  const wrap = document.createElement('div');
-  wrap.className = 'action-overflow';
-  const trigger = document.createElement('button');
-  trigger.className = 'btn ghost small';
-  trigger.textContent = '···';
-  trigger.title = '更多操作';
-  trigger.onclick = (e) => {
-    e.stopPropagation();
-    const menu = wrap.querySelector('.action-overflow-menu');
-    menu.classList.toggle('open');
-    // Close on outside click
-    const close = () => { menu.classList.remove('open'); document.removeEventListener('click', close); };
-    if (menu.classList.contains('open')) setTimeout(() => document.addEventListener('click', close), 0);
-  };
-  const menu = document.createElement('div');
-  menu.className = 'action-overflow-menu';
-  for (const item of items) {
-    const btn = document.createElement('button');
-    btn.textContent = item.label;
-    if (item.danger) btn.style.color = 'var(--red)';
-    btn.onclick = (e) => { e.stopPropagation(); menu.classList.remove('open'); item.fn(); };
-    menu.appendChild(btn);
-  }
-  wrap.appendChild(trigger);
-  wrap.appendChild(menu);
-  return wrap;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DRAG-TO-REORDER for pending list
@@ -15086,26 +14974,6 @@ function initDragReorder(groupEl, stateIdx) {
   });
 }
 
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NEXT-STEP GUIDANCE — highlight what to fill after cardholder is assigned
-// ═══════════════════════════════════════════════════════════════════════════════
-function highlightNextStep(idx) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  setTimeout(() => {
-    // If cardholder assigned but no PNR → highlight PNR field
-    if (o.cardholderId && !o.pnr) {
-      const pnrEl = document.querySelector(`input[data-field="pnr"][data-idx="${idx}"], #pnr-${idx}`);
-      if (pnrEl) { pnrEl.classList.add('next-step-glow'); pnrEl.focus(); }
-    }
-    // If PNR filled but no points type → highlight points select
-    if (o.pnr && !o.pointsType) {
-      const ptEl = document.querySelector(`#pts-type-${idx}, select[data-field="pointsType"][data-idx="${idx}"]`);
-      if (ptEl) ptEl.classList.add('next-step-glow');
-    }
-  }, 300);
-}
 
 function initKeyboardShortcuts() {
   document.addEventListener('keydown', e => {
@@ -15188,26 +15056,6 @@ function initKeyboardShortcuts() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 7. CHILD AGE AUTO-CLASSIFICATION (helper used during pax display)
-// ═══════════════════════════════════════════════════════════════════════════════
-function getAutoAgeClass(dob, flightDate) {
-  if (!dob || !flightDate) return null;
-  const MONTHS = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
-  const dm = String(dob).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})$/);
-  const fm = String(flightDate).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
-  if (!dm || !fm || MONTHS[dm[2]] === undefined || MONTHS[fm[2]] === undefined) return null;
-  const dobY = dm[3].length===4 ? parseInt(dm[3]) : (parseInt(dm[3])<30 ? 2000+parseInt(dm[3]) : 1900+parseInt(dm[3]));
-  const flY = fm[3] ? parseInt(fm[3]) : new Date().getFullYear();
-  let age = flY - dobY;
-  const flM = MONTHS[fm[2]], flD = parseInt(fm[1]);
-  const dobM = MONTHS[dm[2]], dobD = parseInt(dm[1]);
-  if (flM < dobM || (flM === dobM && flD < dobD)) age--;
-  if (age < 0) return null;
-  if (age < 2) return 'INFANT';
-  if (age < 12) return 'CHILD';
-  return 'ADULT';
-}
 
 // Split-order dialog. User picks which passengers to move to a NEW order.
 // Selected passengers → new order (inserted after this one, no cardholder);
@@ -16310,19 +16158,6 @@ const I18N_DICT = {
   'word.proposal':        { zh: '方案', en: 'Option' },
 };
 
-// Display helper: turn stored cabin (always Chinese) into the user's
-// preferred language at render time. Data on disk stays in Chinese; UI
-// presentation changes per CURRENT_LANG.
-function displayCabin(zhCabin) {
-  if (CURRENT_LANG !== 'en' || !zhCabin) return zhCabin || '';
-  const map = {
-    '经济舱': 'Economy', '经济': 'Economy', '普通经济': 'Economy',
-    '超级经济舱': 'Premium Eco', '超级经济': 'Premium Eco', '超经': 'Premium Eco',
-    '商务舱': 'Business', '商务': 'Business', '公务舱': 'Business', '公务': 'Business',
-    '头等舱': 'First', '头等': 'First',
-  };
-  return map[zhCabin] || zhCabin;
-}
 
 // Display helper: agent name. Agents are user-entered Chinese names like "东莞"
 // (city names) or "罗" (surname). These are business data — we keep them as-is
@@ -18356,25 +18191,6 @@ function chPickerClear(idx) {
 
 // ========== END picker v2 ==========
 
-async function updatePendingCardholder(idx, val, selectEl) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  if (val === '__new__') {
-    const name = prompt('卡主名字：');
-    if (!name) { selectEl.value = o.cardholderId || ''; return; }
-    const ch = await addCardholder('', name.trim());
-    if (ch) {
-      o.cardholderId = ch.id;
-      renderPendingList();  // new cardholder → re-render all selects
-    } else {
-      selectEl.value = o.cardholderId || '';
-    }
-    return;
-  }
-  o.cardholderId = val || null;
-  persistOrders();
-  refreshPendingOrderPreview(idx);
-}
 
 function editOrderInNewTab(idx) {
   switchToOrder(idx);
@@ -19414,128 +19230,6 @@ function rematchAllPaxInfo() {
   }
 }
 
-// Global one-click: re-run the latest parsing logic on every order that has saved raw PNR text.
-// For orders without rawPnr (created before this feature), only does knownPax backfill + cost recompute.
-// Preserves user-entered fields (cardholder, points settings, PNR/TKT codes, labels, etc.)
-async function refreshAllOrders() {
-  let reparsed = 0;
-  let paxUpdated = 0;
-  let skippedNoRaw = 0;
-
-  const allLists = [STATE.orders, settings.ticketed || []];
-
-  allLists.forEach(list => {
-    list.forEach(o => {
-      if (!o.passengers) return;
-
-      // Backfill createdAt for orders from before this field existed
-      if (!o.createdAt) {
-        o.createdAt = Date.now();
-      }
-
-      // Re-parse with latest logic if raw PNR is saved
-      if (o.rawPnr) {
-        try {
-          const parsed = parseSingleBooking(o.rawPnr);
-          if (parsed.pax.length > 0 || parsed.segs.length > 0) {
-            // Remember existing passenger tkt numbers (keyed by name) so we don't lose them
-            const tktByName = {};
-            o.passengers.forEach(p => { if (p.name && p.tkt) tktByName[p.name] = p.tkt; });
-
-            if (parsed.pax.length > 0) {
-              o.passengers = parsed.pax.map(p => {
-                const copy = Object.assign({}, p);
-                if (tktByName[p.name]) copy.tkt = tktByName[p.name];
-                return copy;
-              });
-            }
-            if (parsed.segs.length > 0) o.segments = parsed.segs;
-            if (parsed.airline) o.airline = parsed.airline;
-            if (parsed.trip) o.trip = parsed.trip;
-            if (parsed.cabin) o.cabin = parsed.cabin;
-            if (parsed.rmb != null) {
-              o.basePrice = parsed.rmb;
-              o.rmb = parsed.rmb;
-            }
-            if (parsed.usd != null) o.usd = parsed.usd;
-            if (parsed.discount != null && o.discount == null) o.discount = parsed.discount;
-            if (parsed.customRate != null) o.customRate = parsed.customRate;
-            // Re-sort paxPrices by passenger age after re-parse
-            if (parsed.paxPrices && parsed.paxPrices.length === o.passengers.length && new Set(parsed.paxPrices).size > 1) {
-              const firstDate = o.segments[0] ? (o.segments[0]||{}).date : null;
-              const paxAgeRank = (o.passengers||[]).map((p, i) => {
-                if (!p.dob || !firstDate) return { i, rank: 0 };
-                const age = calculateAgeAtFlight(p.dob, firstDate);
-                if (age == null) return { i, rank: 0 };
-                return { i, rank: age < 2 ? 3 : age < 12 ? 2 : 0 };
-              });
-              const sortedPrices = [...parsed.paxPrices].sort((a, b) => b - a);
-              const assigned = new Array(o.passengers.length);
-              [...paxAgeRank].sort((a, b) => a.rank - b.rank).forEach(({ i }, pi) => { assigned[i] = sortedPrices[pi]; });
-              o.paxPrices = assigned;
-            } else if (parsed.paxPrices) {
-              o.paxPrices = parsed.paxPrices;
-            }
-            reparsed++;
-          }
-        } catch (e) {
-          console.warn('re-parse failed for order', o.id, e);
-        }
-      } else {
-        skippedNoRaw++;
-      }
-
-      // Backfill DOB/gender from known passengers library
-      o.passengers.forEach(p => {
-        if (!p.name || !p.name.includes('/')) return;
-        const [last, first] = p.name.split('/').map(x => x.trim().toUpperCase());
-        const k = (settings.knownPax || []).find(kp =>
-          kp.last && kp.first &&
-          kp.last.toUpperCase() === last &&
-          kp.first.toUpperCase() === first
-        );
-        if (k) {
-          if (!p.dob && k.dob) { p.dob = k.dob; paxUpdated++; }
-          if (!p.gender && k.gender) { p.gender = k.gender; paxUpdated++; }
-        }
-        // And add complete passengers to the library
-        if (p.dob && p.gender) {
-          settings.knownPax = settings.knownPax || [];
-          if (!settings.knownPax.find(kp => kp.last && kp.first && kp.last.toUpperCase() === last && kp.first.toUpperCase() === first)) {
-            settings.knownPax.push({ last, first, dob: p.dob, gender: p.gender });
-          }
-        }
-      });
-    });
-  });
-
-  // Recompute cached cardholderFee for pending orders (in USD)
-  STATE.orders.forEach(o => {
-    const st = computeSettlement(o);
-    o.cardholderFee = st;  // USD
-  });
-
-  persistOrders();
-  await storageSet('ticket-organizer-settings', settings);
-
-  loadCurrToDOM();
-  renderOrderTabs();
-  renderPreview();
-  renderPendingList();
-  renderPendingBanner();
-  renderPendingPointer();
-  renderTicketed();
-  renderCardholdersList();
-  renderKnownPax();
-  renderAgentChips();
-  renderPresetAgentsList();
-
-  const parts = [];
-  if (reparsed > 0) parts.push(`重跑 ${reparsed}张`);
-  if (paxUpdated > 0) parts.push(`补全 ${paxUpdated}项乘客信息`);
-  if (skippedNoRaw > 0) parts.push(`${skippedNoRaw}张无原文跳过`);
-  toast(parts.length ? `✓ ${parts.join(', ')}` : '✓ 所有订单已是最新');
-}
 
 // ============================================
 // TICKETED
@@ -21150,12 +20844,6 @@ function exportBillingExcel() {
 }
 
 
-// Expose viewMode filter to renderPendingList
-function getViewModeFilter() {
-  return _teamConfig.viewMode || 'all';
-}
-
-
 function filterChaseOrders(query) {
   const q = (query || '').toLowerCase().trim();
   const cards = document.querySelectorAll('[id^="chase-order-card-"]');
@@ -21558,9 +21246,6 @@ async function selectChaseCard(idx, value) {
   }
 }
 
-function promptChaseCardNumber(idx) {
-  selectChaseCard(idx, '__new__');
-}
 
 function renderPendingBanner() {
   const banner = document.getElementById('pendingBanner');
@@ -22733,15 +22418,6 @@ function createActionFromOrder(order, defaultStatus = 'VOID') {
   });
 }
 
-// Convenience for buttons inside pending/ticketed cards
-function moveOrderToActionsByIdx(idx) {
-  const o = STATE.orders[idx];
-  if (o) createActionFromOrder(o);
-}
-function moveTicketedToActionsByIdx(idx) {
-  const o = (settings.ticketed || [])[idx];
-  if (o) createActionFromOrder(o);
-}
 function moveTicketedToActionsById(id) {
   const o = (settings.ticketed || []).find(x => x.id === id);
   if (o) createActionFromOrder(o);
@@ -24051,22 +23727,6 @@ async function removeBlacklistName(name) {
   toast('✓ 已移出黑名单');
 }
 
-async function setChasePanelField(idx, field, value) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  o[field] = value;
-  persistOrders();
-  // Re-render just the status bar of this card without full panel rebuild
-  const statusEl = document.getElementById(`chase-status-${idx}`);
-  const cardEl = document.getElementById(`chase-card-${idx}`);
-  const isReady = o.cardholderId && o.swipeCardLast4;
-  if (statusEl) {
-    statusEl.style.background = isReady ? '#eef5ff' : '#fff8f0';
-    statusEl.querySelector('span').style.color = isReady ? '#0050aa' : 'var(--warning-deep)';
-    statusEl.querySelector('span').textContent = isReady ? '✓ 可以出票' : '⚠ 请先分配卡主并填写卡号后四位';
-  }
-  if (cardEl) cardEl.style.border = `2px solid ${isReady ? '#0070c9' : 'var(--line)'}`;
-}
 
 // PRESET AGENTS
 // ============================================
@@ -24743,25 +24403,14 @@ function formatTime(t) {
 }
 
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms = 2200) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-// Bilingual toast: pass an object {zh, en} or two strings, picks based on
-// CURRENT_LANG. Falls back to zh when en missing.
-function tt(zhOrObj, en) {
-  let msg;
-  if (typeof zhOrObj === 'object' && zhOrObj !== null) {
-    msg = zhOrObj[CURRENT_LANG] || zhOrObj.zh || zhOrObj.en || '';
-  } else {
-    msg = CURRENT_LANG === 'en' ? (en || zhOrObj) : zhOrObj;
-  }
-  toast(msg);
-}
 
 // ============================================
 // ORDER PERSISTENCE
