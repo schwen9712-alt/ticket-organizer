@@ -7383,41 +7383,53 @@ function getHoursUntilDeparture(order) {
   return diffMs / 3600_000;  // hours, can be negative if past
 }
 
-// Build a compact countdown chip for orders departing within 72h.
-// Returns '' for orders departing >72h away or already departed (which
-// shouldn't be in pending list anyway, but defensive).
+// Build a departure-countdown chip covering the full horizon, not just the
+// final 72 hours. Colour escalates as departure nears: grey (months out) →
+// teal → green → yellow → amber → orange → red (imminent). The label unit
+// adapts — months / days / hour-buckets — so a chip is never noisier than it
+// needs to be.
+// Returns '' only for orders with no parseable date or already-departed (>2h).
 function buildImminentDepartureHTML(order) {
   const hours = getHoursUntilDeparture(order);
   if (hours === null) return '';
-  if (hours > 72) return '';     // too far out — no chip
   if (hours < -2) return '';      // already departed >2h ago — defensive
 
-  // Bucket into 24 / 48 / 72 with color escalating from amber → orange → red.
-  // Numbers are intentionally simple (24/48/72) for visual rhythm, not
-  // continuous like "63h" which would be noisy.
-  let bucket, bg, fg, border;
-  if (hours <= 24) {
-    bucket = '24h';
-    bg = 'rgba(184,60,44,0.13)';
-    fg = '#b7321f';
-    border = 'rgba(184,60,44,0.45)';
-  } else if (hours <= 48) {
-    bucket = '48h';
-    bg = 'rgba(216,120,40,0.13)';
-    fg = '#a85518';
-    border = 'rgba(216,120,40,0.45)';
+  const days = hours / 24;
+  let bucket, bg, fg, border, tip;
+
+  // Palette helper keeps the inline-style block below readable.
+  const C = {
+    red:   ['rgba(184,60,44,0.13)',  '#b7321f', 'rgba(184,60,44,0.45)'],
+    orange:['rgba(216,120,40,0.13)', '#a85518', 'rgba(216,120,40,0.45)'],
+    amber: ['rgba(199,162,50,0.14)', '#8b6914', 'rgba(199,162,50,0.45)'],
+    gold:  ['rgba(180,150,30,0.12)', '#7d6510', 'rgba(180,150,30,0.38)'],
+    green: ['rgba(70,150,80,0.12)',  '#2f7d3f', 'rgba(70,150,80,0.38)'],
+    teal:  ['rgba(60,140,140,0.11)', '#246b6b', 'rgba(60,140,140,0.34)'],
+    grey:  ['rgba(120,120,130,0.10)','#5a5a66', 'rgba(120,120,130,0.30)'],
+  };
+  const pick = (label, colorKey, tooltip) => {
+    bucket = label; [bg, fg, border] = C[colorKey]; tip = tooltip;
+  };
+
+  // Precise remainder strings for the tooltip.
+  const remH = Math.max(0, Math.floor(hours));
+  const remD = Math.max(0, Math.floor(days));
+
+  if (hours <= 24)       pick('24h', 'red',    hours < 1 ? '不到 1 小时即将起飞' : `${remH} 小时后起飞`);
+  else if (hours <= 48)  pick('48h', 'orange', `${remH} 小时后起飞`);
+  else if (hours <= 72)  pick('72h', 'orange', `${remH} 小时后起飞`);
+  else if (days <= 7)    pick(`${Math.round(days)}天`,  'amber', `${remD} 天后起飞`);
+  else if (days <= 14)   pick(`${Math.round(days)}天`,  'gold',  `${remD} 天后起飞`);
+  else if (days <= 31)   pick(`${Math.round(days)}天`,  'green', `${remD} 天后起飞`);
+  else if (days <= 95) {
+    const months = Math.round(days / 30);
+    pick(`${months}个月`, 'teal', `约 ${months} 个月后起飞（${remD} 天）`);
   } else {
-    bucket = '72h';
-    bg = 'rgba(199,162,50,0.14)';
-    fg = '#8b6914';
-    border = 'rgba(199,162,50,0.45)';
+    const months = Math.round(days / 30);
+    pick(`${months}个月`, 'grey', `约 ${months} 个月后起飞（${remD} 天）`);
   }
-  // Tooltip: precise hours remaining
-  const remainingH = Math.max(0, Math.floor(hours));
-  const tipLabel = hours < 0
-    ? `已起飞 ${Math.floor(-hours)} 小时`
-    : (hours < 1 ? '不到 1 小时即将起飞' : `${remainingH} 小时后起飞`);
-  return `<span title="${escapeAttr(tipLabel)}" style="display:inline-block; padding:1px 6px; border:1px solid ${border}; background:${bg}; color:${fg}; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.04em; line-height:1.3; flex-shrink:0;">${bucket}</span>`;
+
+  return `<span title="${escapeAttr(tip)}" style="display:inline-block; padding:1px 6px; border:1px solid ${border}; background:${bg}; color:${fg}; border-radius:3px; font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:700; letter-spacing:0.04em; line-height:1.3; flex-shrink:0;">${bucket}</span>`;
 }
 // ──────────────────────────────────────────────────────────────────────────
 
