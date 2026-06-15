@@ -9395,6 +9395,8 @@ function parseSingleBooking(raw) {
   ];
 
   let segCarry = null;  // carries partial segment (carrier+flight+cls+date) waiting for next line's route
+  let cityCarry = null; // Expedia/OTA: carries route+cabin from a "City (XXX) XXX to City YYY CABIN" line,
+                        // waiting for the next "Mon DD · time to time" line to supply date+times.
 
   // ── Pre-process: split lines that contain multiple segments or inline TOTAL.
   // Only split a line when it contains 2+ date markers (meaning multiple segments
@@ -9473,8 +9475,10 @@ function parseSingleBooking(raw) {
     const merged = [];
     for (let i = 0; i < expandedLines.length; i++) {
       const cur = expandedLines[i].trim();
-      // "SURNAME,GIVEN" — letters, a comma, letters (allow spaces in given e.g. "GAO,PENG FEI")
-      const nameCard = cur.match(/^([A-Z]{2,}(?:\s+[A-Z]+)*)\s*,\s*([A-Z]{2,}(?:\s+[A-Z]+)*)$/);
+      // "SURNAME,GIVEN" — letters, a comma, letters (allow spaces in given e.g. "GAO,PENG FEI").
+      // Accept both ASCII "," and full-width Chinese "，" (U+FF0C) — passport OCR/IME
+      // pastes frequently use the Chinese comma (e.g. "GU， JEFFREY").
+      const nameCard = cur.match(/^([A-Z]{2,}(?:\s+[A-Z]+)*)\s*[,，]\s*([A-Z]{2,}(?:\s+[A-Z]+)*)$/);
       // Guard: skip obvious non-name phrases (tax/fare boilerplate) even if they
       // happen to contain a comma. Real names won't contain these tokens.
       const NON_NAME = /\b(INCL|TAX|TAXES|FEE|FEES|TOTAL|FARE|CNY|RMB|USD|EUR|PNR|TICKET|TKT|CLASS|CABIN|SEAT|BAG|PC|KG|ECONOMY|BUSINESS|FIRST|ADULT|CHILD|INFANT)\b/i;
@@ -9489,8 +9493,19 @@ function parseSingleBooking(raw) {
           const nxt = expandedLines[i + k].trim();
           // gender line: 男/M, 女/F, 男, 女, M, F, MALE, FEMALE
           const gm = nxt.match(/^(?:性别\s*[：:]?\s*)?(男|女|MALE|FEMALE|M|F)\s*(?:\/\s*(男|女|M|F|MALE|FEMALE))?$/i);
+          // OCR month repair: passport scans turn O↔0 and I↔1, so "0CT"→"OCT",
+          // "AU6"→"AUG" etc. Only touch a 3-char token sitting between day and year.
+          const nxtFixed = nxt.replace(
+            /^(\d{1,2})\s*([A-Z0-9]{3})\s*(\d{2,4})$/i,
+            (full, d, mon, y) => {
+              const m = mon.toUpperCase()
+                .replace(/0/g, 'O').replace(/1/g, 'I').replace(/5/g, 'S')
+                .replace(/6/g, 'G').replace(/8/g, 'B');
+              return `${d} ${m} ${y}`;
+            }
+          );
           // DOB line: "21 MAY 1989", "21MAY1989", "21MAY89", "1989-05-21", "1989年5月21日"
-          const dm = nxt.match(/^(\d{1,2})\s*([A-Z]{3})\s*(\d{2,4})$/i)
+          const dm = nxtFixed.match(/^(\d{1,2})\s*([A-Z]{3})\s*(\d{2,4})$/i)
                   || nxt.match(/^(\d{4})[\-\/\.](\d{1,2})[\-\/\.](\d{1,2})$/)
                   || nxt.match(/^(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?$/);
           if (gm && !gender) {
@@ -9561,6 +9576,65 @@ function parseSingleBooking(raw) {
         continue;
       }
       segCarry = null; // didn't match, abandon carry
+    }
+
+    // ── Expedia/OTA two-line segment ──────────────────────────────────────
+    // Line 1 (route + cabin):  "Shanghai (PVG) PVG to Los Angeles LAX  BUSINESS"
+    //                          "Los Angeles LAX to Shanghai (PVG) PVG  BUSINESS"
+    // Line 2 (date + times):   "Jul16·8:10 pm to 5:20 pm ·Nonstop"
+    //                          "Aug 20 · 1:15 pm to 5:45 pm · Nonstop"
+    // No flight number is present, so the segment is created with an empty
+    // flight (to be filled in manually) — matching existing "partial" semantics.
+    // First, if a cityCarry is pending, try to consume a date+time line.
+    if (cityCarry) {
+      // "Jul16" / "Jul 16" / "Aug 20" then a dot/space then "8:10 pm to 5:20 pm"
+      const dtM = trimmed.match(/^([A-Z][a-z]{2})\s*(\d{1,2})\s*[·•・]?\s*(\d{1,2}:\d{2})\s*(am|pm)?\s*to\s*(\d{1,2}:\d{2})\s*(am|pm)?/i);
+      if (dtM) {
+        const mon = dtM[1].toUpperCase();
+        const monMapEx = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
+        if (monMapEx[mon] !== undefined) {
+          const day = String(parseInt(dtM[2], 10)).padStart(2, '0');
+          const date = day + mon;  // IATA-style "16JUL", year inferred downstream
+          const to24 = (hm, ap) => {
+            let [h, mm] = hm.split(':').map(Number);
+            if (ap) { const pm = ap.toUpperCase() === 'PM'; if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+            return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+          };
+          segs.push({
+            from: cityCarry.from, to: cityCarry.to, date,
+            flight: '', cls: cityCarry.cabin || '',
+            depTime: to24(dtM[3], dtM[4]), arrTime: to24(dtM[5], dtM[6])
+          });
+          if (cityCarry.cabin && parsedCabin === undefined) {
+            parsedCabin = cityCarry.cabin;
+          }
+          cityCarry = null;
+          continue;
+        }
+      }
+      cityCarry = null; // date line didn't follow — abandon
+    }
+    // Detect an Expedia city/route line. IATA codes may appear once or twice per
+    // endpoint: "Shanghai (PVG) PVG" or "Los Angeles LAX". We take the LAST
+    // 3-letter code before "to" as origin, and the LAST one after as destination.
+    {
+      const cityLine = trimmed.match(/^[A-Za-z].*?\b([A-Z]{3})\b(?:\s+[A-Z]{3})?\s+to\s+.*?\b([A-Z]{3})\b(?:\s+([A-Z]{3}))?(?:\s+(BUSINESS|ECONOMY|FIRST|PREMIUM(?:\s+ECONOMY)?|COACH))?\s*$/i);
+      if (cityLine) {
+        // The post-"to" side may end with: "... LAX" or "... (PVG) PVG" or "... PVG BUSINESS".
+        // cityLine[2] = first code after "to"; cityLine[3] = optional second code (the
+        // repeated IATA); cityLine[4] = optional cabin. Destination = repeated code if
+        // present, else the first.
+        const fromCode = cityLine[1].toUpperCase();
+        const toCode = (cityLine[3] || cityLine[2]).toUpperCase();
+        const cabinRaw = (cityLine[4] || '').toUpperCase();
+        const cabinMapEx = {
+          'BUSINESS': '商务舱', 'FIRST': '头等舱',
+          'ECONOMY': '经济舱', 'COACH': '经济舱',
+          'PREMIUM': '超级经济舱', 'PREMIUM ECONOMY': '超级经济舱'
+        };
+        cityCarry = { from: fromCode, to: toCode, cabin: cabinMapEx[cabinRaw] || '' };
+        continue;
+      }
     }
 
     // ── Detect partial segment line (no route): "AA2364 R  FR05JUN" ──
