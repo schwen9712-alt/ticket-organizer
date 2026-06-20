@@ -9257,6 +9257,115 @@ function parseSingleBooking(raw) {
   let parsedCustomRate = undefined;
   let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
+  // ── United/airline verbose itinerary format ───────────────────────────────
+  // Airline websites (United especially) emit a label-per-line layout:
+  //   Flight 1 of 2
+  //   departs at
+  //   12:10 pm on Aug. 9
+  //   from
+  //   Shanghai Pudong International Airport (PVG)
+  //   ...
+  //   arrives at
+  //   8:55 am on Aug. 9
+  //   to
+  //   San Francisco International Airport (SFO)
+  //   ...
+  //   * Business
+  //   * United Airlines UA 858
+  // Each flight is a block delimited by "Flight N of M". Within a block, values
+  // follow their label lines ("departs at" → next non-empty line has time+date).
+  // We parse all blocks into segments here and short-circuit the rest of the
+  // parser when at least one segment is produced.
+  if (/Flight\s+\d+\s+of\s+\d+/i.test(raw) && /departs?\s+at/i.test(raw) && /arrives?\s+at/i.test(raw)) {
+    const uLines = raw.split(/\r?\n/).map(l => l.trim());
+    const MON
+      = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
+    // Slice into flight blocks
+    const blockStarts = [];
+    uLines.forEach((l, idx) => { if (/^Flight\s+\d+\s+of\s+\d+/i.test(l)) blockStarts.push(idx); });
+    const uSegs = [];
+    for (let b = 0; b < blockStarts.length; b++) {
+      const start = blockStarts[b];
+      const end = b + 1 < blockStarts.length ? blockStarts[b + 1] : uLines.length;
+      const block = uLines.slice(start, end);
+      // Helper: value line that follows a label line matching `labelRe`
+      const valueAfter = (labelRe) => {
+        for (let i = 0; i < block.length; i++) {
+          if (labelRe.test(block[i])) {
+            for (let j = i + 1; j < block.length; j++) {
+              if (block[j].trim()) return block[j].trim();
+            }
+          }
+        }
+        return '';
+      };
+      // Parse "12:10 pm on Aug. 9" → { time:'12:10', ap:'pm', mon:'AUG', day:9 }
+      const parseTimeDate = (s) => {
+        const m = s.match(/(\d{1,2}:\d{2})\s*(am|pm)?\s+on\s+([A-Z][a-z]{2})\.?\s+(\d{1,2})/i);
+        if (!m) return null;
+        return { time: m[1], ap: (m[2] || '').toUpperCase(), mon: m[3].toUpperCase(), day: parseInt(m[4], 10) };
+      };
+      const to24 = (hm, ap) => {
+        let [h, mm] = hm.split(':').map(Number);
+        if (ap) { const pm = ap === 'PM'; if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+        return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+      };
+      // IATA code = last "(XXX)" before vs after the route midpoint. We grab the
+      // airport line following "from" / "to" and pull the parenthesised code.
+      const codeFrom = (valueAfter(/^from$/i).match(/\(([A-Z]{3})\)/) || [])[1] || '';
+      const codeTo = (valueAfter(/^to$/i).match(/\(([A-Z]{3})\)/) || [])[1] || '';
+      const dep = parseTimeDate(valueAfter(/departs?\s+at/i));
+      const arr = parseTimeDate(valueAfter(/arrives?\s+at/i));
+      // Flight number: "* United Airlines UA 858" → UA858
+      let carrier = '', fnum = '';
+      for (const l of block) {
+        const fm = l.match(/\b([A-Z]{2})\s*(\d{1,4})\b/);
+        if (fm && /airlines?|air\b|UA|AA|DL|CA|MU|CZ/i.test(l) && !/of\s+\d/i.test(l)) {
+          carrier = fm[1].toUpperCase(); fnum = fm[2]; break;
+        }
+      }
+      // Cabin: "* Business" / "* First" / "* Economy"
+      let cabin = '';
+      for (const l of block) {
+        const cm = l.match(/^\*?\s*(Business|First|Economy|Premium\s+Economy|Coach)\s*$/i);
+        if (cm) {
+          const c = cm[1].toUpperCase();
+          cabin = c.startsWith('BUSINESS') ? '商务舱'
+            : c.startsWith('FIRST') ? '头等舱'
+            : c.startsWith('PREMIUM') ? '超级经济舱'
+            : '经济舱';
+          break;
+        }
+      }
+      if (codeFrom && codeTo && dep) {
+        const dd = dep.mon in MON ? String(dep.day).padStart(2, '0') + dep.mon : '';
+        uSegs.push({
+          from: codeFrom, to: codeTo, date: dd,
+          flight: carrier && fnum ? carrier + fnum : '',
+          cls: cabin || '',
+          depTime: to24(dep.time, dep.ap),
+          arrTime: arr ? to24(arr.time, arr.ap) : ''
+        });
+        if (carrier && !airline) airline = carrier;
+        if (cabin && parsedCabin === undefined) parsedCabin = cabin;
+      }
+    }
+    if (uSegs.length > 0) {
+      uSegs.forEach(s => segs.push(s));
+      // Short-circuit: emit the result now. Price/pax (if any) are rarely in this
+      // pure-itinerary block; user adds them or pastes separately.
+      return {
+        pax, segs, airline, rmb, usd, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // Scan whole text for product discount markers (产1, 产2, etc.)
   // Highest priority — overrides all other discount sources.
   // Smart matching: "产1" setting also matches "产一" / "产壹" in PNR (and vice versa).
@@ -9351,7 +9460,18 @@ function parseSingleBooking(raw) {
     '莫斯科':'SVO','圣彼得堡':'LED','开罗':'CAI',
     '约翰内斯堡':'JNB','内罗毕':'NBO','拉各斯':'LOS',
     '孟买':'BOM','德里':'DEL','班加罗尔':'BLR','金奈':'MAA',
-    '科伦坡':'CMB','达卡':'DAC','卡拉奇':'KHI','拉合尔':'LHE'
+    '科伦坡':'CMB','达卡':'DAC','卡拉奇':'KHI','拉合尔':'LHE',
+    // US secondary/regional airports (added for Chinese-itinerary city resolution)
+    '圣安娜':'SNA','橙县':'SNA','约翰韦恩':'SNA','棕榈泉':'PSP',
+    '伯班克':'BUR','安大略机场':'ONT','长滩':'LGB','圣荷西':'SJC',
+    '图森':'TUS','阿尔伯克基':'ABQ','埃尔帕索':'ELP','里诺':'RNO',
+    '博伊西':'BOI','斯波坎':'GEG','塔尔萨':'TUL','俄克拉荷马城':'OKC',
+    '奥马哈':'OMA','得梅因':'DSM','麦迪逊':'MSN','水牛城':'BUF','布法罗':'BUF',
+    '罗切斯特':'ROC','奥尔巴尼':'ALB','哈特福德':'BDL','普罗维登斯':'PVD',
+    '里士满':'RIC','罗利':'RDU','杰克逊维尔':'JAX','萨凡纳':'SAV',
+    '查尔斯顿':'CHS','孟菲斯':'MEM','路易斯维尔':'SDF','代顿':'DAY',
+    '大急流城':'GRR','诺克斯维尔':'TYS','亨茨维尔':'HSV','伯明翰':'BHM',
+    '小石城':'LIT','威奇托':'ICT'
   };
   function cnCityToIATA(city) {
     const c = (city || '').trim();

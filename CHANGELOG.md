@@ -1,3 +1,85 @@
+## 2026-06-11 — 城市映射补充：圣安娜等41个美国二三线机场（修复中文航段丢失）
+
+**改了什么**
+CN_CITY_IATA 城市映射表补充 41 个此前缺失的美国二三线机场城市名（含别名去重后）。关键：圣安娜(SNA)、棕榈泉(PSP)、长滩(LGB)、孟菲斯(MEM)、图森(TUS)、里诺(RNO)、罗利(RDU) 等。
+
+**为什么改**
+用户粘贴 UA5351 圣安娜-旧金山 航段，乘客(2人)/价格(2599)/舱位(头等舱)全部正常，但航段丢失。根因不是解析逻辑——cnSeg 正则能匹配，是 `圣安娜`(Santa Ana/SNA) 不在城市映射表里，cnCityToIATA 返回 null 导致航段被丢弃。这是数据缺口，非逻辑 bug。
+
+**端到端结果（用户输入）**
+- ✓ UA5351 22JUN SNA-SFO 16:12-17:50
+- ✓ 乘客 YU/QI、NIU/SIHAN（含 YY 占位航司、护照有效期）
+- ✓ rmb=2599、cabin=头等舱、未识别行清零
+
+**测试通过（7项+防误伤 全过）**
+- ✓ 圣安娜→SNA / 棕榈泉→PSP / 长滩→LGB / 孟菲斯→MEM
+- ✓ 防误伤：旧金山仍→SFO、北京仍→PEK
+- ✓ 关键防歧义：圣何塞胡安→SJO 不被新增的"圣荷西"部分匹配误伤
+- ✓ 六套历史回归（GONG/KE 6 + AS120 8 + UA820 4 + Expedia 9 + 护照卡 10 + United 6 = 43项）全通过
+
+**补充清单**
+圣安娜/橙县/约翰韦恩(SNA)、棕榈泉(PSP)、伯班克(BUR)、安大略机场(ONT)、长滩(LGB)、圣荷西(SJC)、图森(TUS)、阿尔伯克基(ABQ)、埃尔帕索(ELP)、里诺(RNO)、博伊西(BOI)、斯波坎(GEG)、塔尔萨(TUL)、俄克拉荷马城(OKC)、奥马哈(OMA)、得梅因(DSM)、麦迪逊(MSN)、水牛城/布法罗(BUF)、罗切斯特(ROC)、奥尔巴尼(ALB)、哈特福德(BDL)、普罗维登斯(PVD)、里士满(RIC)、罗利(RDU)、杰克逊维尔(JAX)、萨凡纳(SAV)、查尔斯顿(CHS)、孟菲斯(MEM)、路易斯维尔(SDF)、代顿(DAY)、大急流城(GRR)、诺克斯维尔(TYS)、亨茨维尔(HSV)、伯明翰(BHM)、小石城(LIT)、威奇托(ICT)
+
+**改动位置**
+- index.html ~9460：CN_CITY_IATA 表末尾追加美国二三线机场段
+
+**风险或注意事项**
+- ⚠ 刻意排除歧义项：用"安大略机场"而非"安大略"（避免匹配加拿大省）；未加"杰克逊/斯普林菲尔德"（多城市同名）；未加"奥克兰加州/圣何塞加州"（奥克兰/圣何塞已有映射）
+- ⚠ 部分匹配兜底仍存在：若未来出现含这些城市名子串的其他地名可能误匹配，目前未见
+- 此次仅补数据，解析逻辑零改动，回归风险极低
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
+## 2026-06-11 — 解析器新增：United/航司官网超详细行程（标签分行 + 多航段块）
+
+**改了什么**
+新增 United 官网行程格式专用解析器（在 parseSingleBooking 开头，命中即短路返回）。这是迄今最复杂的格式——信息高度分散、靠标签词组织、多航段：
+```
+Flight 1 of 2
+departs at
+12:10 pm on Aug. 9
+from
+Shanghai Pudong International Airport (PVG)
+...
+arrives at
+8:55 am on Aug. 9
+to
+San Francisco International Airport (SFO)
+* Business
+* United Airlines UA 858
+Flight 2 of 2
+...
+```
+解析方式：按 `Flight N of M` 切块；块内用标签词（departs at / from / arrives at / to）定位值行；机场 IATA 取括号内 `(XXX)`；航班号取 `* United Airlines UA 858`→UA858；舱位 `* Business`→商务舱；时间 12:10pm→24h；日期 `Aug. 9`→09AUG。
+
+**为什么改**
+用户粘贴 United 两段行程（PVG-SFO-PSP），44 行全部未识别。这种格式与所有现有路径都不同，需独立处理。
+
+**端到端结果（用户输入）**
+- ✓ UA858 09AUG PVG-SFO 12:10-08:55 商务舱
+- ✓ UA5705 09AUG SFO-PSP 18:38-20:26 头等舱
+- ✓ 44 行未识别清零
+
+**测试通过（6项变体+防误伤 全过）**
+- ✓ 单航段 / 多航段 United
+- ✓ 舱位 Business→商务舱 First→头等舱 Economy→经济舱
+- ✓ am/pm 时间转 24h；Aug. 9 带点日期
+- ✓ 防误伤：检测要求同时含 Flight N of M + departs at + arrives at 三特征，GDS/Expedia/中文航段/护照卡 全部不被误吞
+- ✓ 五套历史回归（GONG/KE 6 + AS120 8 + UA820 4 + Expedia 9 + 护照卡 10 = 37项）全通过
+
+**改动位置**
+- index.html ~9259：parseSingleBooking 共享变量声明后插入 United 块解析器 + 短路 return
+
+**风险或注意事项**
+- ⚠ 此格式为纯行程，无价格/乘客——需另行粘贴或手动补
+- ⚠ 航班号取块内首个"航司名+代码数字"组合；若某航段缺 `* Airline XX NNN` 行则航班号留空（待补）
+- ⚠ 跨日界线航段（如 PVG-SFO 到达时间早于出发）按原值保留，不强行加跨天标记
+- ⚠ Operated by / 机型 / 设施等行直接忽略（非行程核心字段）
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-11 — 护照卡解析增强：中文逗号姓名 + OCR月份修正（0CT→OCT）
 
 **改了什么**
