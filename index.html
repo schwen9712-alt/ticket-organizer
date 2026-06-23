@@ -11665,10 +11665,19 @@ async function parsePNR() {
   // to every booking unless that booking has its own, different marker.
   const batchProduct = detectTopLevelProductMarker(raw);
 
+  // ── 表G detection ─────────────────────────────────────────────────────────
+  // Triggers: "表G" / "表 G" (any case) or "官网[爱心]" (the 爱心 may be the literal
+  // text "[爱心]", a ❤/♥/💗 emoji, or "爱心" alone after 官网). When present, every
+  // order in this paste becomes a 表G order: tableLabel='G', fixed 92折, basic
+  // economy, manual-booking flag — overriding whatever the entry form had.
+  const _isTableGBatch = /表\s*[Gg]\b/.test(raw)
+    || /官网\s*[\[【]?\s*(?:爱心|❤|♥|💗|💖|♡)\s*[\]】]?/.test(raw);
+  // ──────────────────────────────────────────────────────────────────────────
+
   // Preserve agent/branch/tableLabel/client from current order (likely from same batch)
   const sharedAgent = curr().agent;
   const sharedBranch = curr().branch;
-  const sharedTableLabel = curr().tableLabel;
+  const sharedTableLabel = _isTableGBatch ? 'G' : curr().tableLabel;
   const sharedClient = curr().client;
   // Preserve 表 Y flag — if user pre-flagged the entry form as Y, all bookings
   // from this paste inherit that. (Bug fix: previously dropped during parse,
@@ -11728,6 +11737,11 @@ async function parsePNR() {
       finalDiscount = _specialDiscountValue;
       isSpecial = true;
       specialNote = _specialDiscountNote || '手动特殊折扣';
+    } else if (_isTableGBatch) {
+      // 表G: fixed 92折, basic economy, manual customer-service booking.
+      finalDiscount = 92;
+      isSpecial = true;
+      specialNote = '表G·基础经济·人工预定';
     } else if (productDiscount != null) {
       finalDiscount = productDiscount;
       isSpecial = true;
@@ -12486,7 +12500,7 @@ function renderAirlineUsdPanel(orders) {
         <span class="order-num">#${displayIdx + 1}</span>
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
-        <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}</span>
+              <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
         <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
@@ -21278,6 +21292,7 @@ function renderChasePanel() {
     colHeader.innerHTML = `
       <span class="collapse-num">#${idx+1}</span>
       ${airlineBadgeHtml}
+      <span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-flex;align-items:center;flex-shrink:0;padding:2px 7px;border:1px solid rgba(70,150,80,0.5);background:rgba(70,150,80,0.12);color:#2f7d3f;border-radius:var(--r-sm);font-size:9.5px;font-weight:700;letter-spacing:0.03em;">♡ 基础·人工</span>
       ${o.createdAt ? (buildAgeBadge(o.createdAt) ? buildAgeBadge(o.createdAt).outerHTML : '') : ''}
       ${o.waitingForRelease ? '<span style="background:var(--warning);color:#fff;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:700;flex-shrink:0;">🔒 放位</span>' : ''}
       <span class="collapse-summary">${escapeHtml([paxNames, route, o.cabin||'', price].filter(Boolean).join('  ·  '))}</span>
