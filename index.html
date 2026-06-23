@@ -10304,24 +10304,36 @@ function parseSingleBooking(raw) {
     // ── Chinese-date + English-IATA compact format (common in WeChat copy/paste):
     //   "7月15日 UA 1195 LAX-SFO  20:10-21:38"
     //   "7月15日 UA 805   SFO-ICN 23:55-04:20+2"
+    //   "9月19日 DL38 G PVG-LAX 6:25 PM - 3:25 PM"  (cabin code + AM/PM times)
     // Allowed variants:
-    //   - carrier glued to flight: "UA1195" (no space)
+    //   - carrier glued to flight: "UA1195" (no space); carrier may contain a digit (B6/9C/3U)
+    //   - optional single-letter cabin code after the flight number ("DL38 G ...")
     //   - extra spaces between fields
     //   - route separator: "-" or "→"
-    //   - times optional; arrival can have "+1" "+2" day-offset
+    //   - times optional; 24h ("20:10") or 12h with AM/PM ("6:25 PM"); arrival "+1"/"+2" offset
     const cnDateEnSeg = trimmed.match(
-      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z]{2})\s*(\d{1,4})\s+([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*[-]\s*(\d{1,2}:\d{2})(?:\+\d+)?)?/
+      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9]|[0-9][A-Z])\s*(\d{1,4})\s+(?:([A-Z])\s+)?([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*(AM|PM)?\s*[-–]\s*(\d{1,2}:\d{2})\s*(AM|PM)?(?:\+\d+)?)?/i
     );
     if (cnDateEnSeg) {
       const date = cnDateToIATA(cnDateEnSeg[1], cnDateEnSeg[2]);
-      const carrier = cnDateEnSeg[3];
+      const carrier = cnDateEnSeg[3].toUpperCase();
       const flight = cnDateEnSeg[4];
-      const from = cnDateEnSeg[5];
-      const to = cnDateEnSeg[6];
-      const depTime = cnDateEnSeg[7] || '';
-      const arrTime = cnDateEnSeg[8] || '';
+      const cabinCode = cnDateEnSeg[5] || '';   // optional single-letter class
+      const from = cnDateEnSeg[6];
+      const to = cnDateEnSeg[7];
+      // Convert 12h+AM/PM to 24h when meridiem present; otherwise keep as-is.
+      const conv = (hm, ap) => {
+        if (!hm) return '';
+        if (!ap) return hm;
+        let [h, mm] = hm.split(':').map(Number);
+        const pm = ap.toUpperCase() === 'PM';
+        if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0;
+        return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+      };
+      const depTime = conv(cnDateEnSeg[8], cnDateEnSeg[9]);
+      const arrTime = conv(cnDateEnSeg[10], cnDateEnSeg[11]);
       if (carrier && flight && from && to && date) {
-        segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime });
+        segs.push({ from, to, date, flight: carrier + flight, cls: cabinCode, depTime, arrTime });
         if (!airline) airline = carrier;
         _d(trimmed, '✅ SEGMENT', `${carrier+flight} ${from}→${to} ${date}`);
         matched = true;
