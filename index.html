@@ -10223,7 +10223,7 @@ function parseSingleBooking(raw) {
     //   "3.RAO/XIANG 男 29N0V77"      (OCR typo: zero instead of O in month)
     //   "1. CHEN/GG 女 1990年5月23日"   (Chinese year-month-day)
     const cnInlinePax = trimmed.match(
-      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/\s*[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s+(.+)$/i
+      /^(?:\d+\s*[\.\,、]\s*)?([A-Z][A-Z\s]*\/\s*[A-Za-z][A-Za-z\s]*?)\s+([男女](?:童|婴)?)\s*[，,\s]\s*(.+)$/i
     );
     if (cnInlinePax) {
       const name = cnInlinePax[1].trim().toUpperCase().replace(/\/\s+/, '/').replace(/\s+/g, ' ');
@@ -10232,8 +10232,18 @@ function parseSingleBooking(raw) {
       // Hand the entire tail (after gender) to extractDOB, which handles
       // YYYY年M月D / YYYY-MM-DD / DDMMMYY / DD MMMYYYY / OCR-typo months / etc.
       const dob = extractDOB(cnInlinePax[3]) || '';
-      const isInfant = g === '男婴' || g === '女婴';
+      let isInfant = g === '男婴' || g === '女婴';
       const isChild = g === '男童' || g === '女童';
+      // DOB-based infant fallback: a passenger born within ~2 years is an infant
+      // even when the gender token is just 男/女 (e.g. "Liu/Raina 女，2026.6.16").
+      if (!isInfant && !isChild && dob) {
+        const _by = parseInt(dob.slice(-2), 10);
+        if (!isNaN(_by)) {
+          const fullYr = _by <= ((new Date().getFullYear() % 100) + 1) ? 2000 + _by : 1900 + _by;
+          const ageY = new Date().getFullYear() - fullYr;
+          if (ageY <= 2) isInfant = true;
+        }
+      }
       // Only commit if we actually got a name AND (dob OR no other branch will
       // claim this line). Since this matcher is quite specific (NAME + 男/女 + tail)
       // we commit unconditionally when matched.
@@ -10515,6 +10525,29 @@ function parseSingleBooking(raw) {
     if (matched) continue;
 
     // TYPE-BASED FARE LINES — two formats:
+    // 0. Same-line DUAL fare: "成人  22153  婴儿2308" / "大人16046 儿童12000" —
+    //    two type+amount pairs on one line. Handle before the single-type matcher
+    //    so the second pair isn't lost.
+    const dualFare = trimmed.match(
+      /^(大人|成人|儿童|小儿|婴儿)\s*(\d{3,6})(?:\.\d+)?\s+(大人|成人|儿童|小儿|婴儿)\s*(\d{3,6})(?:\.\d+)?\s*$/
+    );
+    if (dualFare) {
+      const kindOf = (w) => (w === '大人' || w === '成人') ? 'adult'
+        : (w === '儿童' || w === '小儿') ? 'child' : 'infant';
+      const k1 = kindOf(dualFare[1]), a1 = parseFloat(dualFare[2]);
+      const k2 = kindOf(dualFare[3]), a2 = parseFloat(dualFare[4]);
+      if (a1 >= 100 && a1 <= 500000 && a2 >= 100 && a2 <= 500000) {
+        if (!parsedFareByType) parsedFareByType = {};
+        parsedFareByType[k1] = a1;
+        parsedFareByType[k2] = a2;
+        // Adult fare seeds rmb if not already set
+        if (k1 === 'adult' && !rmb) rmb = a1;
+        else if (k2 === 'adult' && !rmb) rmb = a2;
+        _d(trimmed, '✅ FARE-DUAL', `${k1}:${a1} ${k2}:${a2}`);
+        continue;
+      }
+    }
+
     // 1. Chinese prefix: "大人运价... 43648 CNY", "婴儿运价... INF 3425 CNY"
     // 2. Inline fare code: "01 DNW00KRK       INF  3045 CNY" or "01 ABC  CNN  43558 CNY"
     const fareTypeMatch = trimmed.match(/^(大人|成人|儿童|小儿|婴儿)/);
