@@ -10585,7 +10585,11 @@ function parseSingleBooking(raw) {
         // after the type word; optional baggage-pc and *N pax-count suffixes, no
         // CNY keyword required. Full-line anchor prevents date lines ("婴儿 2026年…")
         // and pax-count lines ("成人 2 儿童 1") from matching.
-        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s+(\d{3,6})(?:\.\d+)?\s*(?:\d+\s*pc)?\s*(?:[\*xX×]\s*\d+)?\s*$/i);
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s+(\d{3,6})(?:\.\d+)?\s*(?:\d+\s*pc)?\s*(?:[\*xX×]\s*\d+)?\s*$/i)
+        // "大人运价14250" / "儿童运价 14080" / "成人票价14250" — type word + 运价/票价/净价/价格
+        // glued or space-separated to a bare number, NO colon and NO CNY keyword.
+        // Full-line anchor + the 运价/票价 keyword keep this from over-matching.
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s*(?:运价|票价|净价|价格)\s*(\d{4,6})(?:\.\d+)?\s*$/);
       if (equivMatch) {
         const amt = parseFloat(equivMatch[1]);
         if (amt >= 100 && amt <= 500000) {
