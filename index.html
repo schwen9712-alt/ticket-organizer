@@ -9257,6 +9257,97 @@ function parseSingleBooking(raw) {
   let parsedCustomRate = undefined;
   let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
+  // ── Ctrip/携程 app itinerary format ───────────────────────────────────────
+  // Highly glued multi-line layout from the 携程 app, where each flight is anchored
+  // by an airline line "人<airline>航空公司<carrier><flight>...":
+  //   程07-10周五总时长13h20m
+  //   LAX洛杉矶(美国)洛杉矶国际机场T311:45
+  //   人美国达美航空公司DL039 空客...有餐食〉07-1116:05PVG上海浦东国际机场T1
+  //   07-20周一|总时长12h24m返程
+  //   18:25PVG上海浦东国际机场T1
+  //   人美国达美航空公司DL038|...有餐食>15:49LAX洛杉矶(美国)...
+  // Strategy: the airline line carries carrier+flight AND the destination IATA +
+  // arrival time. The origin IATA + departure time come from the line(s) above it.
+  // Two sub-layouts: outbound (city line then airline line) and return (time+city
+  // line then airline line) — handled by scanning nearby lines for IATA + HH:MM.
+  if (/航空公司[A-Z]/.test(raw) && /(\d{2})-(\d{2})周/.test(raw)) {
+    const cLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const cSegs = [];
+    // Pull all "MM-DD" date tokens in order; map each airline line to the nearest
+    // preceding date.
+    let lastDate = '';
+    const monDay = (mm, dd) => {
+      const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const mi = parseInt(mm, 10) - 1;
+      return mi >= 0 && mi < 12 ? String(parseInt(dd, 10)).padStart(2, '0') + MN[mi] : '';
+    };
+    for (let i = 0; i < cLines.length; i++) {
+      const line = cLines[i];
+      // Track the most recent flight date ("07-10周五", "07-20周一")
+      const dm = line.match(/(\d{2})-(\d{2})\s*周/);
+      if (dm) lastDate = monDay(dm[1], dm[2]);
+      // Airline/flight anchor line
+      const fm = line.match(/航空公司\s*([A-Z][A-Z0-9])\s*(\d{2,4})/);
+      if (!fm) continue;
+      const carrier = fm[1].toUpperCase();
+      const flight = fm[2];
+      // Destination IATA + arrival time live on THIS line, often after an arrival
+      // date "07-11" and time "16:05": "...07-1116:05PVG..." or "...15:49LAX...".
+      // Grab the LAST "HH:MM<IATA>" or "<IATA>" pairing on the line as destination.
+      let dest = '', arrTime = '';
+      const arrWithTime = [...line.matchAll(/(\d{1,2}:\d{2})\s*([A-Z]{3})/g)];
+      if (arrWithTime.length) {
+        arrTime = arrWithTime[arrWithTime.length - 1][1];
+        dest = arrWithTime[arrWithTime.length - 1][2];
+      } else {
+        const codes = [...line.matchAll(/\b([A-Z]{3})\b/g)];
+        if (codes.length) dest = codes[codes.length - 1][1];
+      }
+      // Return-trip layout: the airline line carries NO destination (e.g.
+      // "人...DL038|...有餐食>"). Destination + arrival time sit on the NEXT line
+      // ("15:49LAX..."). Look one line down when this line had no IATA.
+      if (!dest) {
+        for (let k = i + 1; k < cLines.length && k <= i + 2; k++) {
+          const dn = cLines[k];
+          if (/航空公司\s*[A-Z]/.test(dn) || /(\d{2})-(\d{2})\s*周/.test(dn)) break;
+          const tc2 = dn.match(/(\d{1,2}:\d{2})\s*([A-Z]{3})/);
+          const c2 = dn.match(/\b([A-Z]{3})\b/);
+          if (tc2) { arrTime = tc2[1]; dest = tc2[2]; break; }
+          if (c2) { dest = c2[1]; break; }
+        }
+      }
+      // Origin IATA + departure time come from preceding lines (search up to 2 back).
+      let origin = '', depTime = '';
+      for (let k = i - 1; k >= 0 && k >= i - 3; k--) {
+        const up = cLines[k];
+        if (/航空公司\s*[A-Z]/.test(up)) break; // hit previous segment's airline line
+        // "LAX...T311:45" (city then time) or "18:25PVG..." (time then city)
+        const tc = up.match(/(\d{1,2}:\d{2})\s*([A-Z]{3})/);   // time-then-city (return)
+        const ct = up.match(/\b([A-Z]{3})\b.*?(\d{1,2}:\d{2})/); // city-then-time (outbound)
+        if (tc) { depTime = tc[1]; origin = tc[2]; break; }
+        if (ct) { origin = ct[1]; depTime = ct[2]; break; }
+        const justCity = up.match(/\b([A-Z]{3})\b/);
+        if (justCity && !origin) origin = justCity[1];
+      }
+      if (carrier && flight && origin && dest && origin !== dest) {
+        cSegs.push({ from: origin, to: dest, date: lastDate, flight: carrier + flight, cls: '', depTime, arrTime });
+        if (!airline) airline = carrier;
+      }
+    }
+    if (cSegs.length > 0) {
+      cSegs.forEach(s => segs.push(s));
+      return {
+        pax, segs, airline, rmb, usd: null, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // ── Expedia/OTA compact "Total due" format ────────────────────────────────
   // A single-block itinerary where fields are glued and only a TOTAL (not per-pax)
   // price is shown, with a passenger breakdown like "2 adults 18+2 children":
