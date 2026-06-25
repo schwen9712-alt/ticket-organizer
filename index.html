@@ -9257,6 +9257,81 @@ function parseSingleBooking(raw) {
   let parsedCustomRate = undefined;
   let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
+  // ── Expedia/OTA compact "Total due" format ────────────────────────────────
+  // A single-block itinerary where fields are glued and only a TOTAL (not per-pax)
+  // price is shown, with a passenger breakdown like "2 adults 18+2 children":
+  //   Los Angeles LAX to Honolulu HNLJul 27 . 5:05 pm to 7:44 pm . Nonstop
+  //   Travelers: 4
+  //   Flight Number: UA 1170Aircraft type: Boeing777-200
+  //   2 adults 18+2 children
+  //   CN¥26,948.00
+  // The total is divided by the traveller count to show a per-person price (the
+  // app stores per-pax prices and re-sums them, so dividing here is correct).
+  if (/Flight\s+Number:/i.test(raw) && /\bto\b/.test(raw)
+      && /(?:CN¥|CN\s*¥|¥|CNY)\s*[\d,]/.test(raw)
+      && /Travelers?:|adults?\b|child(?:ren)?\b/i.test(raw)) {
+    const eLines = raw.split(/\r?\n/).map(l => l.trim());
+    const eText = eLines.join('\n');
+    // City line: "...LAX to ...HNL" with date glued ("HNLJul 27") and " . " times.
+    let eFrom = '', eTo = '', eDate = '', eDep = '', eArr = '';
+    for (const l of eLines) {
+      const cm = l.match(/\b([A-Z]{3})\s+to\s+.+?\b([A-Z]{3})([A-Z][a-z]{2})\.?\s+(\d{1,2})\s*[.．·]\s*(\d{1,2}:\d{2})\s*(am|pm)?\s*to\s*(\d{1,2}:\d{2})\s*(am|pm)?/i);
+      if (cm) {
+        const MON = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
+        eFrom = cm[1].toUpperCase(); eTo = cm[2].toUpperCase();
+        const mon = cm[3].toUpperCase(); const day = String(parseInt(cm[4], 10)).padStart(2, '0');
+        if (MON[mon] !== undefined) eDate = day + mon;
+        const to24 = (hm, ap) => {
+          if (!hm) return '';
+          let [h, mm] = hm.split(':').map(Number);
+          if (ap) { const pm = ap.toUpperCase() === 'PM'; if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0; }
+          return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+        };
+        eDep = to24(cm[5], cm[6]); eArr = to24(cm[7], cm[8]);
+        break;
+      }
+    }
+    // Flight number: "Flight Number: UA 1170Aircraft..." (carrier may have a digit)
+    const fnM = eText.match(/Flight\s+Number:\s*([A-Z][A-Z0-9])\s*(\d{1,4})/i);
+    const eCarrier = fnM ? fnM[1].toUpperCase() : '';
+    const eFlight = fnM ? fnM[2] : '';
+    // Passenger counts: "2 adults 18+2 children" / "Travelers: 4"
+    const nAdult = parseInt((eText.match(/(\d+)\s*adults?/i) || [])[1] || '0', 10);
+    const nChild = parseInt((eText.match(/(\d+)\s*child(?:ren)?/i) || [])[1] || '0', 10);
+    const nInfant = parseInt((eText.match(/(\d+)\s*infants?/i) || [])[1] || '0', 10);
+    let nTravel = nAdult + nChild + nInfant;
+    if (!nTravel) nTravel = parseInt((eText.match(/Travelers?:\s*(\d+)/i) || [])[1] || '0', 10);
+    // Total price: "CN¥26,948.00"
+    const totM = eText.match(/(?:CN¥|CN\s*¥|¥|CNY|RMB)\s*([\d,]+(?:\.\d+)?)/i);
+    const total = totM ? parseFloat(totM[1].replace(/,/g, '')) : null;
+
+    if (eFrom && eTo && eDate && total && nTravel > 0) {
+      segs.push({ from: eFrom, to: eTo, date: eDate, flight: eCarrier && eFlight ? eCarrier + eFlight : '', cls: '', depTime: eDep, arrTime: eArr });
+      if (eCarrier && !airline) airline = eCarrier;
+      // Per-person price = total / travellers. Store one entry per traveller so the
+      // app's "sum of paxPrices" reconstructs the original total exactly.
+      const perPerson = +(total / nTravel).toFixed(2);
+      parsedPaxPrices = Array(nTravel).fill(perPerson);
+      rmb = total;  // rmb stays the true total; paxPrices carries the per-person split
+      // Record the adult/child makeup as a note so the per-type split is visible.
+      const _mk = [];
+      if (nAdult) _mk.push(`${nAdult}成人`);
+      if (nChild) _mk.push(`${nChild}儿童`);
+      if (nInfant) _mk.push(`${nInfant}婴儿`);
+      const _mkNote = _mk.length ? `（${_mk.join('+')}，人均¥${perPerson}）` : '';
+      return {
+        pax, segs, airline, rmb, usd: null, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: parsedPaxPrices,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null,
+        productNote: _mkNote || null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // ── United/airline verbose itinerary format ───────────────────────────────
   // Airline websites (United especially) emit a label-per-line layout:
   //   Flight 1 of 2

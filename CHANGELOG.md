@@ -1,3 +1,40 @@
+## 2026-06-11 — 解析器新增：Expedia总价格式 + 总价÷人数自动算人均
+
+**改了什么**
+新增 Expedia/OTA 紧凑"Total due"格式专用解析器（parseSingleBooking 开头，命中短路）。特点：字段粘连、只给总价、乘客是人数构成：
+```
+Los Angeles LAX to Honolulu HNLJul 27 . 5:05 pm to 7:44 pm . Nonstop
+Travelers: 4
+Flight Number: UA 1170Aircraft type: Boeing777-200
+2 adults 18+2 children
+CN¥26,948.00
+```
+**核心：总价÷人数自动算人均**。总价 26948 ÷ 4 人 = 人均 6737，存为 paxPrices=[6737,6737,6737,6737]（app 对 paxPrices 求和重建总价，分摊正确）。
+
+解析要点：城市行 IATA + 紧贴日期（HNLJul 27）+ ` . ` 分隔时间；航班号从 Flight Number 提取（粘着 Aircraft 也能切）；人数从"N adults M children"或 Travelers 取；总价支持 CN¥/¥/CNY 带千分位。
+
+**端到端结果（用户输入）**
+- ✓ UA1170 27JUL LAX-HNL 17:05-19:44（时间转24h）
+- ✓ paxPrices=[6737×4]，人均¥6737
+- ✓ rmb=26948（总价保留），备注「（2成人+2儿童，人均¥6737）」
+- ✓ 未识别清零
+
+**测试通过（7项 全过）**
+- ✓ 4人/2人/含婴儿 总价均分
+- ✓ 防误伤：United详细格式、老Expedia两行、GDS 不被吞；无CN¥不误触发
+- ✓ 十二套历史回归（97项）全通过
+
+**改动位置**
+- index.html ~9260：Expedia总价块（在United块前）
+
+**风险或注意事项**
+- ⚠ 人均 = 总价/总人数（平均分摊）。成人儿童单价实际可能不同，但源数据只给总价，平均是唯一可行方案；adult/child 构成已存入备注供人工核对
+- ⚠ 检测需同时含 Flight Number: + to + CN¥/¥ + 人数，条件严格防误触发
+- ⚠ 乘客为人数非姓名，pax 数组为空，需手动补乘客姓名（或粘贴 SSR）
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-11 — 双修复：无舱位GDS航段 + 乘号折扣(*0.9)与价格行舱位
 
 **改了什么**
