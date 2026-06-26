@@ -10722,7 +10722,7 @@ function parseSingleBooking(raw) {
 
     // 1. Chinese prefix: "大人运价... 43648 CNY", "婴儿运价... INF 3425 CNY"
     // 2. Inline fare code: "01 DNW00KRK       INF  3045 CNY" or "01 ABC  CNN  43558 CNY"
-    const fareTypeMatch = trimmed.match(/^(大人|成人|儿童|小儿|婴儿)/);
+    const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿)/i);
     const inlineInfMatch = !fareTypeMatch && trimmed.match(/\bINF\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     const inlineCnnMatch = !fareTypeMatch && !inlineInfMatch && trimmed.match(/\bCNN\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     // GDS adult fare line: "02 SKW7RJYS+*   13585 CNY" (no CNN/INF/CHD code → adult)
@@ -10794,9 +10794,13 @@ function parseSingleBooking(raw) {
         // "大人运价14250" / "儿童运价 14080" / "成人票价14250" — type word + 运价/票价/净价/价格
         // glued or space-separated to a bare number, NO colon and NO CNY keyword.
         // Full-line anchor + the 运价/票价 keyword keep this from over-matching.
-        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s*(?:运价|票价|净价|价格)\s*(\d{4,6})(?:\.\d+)?\s*$/);
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s*(?:运价|票价|净价|价格)\s*(\d{4,6})(?:\.\d+)?\s*$/)
+        // "TOTAL 成人：25,728" / "TOTAL 儿童：25,555" / "成人：25,728" — optional TOTAL
+        // prefix, type word, colon, then a thousands-separated amount. The comma is
+        // stripped by the comma-tolerant parse below.
+        || trimmed.match(/^(?:TOTAL\s*)?(?:大人|成人|儿童|小儿|婴儿)\s*[：:]\s*([\d,]+(?:\.\d+)?)\s*$/i);
       if (equivMatch) {
-        const amt = parseFloat(equivMatch[1]);
+        const amt = parseFloat(String(equivMatch[1]).replace(/,/g, ''));
         if (amt >= 100 && amt <= 500000) {
           // Bare number on same line as fare type = direct assignment, no need to wait for TOTAL
           if (!parsedFareByType) parsedFareByType = {};
