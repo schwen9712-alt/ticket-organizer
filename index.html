@@ -10722,6 +10722,32 @@ function parseSingleBooking(raw) {
 
     // 1. Chinese prefix: "大人运价... 43648 CNY", "婴儿运价... INF 3425 CNY"
     // 2. Inline fare code: "01 DNW00KRK       INF  3045 CNY" or "01 ABC  CNN  43558 CNY"
+    // Same-line MULTIPLE "类型：金额" pairs, optionally each TOTAL-prefixed:
+    //   "TOTAL 成人：25,728 TOTAL 儿童：25,555"
+    //   "成人：25728 儿童：25555 婴儿：3000"
+    // Catch all type:amount pairs on the line at once. Requires the colon so a
+    // segment/route line ("成人 - 儿童") can't match. At least 2 pairs to avoid
+    // overlapping the single-pair path below.
+    {
+      const multiTypeFare = [...trimmed.matchAll(/(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿)\s*[：:]\s*([\d,]+(?:\.\d+)?)/gi)];
+      if (multiTypeFare.length >= 2) {
+        const kindOf = (w) => (w === '大人' || w === '成人') ? 'adult'
+          : (w === '儿童' || w === '小儿') ? 'child' : 'infant';
+        let _any = false;
+        if (!parsedFareByType) parsedFareByType = {};
+        for (const mt of multiTypeFare) {
+          const amt = parseFloat(String(mt[2]).replace(/,/g, ''));
+          if (amt >= 100 && amt <= 500000) {
+            const k = kindOf(mt[1]);
+            parsedFareByType[k] = amt;
+            if (k === 'adult' && !rmb) rmb = amt;
+            _any = true;
+          }
+        }
+        if (_any) { _d(trimmed, '✅ FARE-MULTI', JSON.stringify(parsedFareByType)); continue; }
+      }
+    }
+
     const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿)/i);
     const inlineInfMatch = !fareTypeMatch && trimmed.match(/\bINF\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     const inlineCnnMatch = !fareTypeMatch && !inlineInfMatch && trimmed.match(/\bCNN\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
