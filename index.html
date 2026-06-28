@@ -9257,6 +9257,106 @@ function parseSingleBooking(raw) {
   let parsedCustomRate = undefined;
   let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
+  // ── Ctrip/携程 app VERTICAL detailed format ───────────────────────────────
+  // Each field on its own line; airline line carries flight# + cabin; the city
+  // names are Chinese (no IATA) on the date line above; times/airports follow:
+  //   因09-24 周四 中国香港洛杉矶(美国)
+  //   美国联合航空UA821 波音789(大)公务舱
+  //   当地时间
+  //   21:45
+  //   香港国际机场T1
+  //   13h25m
+  //   当地时间
+  //   20:10
+  //   洛杉矶国际机场T7
+  // Strategy: airline line ("...航空<carrier><flight>...<cabin>") anchors a segment.
+  // Date+cities from the line above; the two HH:MM lines below it are dep/arr.
+  // Origin/dest IATA resolved from the airport-name lines via cnCityToIATA (or the
+  // date line's city names as fallback).
+  if (/航空[A-Z]{2}\d/.test(raw) && /当地时间|周[一二三四五六日]/.test(raw)
+      && /(\d{2})-(\d{2})/.test(raw)) {
+    const vLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const vSegs = [];
+    const monDayV = (mm, dd) => {
+      const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const mi = parseInt(mm, 10) - 1;
+      return mi >= 0 && mi < 12 ? String(parseInt(dd, 10)).padStart(2, '0') + MN[mi] : '';
+    };
+    // Inline city→IATA map (avoids referencing CN_CITY_IATA, which is declared later
+    // and would hit the temporal-dead-zone). Covers cities common to this format;
+    // extend as needed.
+    const V_CITY = {
+      '香港':'HKG','洛杉矶':'LAX','上海':'PVG','北京':'PEK','纽约':'JFK',
+      '旧金山':'SFO','广州':'CAN','深圳':'SZX','成都':'CTU','西雅图':'SEA',
+      '波士顿':'BOS','芝加哥':'ORD','华盛顿':'IAD','达拉斯':'DFW','休斯顿':'IAH',
+      '首尔':'ICN','东京':'NRT','大阪':'KIX','温哥华':'YVR','多伦多':'YYZ',
+      '台北':'TPE','曼谷':'BKK','新加坡':'SIN','悉尼':'SYD','墨尔本':'MEL',
+      '伦敦':'LHR','巴黎':'CDG','法兰克福':'FRA','迪拜':'DXB','杭州':'HGH',
+      '南京':'NKG','武汉':'WUH','重庆':'CKG','西安':'XIY','青岛':'TAO',
+      '厦门':'XMN','昆明':'KMG','长沙':'CSX','郑州':'CGO','天津':'TSN'
+    };
+    const cityCode = (s) => {
+      if (!s) return '';
+      for (const [city, code] of Object.entries(V_CITY)) {
+        if (s.includes(city)) return code;
+      }
+      return '';
+    };
+    for (let i = 0; i < vLines.length; i++) {
+      const fm = vLines[i].match(/航空\s*([A-Z][A-Z0-9])\s*(\d{2,4})/);
+      if (!fm) continue;
+      const carrier = fm[1].toUpperCase(), flight = fm[2];
+      const cm = vLines[i].match(/(公务舱|商务舱|头等舱|超级经济舱|经济舱)/);
+      const cabin = cm ? (cm[1] === '公务舱' ? '商务舱' : cm[1]) : '';
+      // Date + city names: nearest preceding line containing "MM-DD"
+      let segDate = '', dateLineCities = '';
+      for (let k = i - 1; k >= 0 && k >= i - 2; k--) {
+        const dm = vLines[k].match(/(\d{2})-(\d{2})/);
+        if (dm) { segDate = monDayV(dm[1], dm[2]); dateLineCities = vLines[k]; break; }
+      }
+      // Times below: first=dep, last=arr. Airport lines: first=origin, last=dest.
+      const times = [], airports = [];
+      for (let k = i + 1; k < vLines.length; k++) {
+        if (/航空\s*[A-Z]/.test(vLines[k])) break;
+        const tm = vLines[k].match(/^(?:当地时间)?\s*(\d{1,2}:\d{2})$/);
+        if (tm) { times.push(tm[1]); continue; }
+        const adm = vLines[k].match(/当地时间\s*(\d{2})-(\d{2})/);
+        if (adm) continue; // next-day arrival marker; date stays the dep date
+        if (/机场/.test(vLines[k])) airports.push(vLines[k]);
+      }
+      const depTime = times[0] || '';
+      const arrTime = times.length > 1 ? times[times.length - 1] : '';
+      // Origin/dest from airport lines, falling back to the date line's two cities.
+      let origin = cityCode(airports[0] || '');
+      let dest = cityCode(airports[airports.length - 1] || '');
+      if ((!origin || !dest) && dateLineCities) {
+        for (const [city, code] of Object.entries(V_CITY)) {
+          if (dateLineCities.includes(city)) {
+            if (!origin) origin = code;
+            else if (!dest && code !== origin) dest = code;
+          }
+        }
+      }
+      if (carrier && flight && origin && dest && origin !== dest) {
+        vSegs.push({ from: origin, to: dest, date: segDate, flight: carrier + flight, cls: '', depTime, arrTime });
+        if (!airline) airline = carrier;
+        if (cabin && parsedCabin === undefined) parsedCabin = cabin;
+      }
+    }
+    if (vSegs.length > 0) {
+      vSegs.forEach(s => segs.push(s));
+      return {
+        pax, segs, airline, rmb, usd: null, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // ── Ctrip/携程 app itinerary format ───────────────────────────────────────
   // Highly glued multi-line layout from the 携程 app, where each flight is anchored
   // by an airline line "人<airline>航空公司<carrier><flight>...":
