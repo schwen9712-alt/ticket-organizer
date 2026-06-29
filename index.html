@@ -9271,7 +9271,20 @@ function parseSingleBooking(raw) {
   // (skipping 飞行/中转/返程 lines) are dep then arr.
   if (/航空[A-Z]{2}\d/.test(raw) && /平均到达时间/.test(raw)
       && /\d{2}-\d{2}\s*\d{1,2}:\d{2}\s*[A-Z]{3}|\d{2}-\d{2}\d{1,2}:\d{2}[A-Z]{3}/.test(raw)) {
-    const iLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    // Some pastes arrive as a SINGLE line (newlines lost in copy). Re-insert line
+    // breaks before structural markers so the line-based scan below works for both
+    // single-line and multi-line input.
+    let _normRaw = raw;
+    if ((raw.split(/\r?\n/).filter(l => l.trim()).length) <= 2) {
+      _normRaw = raw
+        .replace(/\s*(美国|中国)?[\u4e00-\u9fa5]{0,8}航空(?=[A-Z]{2}\d)/g, '\n$&')  // before each airline+flight
+        .replace(/(\d{2}-\d{2}\s*\d{1,2}:\d{2}\s*[A-Z]{3})/g, '\n$1')              // before each date+time+IATA
+        .replace(/\s*(飞行\d)/g, '\n$1')                                            // before 飞行X小时
+        .replace(/\s*([\u4e00-\u9fa5]{2,}\(美国\)中转停留)/g, '\n$1')               // before 中转
+        .replace(/\s*(返程\s)/g, '\n$1')                                           // before 返程
+        .replace(/\s*(TOTAL\s)/gi, '\n$1');                                        // before TOTAL
+    }
+    const iLines = _normRaw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const iSegs = [];
     const MN2 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     // Parse a "date+time+IATA" travel line in any spacing variant:
@@ -9309,8 +9322,12 @@ function parseSingleBooking(raw) {
     }
     if (iSegs.length > 0) {
       iSegs.forEach(s => segs.push(s));
+      // Capture a TOTAL/total price if present (e.g. "TOTAL CNY 33679").
+      const _tot = raw.match(/TOTAL\s*(?:CNY|RMB|¥|人民币)?\s*([\d,]+(?:\.\d+)?)/i)
+                || raw.match(/(?:CN¥|¥|CNY|RMB)\s*([\d,]+(?:\.\d+)?)/i);
+      const _totVal = _tot ? parseFloat(_tot[1].replace(/,/g, '')) : null;
       return {
-        pax, segs, airline, rmb, usd: null, trip: undefined,
+        pax, segs, airline, rmb: (_totVal && _totVal >= 100) ? _totVal : rmb, usd: null, trip: undefined,
         discount: null, cabin: parsedCabin ?? null, paxPrices: null,
         customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
         urgent: false, ticketSeqNote: undefined,
