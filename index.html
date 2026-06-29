@@ -9257,6 +9257,70 @@ function parseSingleBooking(raw) {
   let parsedCustomRate = undefined;
   let parsedPnr = null;  // standalone PNR captured from text (e.g. "CO26642", "NDPYKN")
 
+  // ── Ctrip/携程 app format with INLINE IATA codes ──────────────────────────
+  // Airline line has "平均到达时间" (no cabin); each dep/arr line glues
+  // date+time+IATA+airport name. IATA codes are present so no city map needed:
+  //   美国联合航空UA199 平均到达时间16:36说明
+  //   07-2520:10PVG浦东国际机场 T2          ← dep: 07-25 20:10 PVG
+  //   飞行12小时10分
+  //   07-25 17:20LAX洛杉矶国际机场T6         ← arr: 07-25 17:20 LAX
+  //   洛杉矶(美国)中转停留3小时40分           ← layover (ignored)
+  //   美国联合航空UA2397平均到达时间04:57说明
+  //   ...
+  // Strategy: airline line anchors a segment; the next two "date+time+IATA" lines
+  // (skipping 飞行/中转/返程 lines) are dep then arr.
+  if (/航空[A-Z]{2}\d/.test(raw) && /平均到达时间/.test(raw)
+      && /\d{2}-\d{2}\s*\d{1,2}:\d{2}\s*[A-Z]{3}|\d{2}-\d{2}\d{1,2}:\d{2}[A-Z]{3}/.test(raw)) {
+    const iLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const iSegs = [];
+    const MN2 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    // Parse a "date+time+IATA" travel line in any spacing variant:
+    //   "07-2520:10PVG..." / "07-25 17:20LAX..." / "08-0517:45 PVG..."
+    const parseTravelLine = (s) => {
+      const m = s.match(/(\d{2})-(\d{2})\s*(\d{1,2}:\d{2})\s*([A-Z]{3})/);
+      if (!m) return null;
+      const mi = parseInt(m[1], 10) - 1;
+      return {
+        date: (mi >= 0 && mi < 12) ? String(parseInt(m[2], 10)).padStart(2, '0') + MN2[mi] : '',
+        time: m[3], iata: m[4].toUpperCase()
+      };
+    };
+    for (let i = 0; i < iLines.length; i++) {
+      const fm = iLines[i].match(/航空\s*([A-Z][A-Z0-9])\s*(\d{2,4})/);
+      if (!fm) continue;
+      const carrier = fm[1].toUpperCase(), flight = fm[2];
+      // Collect the next travel lines until the following airline line. First =
+      // departure, second = arrival. (飞行/中转/返程/行李 lines simply don't parse.)
+      const travel = [];
+      for (let k = i + 1; k < iLines.length; k++) {
+        if (/航空\s*[A-Z][A-Z0-9]\s*\d/.test(iLines[k])) break;
+        const t = parseTravelLine(iLines[k]);
+        if (t) travel.push(t);
+        if (travel.length >= 2) break;
+      }
+      if (travel.length >= 2 && travel[0].iata !== travel[1].iata) {
+        iSegs.push({
+          from: travel[0].iata, to: travel[1].iata,
+          date: travel[0].date, flight: carrier + flight, cls: '',
+          depTime: travel[0].time, arrTime: travel[1].time
+        });
+        if (!airline) airline = carrier;
+      }
+    }
+    if (iSegs.length > 0) {
+      iSegs.forEach(s => segs.push(s));
+      return {
+        pax, segs, airline, rmb, usd: null, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // ── Ctrip/携程 app VERTICAL detailed format ───────────────────────────────
   // Each field on its own line; airline line carries flight# + cabin; the city
   // names are Chinese (no IATA) on the date line above; times/airports follow:
