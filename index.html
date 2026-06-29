@@ -10658,13 +10658,19 @@ function parseSingleBooking(raw) {
     //   - route separator: "-" or "→"
     //   - times optional; 24h ("20:10") or 12h with AM/PM ("6:25 PM"); arrival "+1"/"+2" offset
     const cnDateEnSeg = trimmed.match(
-      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9]|[0-9][A-Z])\s*(\d{1,4})\s+(?:([A-Z])\s+)?([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*(AM|PM)?\s*[-–]\s*(\d{1,2}:\d{2})\s*(AM|PM)?(?:\+\d+)?)?/i
+      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9]|[0-9][A-Z])\s*(\d{1,4})\s+(?:(经济舱|商务舱|头等舱|公务舱|超级经济舱|超经|[A-Z])\s+)?([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*(AM|PM)?\s*[-–]\s*(\d{1,2}:\d{2})\s*(AM|PM)?(?:\+\d+)?)?/i
     );
     if (cnDateEnSeg) {
       const date = cnDateToIATA(cnDateEnSeg[1], cnDateEnSeg[2]);
       const carrier = cnDateEnSeg[3].toUpperCase();
       const flight = cnDateEnSeg[4];
-      const cabinCode = cnDateEnSeg[5] || '';   // optional single-letter class
+      // Cabin: single-letter class code OR a Chinese cabin word. Chinese words also
+      // seed parsedCabin (order-level cabin); single letters stay as the seg class.
+      const cabinRaw = cnDateEnSeg[5] || '';
+      const _cnCabinMap = { '经济舱':'经济舱','商务舱':'商务舱','头等舱':'头等舱','公务舱':'商务舱','超级经济舱':'超级经济舱','超经':'超级经济舱' };
+      const isChineseCabin = !!_cnCabinMap[cabinRaw];
+      const cabinCode = isChineseCabin ? '' : cabinRaw;   // single-letter class only
+      if (isChineseCabin && parsedCabin === undefined) parsedCabin = _cnCabinMap[cabinRaw];
       const from = cnDateEnSeg[6];
       const to = cnDateEnSeg[7];
       // Convert 12h+AM/PM to 24h when meridiem present; otherwise keep as-is.
