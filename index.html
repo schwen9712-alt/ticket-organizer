@@ -14580,6 +14580,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="openMRZDialog(${idx}); closeOrderMenu()" style="${passportDone ? doneStyle : ''}" title="粘贴护照 MRZ 给此单添加乘客">${passportDone ? checkmark : ''}📷 加护照</button>
       <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? doneStyle : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
+      <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? doneStyle : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx}); closeOrderMenu()" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
       ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx}); closeOrderMenu()" title="与行程/价格相同的订单合并乘客">⊕ 合单</button>` : ''}
@@ -18180,6 +18181,37 @@ function toggleNoAvailability(idx) {
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
   toast(o.noAvailability ? '⏸ 已标记为暂时无位' : '✓ 已恢复');
+}
+
+// 改运价 — quick manual correction of an order's TOTAL price (CNY). Uses a prompt
+// so it works regardless of whether the card is expanded. Sets flat-price mode
+// (which overrides the discount formula) to the entered total. This is the one-tap
+// "the parser got the price wrong, fix it now" path.
+async function editOrderPrice(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const pax = (o.passengers && o.passengers.length) || 1;
+  // Current total for the prompt default.
+  const curTotal = (() => {
+    const fp = computeFinalPrice(o);
+    if (fp != null) return Math.round(fp);
+    if (o.rmb != null) return Math.round(o.rmb * pax);
+    return '';
+  })();
+  const paxNote = pax > 1 ? `（共 ${pax} 人，将平摊为人均 ¥${curTotal ? Math.round(curTotal / pax).toLocaleString() : '—'}）` : '';
+  const input = prompt(`修改此单总运价（人民币）${paxNote}\n\n输入新的总价，留空取消：`, curTotal === '' ? '' : String(curTotal));
+  if (input === null) return;                       // cancelled
+  const raw = input.trim().replace(/[,，¥￥\s]/g, ''); // tolerate commas / yen sign / spaces
+  if (raw === '') { toast('未输入，已取消'); return; }
+  const v = Number(raw);
+  if (isNaN(v) || v < 0) { toast('金额无效，请输入数字'); return; }
+  // Set flat-price (一口价) TOTAL mode to the entered value — overrides discount.
+  o.flatPriceMode = true;
+  o.flatPricePerPax = false;
+  o.flatPriceCny = v;
+  await _afterFlatPriceChange(idx);
+  const total = computeFinalPrice(o);
+  toast(`✓ 总运价已改为 ¥${v.toLocaleString()}${pax > 1 ? `（人均 ¥${Math.round((total || v) / pax).toLocaleString()}）` : ''}`);
 }
 
 // Toggle urgent (加急) flag on an order. Flagged orders sort to the top of
