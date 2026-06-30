@@ -10710,7 +10710,29 @@ function parseSingleBooking(raw) {
       }
     }
 
-    // ── Chinese format segment: "1. 联合航空UA771  06月04日  洛杉矶 - 北京首都  23:35出发  04:40+2到达"
+    // ── Chinese-date with carrier BEFORE route, flight number AFTER route ──────
+    //   "8月31日 UA LAX-EWR 199 12:40-12:50"
+    // Order: date / carrier / IATA-IATA route / flight# / times. Unusual layout
+    // where the flight number is separated from the carrier by the route.
+    const cnDateRouteFirst = trimmed.match(
+      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9])\s+([A-Z]{3})\s*[-→]\s*([A-Z]{3})\s+(\d{1,4})(?:\s+(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})(?:\+\d+)?)?\s*$/
+    );
+    if (cnDateRouteFirst) {
+      const date = cnDateToIATA(cnDateRouteFirst[1], cnDateRouteFirst[2]);
+      const carrier = cnDateRouteFirst[3].toUpperCase();
+      const from = cnDateRouteFirst[4].toUpperCase();
+      const to = cnDateRouteFirst[5].toUpperCase();
+      const flight = cnDateRouteFirst[6];
+      const depTime = cnDateRouteFirst[7] || '';
+      const arrTime = cnDateRouteFirst[8] || '';
+      if (carrier && flight && from && to && date && from !== to) {
+        segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime });
+        if (!airline) airline = carrier;
+        _d(trimmed, '✅ SEGMENT', `${carrier+flight} ${from}→${to} ${date}`);
+        matched = true;
+        continue;
+      }
+    }
     // Also: "1. UA771  06月04日  洛杉矶 - 北京首都" (no Chinese airline name)
     // Also 恒途: "1. AS1352  06月03日(星期三)  洛杉矶T6 - 圣何塞胡安　圣玛利亚M  16:40  23:33"
     // Also bare dot: ". UA869  07月02日  旧金山I - 香港T1  13:45  18:55+1" (no leading digit)
