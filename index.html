@@ -9954,7 +9954,31 @@ function parseSingleBooking(raw) {
       // "SURNAME,GIVEN" — letters, a comma, letters (allow spaces in given e.g. "GAO,PENG FEI").
       // Accept both ASCII "," and full-width Chinese "，" (U+FF0C) — passport OCR/IME
       // pastes frequently use the Chinese comma (e.g. "GU， JEFFREY").
-      const nameCard = cur.match(/^([A-Z]{2,}(?:\s+[A-Z]+)*)\s*[,，]\s*([A-Z]{2,}(?:\s+[A-Z]+)*)$/);
+      let nameCard = cur.match(/^([A-Z]{2,}(?:\s+[A-Z]+)*)\s*[,，]\s*([A-Z]{2,}(?:\s+[A-Z]+)*)$/);
+      let splitNameConsumed = 0;
+      // Split-name variant: surname and given on TWO separate bare lines, e.g.
+      //   JIANG
+      //   LI
+      //   08 APR 1960
+      //   FEMALE
+      // Only treat as a name pair when the line AFTER the two candidate name lines
+      // looks like a DOB or gender (so ordinary all-caps words aren't misread).
+      if (!nameCard) {
+        const l1 = cur;
+        const l2 = (expandedLines[i + 1] || '').trim();
+        const l3 = (expandedLines[i + 2] || '').trim();
+        const bareName = (s) => /^[A-Z]{2,}(?:\s+[A-Z]+)?$/.test(s);
+        const looksDOB = (s) => /^\d{1,2}\s*[A-Z0-9]{3}\s*\d{2,4}$/i.test(s)
+          || /^\d{4}[\-\/\.]\d{1,2}[\-\/\.]\d{1,2}$/.test(s)
+          || /^\d{4}\s*年/.test(s);
+        const looksGender = (s) => /^(男|女|MALE|FEMALE|M|F)$/i.test(s);
+        const NON_NAME_WORD = /^(INCL|TAX|TAXES|FEE|FEES|TOTAL|FARE|CNY|RMB|USD|EUR|PNR|TICKET|TKT|CLASS|CABIN|SEAT|BAG|PC|KG|ECONOMY|BUSINESS|FIRST|COACH|ADULT|CHILD|INFANT|NONSTOP|DURATION|TRAVELERS?|FLIGHT|EMISSIONS)$/i;
+        if (bareName(l1) && bareName(l2) && !NON_NAME_WORD.test(l1) && !NON_NAME_WORD.test(l2)
+            && (looksDOB(l3) || looksGender(l3))) {
+          nameCard = [cur, l1, l2];      // synthesize [full, surname, given]
+          splitNameConsumed = 1;          // we consumed the extra given-name line
+        }
+      }
       // Guard: skip obvious non-name phrases (tax/fare boilerplate) even if they
       // happen to contain a comma. Real names won't contain these tokens.
       const NON_NAME = /\b(INCL|TAX|TAXES|FEE|FEES|TOTAL|FARE|CNY|RMB|USD|EUR|PNR|TICKET|TKT|CLASS|CABIN|SEAT|BAG|PC|KG|ECONOMY|BUSINESS|FIRST|ADULT|CHILD|INFANT)\b/i;
@@ -9964,9 +9988,12 @@ function parseSingleBooking(raw) {
         let gender = '';
         let dob = '';
         let consumed = 0;
-        // Look at up to the next 3 lines for gender / DOB
-        for (let k = 1; k <= 3 && i + k < expandedLines.length; k++) {
-          const nxt = expandedLines[i + k].trim();
+        // For split-name, the given-name line at i+1 is already consumed; start the
+        // gender/DOB scan after it. For comma-name, start at i+1 as before.
+        const scanBase = splitNameConsumed;  // 0 for comma-name, 1 for split-name
+        // Look at up to the next 3 lines (after the name) for gender / DOB
+        for (let k = 1; k <= 3 && i + scanBase + k < expandedLines.length; k++) {
+          const nxt = expandedLines[i + scanBase + k].trim();
           // gender line: 男/M, 女/F, 男, 女, M, F, MALE, FEMALE
           const gm = nxt.match(/^(?:性别\s*[：:]?\s*)?(男|女|MALE|FEMALE|M|F)\s*(?:\/\s*(男|女|M|F|MALE|FEMALE))?$/i);
           // OCR month repair: passport scans turn O↔0 and I↔1, so "0CT"→"OCT",
@@ -10007,7 +10034,7 @@ function parseSingleBooking(raw) {
         if (gender || dob) {
           // Build a synthetic standard line: "GAO/PENG 男 21MAY89"
           merged.push(`${surname}/${given} ${gender || ''} ${dob || ''}`.replace(/\s+/g,' ').trim());
-          i += consumed; // skip the lines we folded in
+          i += scanBase + consumed; // skip given-name line (split) + gender/DOB lines
           continue;
         }
       }
@@ -10729,6 +10756,26 @@ function parseSingleBooking(raw) {
         segs.push({ from, to, date, flight: carrier + flight, cls: '', depTime, arrTime });
         if (!airline) airline = carrier;
         _d(trimmed, '✅ SEGMENT', `${carrier+flight} ${from}→${to} ${date}`);
+        matched = true;
+        continue;
+      }
+    }
+
+    // ── Chinese-date carrier + route, NO flight number ────────────────────────
+    //   "8月20日 UA SFO-HKG"   (flight number to be filled in manually)
+    // Kept AFTER the flight-numbered variants so those win when a number is present.
+    const cnDateNoFlight = trimmed.match(
+      /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9])\s+([A-Z]{3})\s*[-→]\s*([A-Z]{3})\s*$/
+    );
+    if (cnDateNoFlight) {
+      const date = cnDateToIATA(cnDateNoFlight[1], cnDateNoFlight[2]);
+      const carrier = cnDateNoFlight[3].toUpperCase();
+      const from = cnDateNoFlight[4].toUpperCase();
+      const to = cnDateNoFlight[5].toUpperCase();
+      if (carrier && from && to && date && from !== to) {
+        segs.push({ from, to, date, flight: carrier, cls: '', depTime: '', arrTime: '' });
+        if (!airline) airline = carrier;
+        _d(trimmed, '✅ SEGMENT', `${carrier}(无航班号) ${from}→${to} ${date}`);
         matched = true;
         continue;
       }
