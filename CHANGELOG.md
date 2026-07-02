@@ -1,3 +1,40 @@
+## 2026-06-11 — 解析器新增：Expedia "City (IATA) to City (IATA) on Day" 详细格式
+
+**改了什么**
+新增 Expedia/OTA 详细行程格式，特点：城市带IATA括号、航班号粘连行尾、时间/中转独立成行、首行是总览：
+```
+Tokyo (NRT) to Oklahoma City (OKC) on Sun, Jul 5           ← 总览(跳过)
+Tokyo (NRT) to Houston (IAH) on Sun, Jul 5United 6         ← 分段1
+Houston (IAH) to Oklahoma City (OKC) on Mon, Jul 6United 6189 (operated by...)  ← 分段2
+5:00 PM to 3:00 PM on Sun, Jul 5 (12h 0m)Boeing 787        ← 分段1时间
+LAYOVER IN IAH (23H 35M)
+2:35 PM to 4:15 PM (1h 40m)                                ← 分段2时间
+Business / First (C)
+```
+策略：只取带航班号的分段行（总览行无航班号自动跳过）；时间行按顺序配对分段；航司名→IATA（United→UA）；LAYOVER行忽略；舱位取 Business/First 等。
+
+**端到端结果（用户输入）**
+- ✓ UA6 05JUL NRT-IAH 17:00-15:00
+- ✓ UA6189 06JUL IAH-OKC 14:35-16:15
+- ✓ 舱位 头等舱，未识别清零
+
+**测试通过（6项+16核心回归 全过）**
+- ✓ 双段+总览跳过；单段American
+- ✓ 防误伤：Expedia紧凑总价、Expedia两行、GDS 不被吞
+- ✓ 有括号IATA但无"on Day"不误触发
+- ✓ 16项核心回归全通过
+
+**改动位置**
+- index.html ~9532：Expedia括号格式块（在Expedia紧凑块前）
+
+**风险或注意事项**
+- ⚠ 检测需 (IATA) to + on Day + 航司名，三者齐全防误触发
+- ⚠ 时间按顺序配对分段（分段i配时间i）；若时间行数与分段不符可能错位，但常见双段场景正确
+- ⚠ 无价格/乘客，纯航段——需另贴
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-11 — SSR解析补强：斜杠周围空格 + 单位数日补零
 
 **改了什么**

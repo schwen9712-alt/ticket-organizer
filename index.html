@@ -9529,6 +9529,74 @@ function parseSingleBooking(raw) {
     }
   }
 
+  // ── Expedia/OTA "City (IATA) to City (IATA) on Day...Airline Flight" format ──
+  // Detailed itinerary where each leg line ends with a glued airline+flight, an
+  // optional summary line (no flight number) may lead, and times/layovers are on
+  // separate lines:
+  //   Tokyo (NRT) to Oklahoma City (OKC) on Sun, Jul 5           ← summary (skip)
+  //   Tokyo (NRT) to Houston (IAH) on Sun, Jul 5United 6         ← leg 1
+  //   Houston (IAH) to Oklahoma City (OKC) on Mon, Jul 6United 6189 (operated by...) ← leg 2
+  //   5:00 PM to 3:00 PM on Sun, Jul 5 (12h 0m)Boeing 787        ← times for leg 1
+  //   LAYOVER IN IAH (23H 35M)
+  //   2:35 PM to 4:15 PM (1h 40m)                                ← times for leg 2
+  //   Business / First (C)                                      ← cabin
+  // Legs WITH a flight number are real segments; the flightless summary is skipped.
+  if (/\([A-Z]{3}\)\s*to\s+/.test(raw) && /\bon\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)/i.test(raw)
+      && /(?:United|American|Delta|Alaska|JetBlue|Southwest|Hawaiian|Spirit|Frontier|Air\s|ANA|JAL)/i.test(raw)) {
+    const oLines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const MON3 = { Jan:'JAN',Feb:'FEB',Mar:'MAR',Apr:'APR',May:'MAY',Jun:'JUN',Jul:'JUL',Aug:'AUG',Sep:'SEP',Oct:'OCT',Nov:'NOV',Dec:'DEC' };
+    // Airline display-name → IATA code
+    const AL = { United:'UA', American:'AA', Delta:'DL', Alaska:'AS', JetBlue:'B6', Southwest:'WN', Hawaiian:'HA', Spirit:'NK', Frontier:'F9', ANA:'NH', JAL:'JL' };
+    const oSegs = [];
+    const oTimes = [];
+    for (const line of oLines) {
+      // Time line: "5:00 PM to 3:00 PM ..." — collect in order for later pairing.
+      const tm = line.match(/(\d{1,2}:\d{2})\s*([AP]M)\s*to\s*(\d{1,2}:\d{2})\s*([AP]M)/i);
+      if (tm && !/\)\s*to\s+/.test(line)) {  // a time line, not a city line
+        const to24 = (hm, ap) => {
+          let [h, mm] = hm.split(':').map(Number);
+          const pm = ap.toUpperCase() === 'PM';
+          if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0;
+          return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+        };
+        oTimes.push({ dep: to24(tm[1], tm[2]), arr: to24(tm[3], tm[4]) });
+        continue;
+      }
+      // Leg line: "...(IATA) to ...(IATA) on Day, Mon D<Airline> <Flight>"
+      const lm = line.match(/\(([A-Z]{3})\)\s*to\s+.+?\(([A-Z]{3})\)\s*on\s+\w+,\s*([A-Z][a-z]+)\s+(\d{1,2})\s*([A-Z][a-z]+)\s*(\d{1,4})/);
+      if (lm) {
+        const from = lm[1].toUpperCase(), to = lm[2].toUpperCase();
+        const mon = MON3[lm[3]] || '';
+        const day = String(parseInt(lm[4], 10)).padStart(2, '0');
+        const airlineName = lm[5];
+        const flightNum = lm[6];
+        const code = AL[airlineName] || airlineName.slice(0, 2).toUpperCase();
+        if (mon) oSegs.push({ from, to, date: day + mon, flight: code + flightNum, cls: '', depTime: '', arrTime: '' });
+      }
+    }
+    // Pair times to segments in order (segment i gets time i).
+    oSegs.forEach((s, i) => { if (oTimes[i]) { s.depTime = oTimes[i].dep; s.arrTime = oTimes[i].arr; } });
+    // Cabin: first cabin word found (Business/First/Economy/Premium).
+    const cabM = raw.match(/\b(Business|First|Economy|Premium\s*Economy)\b/i);
+    if (cabM && parsedCabin === undefined) {
+      const cmap = { business:'商务舱', first:'头等舱', economy:'经济舱', 'premium economy':'超级经济舱' };
+      parsedCabin = cmap[cabM[1].toLowerCase().replace(/\s+/g, ' ')] || null;
+    }
+    if (oSegs.length > 0) {
+      oSegs.forEach(s => segs.push(s));
+      if (!airline && oSegs[0]) airline = oSegs[0].flight.slice(0, 2);
+      return {
+        pax, segs, airline, rmb, usd: null, trip: undefined,
+        discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+        customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+        urgent: false, ticketSeqNote: undefined,
+        basicFare: false, basicFareLabel: '',
+        fareByType: null, unrecognizedLines: [],
+        waitingForRelease: /要放位|等放位|需要放位|放位/u.test(raw)
+      };
+    }
+  }
+
   // ── Expedia/OTA compact "Total due" format ────────────────────────────────
   // A single-block itinerary where fields are glued and only a TOTAL (not per-pax)
   // price is shown, with a passenger breakdown like "2 adults 18+2 children":
