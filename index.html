@@ -10322,15 +10322,26 @@ function parseSingleBooking(raw) {
         ssrLine = ssrLine.slice(0, ssrLine.length - ssrTrailingPrice[0].length);
       }
     }
+    // Normalize stray spaces AROUND slashes in the P/.../ document block, which some
+    // pastes introduce: "P/CHN/ F4910309/CHN/2MAR71/M/2MAR30/ ZHANG/ XIAOMEI/P1".
+    // Collapse "/ x" and "x /" to "/x" so the strict field regex below matches.
+    // Only applied from the "P/" token onward to avoid touching earlier text.
+    {
+      const pIdx = ssrLine.search(/\bP\//i);
+      if (pIdx >= 0) {
+        ssrLine = ssrLine.slice(0, pIdx) + ssrLine.slice(pIdx).replace(/\s*\/\s*/g, '/');
+      }
+    }
     // EXPIRY is now OPTIONAL: some SSR lines omit it, e.g.
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
     const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
     if (ssrMatch) {
-      const dob = ssrMatch[1].toUpperCase();
+      const _pad2 = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');  // "2MAR71"→"02MAR71"
+      const dob = _pad2(ssrMatch[1].toUpperCase());
       const gender = ssrMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const expiry = ssrMatch[3] ? ssrMatch[3].toUpperCase() : '';  // optional
+      const expiry = ssrMatch[3] ? _pad2(ssrMatch[3].toUpperCase()) : '';  // optional
       const surname = ssrMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = ssrMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = `${surname}/${given}`;
@@ -10353,9 +10364,10 @@ function parseSingleBooking(raw) {
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
     const bareDocMatch = trimmed.match(/^P\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
     if (bareDocMatch) {
-      const dob = bareDocMatch[1].toUpperCase();
+      const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
+      const dob = _pad2b(bareDocMatch[1].toUpperCase());
       const gender = bareDocMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const expiry = bareDocMatch[3] ? bareDocMatch[3].toUpperCase() : '';
+      const expiry = bareDocMatch[3] ? _pad2b(bareDocMatch[3].toUpperCase()) : '';
       const surname = bareDocMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = bareDocMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = `${surname}/${given}`;
