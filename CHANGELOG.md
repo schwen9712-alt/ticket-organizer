@@ -1,3 +1,24 @@
+## 2026-06-11 — 部署通道切换：官方 Actions workflow（修复持续 deploy 失败）
+
+**改了什么**
+新增 `.github/workflows/deploy-pages.yml` — GitHub Pages 官方 Actions 部署通道，替代默认 "pages build and deployment"（该通道 #121、#122 连续 deploy 失败，报 "Deployment failed, try again later"，build 均成功，属 Pages 发布环节配置性故障）。
+
+workflow 要点：push 到 main 自动跑；支持 Actions 页手动触发；官方三件套 configure-pages→upload-pages-artifact→deploy-pages；并发控制新部署顶掉排队旧部署。
+
+**部署操作变化（重要）**
+1. 解压后把 `.github` 文件夹（含 workflows/deploy-pages.yml）连同 index.html、CHANGELOG.md 一起拖进本地仓库
+2. GitHub Desktop commit + push
+3. **必须一次性设置**：仓库 Settings → Pages → Source 改为 **GitHub Actions**（否则新旧两条通道并行，旧的还会报错干扰）
+4. 之后每次 push，Actions 页会出现 "Deploy to GitHub Pages" 运行，绿了即上线
+
+**风险或注意事项**
+- ⚠ Source 不切到 GitHub Actions 的话，旧通道继续跑继续红，但不影响新通道实际部署成功
+- ⚠ .github 是隐藏文件夹，拖拽时确认它进了仓库根目录
+- ⚠ 首次运行若报权限错误，检查 Settings → Actions → General → Workflow permissions 为 Read and write
+
+**回滚方式**
+删除 .github/workflows/deploy-pages.yml，Settings → Pages → Source 改回 Deploy from a branch。
+---
 ## 2026-06-11 — 全面审核审查：31项改动核对 + 边界统一 + ReDoS压测
 
 **改了什么**
