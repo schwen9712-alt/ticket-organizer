@@ -8444,6 +8444,34 @@ function removeFromBlacklist(name) {
   storageSet('ticket-organizer-settings', settings);
 }
 
+// One-tap: add every passenger of an order to the online-invoicing blacklist.
+// Used from the order card menu so the operator doesn't have to retype names in
+// Settings. Confirms first, skips names already listed, and refreshes the
+// blacklist UI if the Settings panel is open.
+function blacklistOrderPax(idx) {
+  const o = STATE.orders[idx];
+  if (!o || !Array.isArray(o.passengers) || o.passengers.length === 0) {
+    toast('此单没有可加入黑名单的乘客');
+    return;
+  }
+  const names = o.passengers.map(p => p && p.name).filter(Boolean).map(normalizeBlacklistName);
+  const uniq = [...new Set(names)];
+  if (uniq.length === 0) { toast('此单没有有效乘客姓名'); return; }
+  const already = uniq.filter(n => isBlacklisted(n));
+  const toAdd = uniq.filter(n => !isBlacklisted(n));
+  if (toAdd.length === 0) {
+    toast(`这些乘客已在黑名单中：${already.join('、')}`);
+    return;
+  }
+  const msg = `确定把以下乘客加入在线开票黑名单？\n\n${toAdd.map(n => '  • ' + n).join('\n')}` +
+    (already.length ? `\n\n（已在名单中，跳过：${already.join('、')}）` : '') +
+    `\n\n下次录入到同名乘客时会强提醒。`;
+  if (!confirm(msg)) return;
+  toAdd.forEach(n => addToBlacklist(n));
+  if (typeof renderBlacklistList === 'function') renderBlacklistList();
+  toast(`⛔ 已加入黑名单：${toAdd.join('、')}`);
+}
+
 function computeFinalPrice(o) {
   if (!o) return null;
   // ── Flat price (一口价) takes precedence over the discount formula ──
@@ -9245,6 +9273,19 @@ function parseSingleBooking(raw) {
   const segs = [];
   let airline = '';
   let rmb = null, usd = null, parsedDiscount = null;
+  // Universal TOTAL price extractor. "TOTAL CNY 12345" (or ¥/CN¥/RMB, with optional
+  // thousands separators) is ALWAYS the order price — this helper lets every
+  // short-circuit format parser adopt it, so the price is never lost regardless of
+  // which itinerary format matched. Returns a number or the passed-in fallback.
+  const _totalFromRaw = (fallback) => {
+    const m = raw.match(/TOTAL\s*(?:CNY|RMB|¥|人民币)?\s*([\d,]+(?:\.\d+)?)/i)
+           || raw.match(/(?:CN¥|¥|CNY|RMB)\s*([\d,]+(?:\.\d+)?)/i);
+    if (m) {
+      const v = parseFloat(m[1].replace(/,/g, ''));
+      if (v >= 100 && v <= 5000000) return v;
+    }
+    return fallback;
+  };
   // Declare shared parse-result variables upfront to avoid var-hoisting bugs
   let parsedCabin = undefined;
   let parsedBasicFare = false;       // 基础/特价运价（不可退改）
@@ -9427,7 +9468,7 @@ function parseSingleBooking(raw) {
     if (vSegs.length > 0) {
       vSegs.forEach(s => segs.push(s));
       return {
-        pax, segs, airline, rmb, usd: null, trip: undefined,
+        pax, segs, airline, rmb: _totalFromRaw(rmb), usd: null, trip: undefined,
         discount: null, cabin: parsedCabin ?? null, paxPrices: null,
         customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
         urgent: false, ticketSeqNote: undefined,
@@ -9518,7 +9559,7 @@ function parseSingleBooking(raw) {
     if (cSegs.length > 0) {
       cSegs.forEach(s => segs.push(s));
       return {
-        pax, segs, airline, rmb, usd: null, trip: undefined,
+        pax, segs, airline, rmb: _totalFromRaw(rmb), usd: null, trip: undefined,
         discount: null, cabin: parsedCabin ?? null, paxPrices: null,
         customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
         urgent: false, ticketSeqNote: undefined,
@@ -9586,7 +9627,7 @@ function parseSingleBooking(raw) {
       oSegs.forEach(s => segs.push(s));
       if (!airline && oSegs[0]) airline = oSegs[0].flight.slice(0, 2);
       return {
-        pax, segs, airline, rmb, usd: null, trip: undefined,
+        pax, segs, airline, rmb: _totalFromRaw(rmb), usd: null, trip: undefined,
         discount: null, cabin: parsedCabin ?? null, paxPrices: null,
         customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
         urgent: false, ticketSeqNote: undefined,
@@ -14730,6 +14771,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? doneStyle : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
       <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
+      <button class="btn ghost small" onclick="blacklistOrderPax(${idx}); closeOrderMenu()" title="把此单乘客加入在线开票黑名单（下次录入到同名会强提醒）">⛔ 加入黑名单</button>
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? doneStyle : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
       ${o.passengers.length > 1 ? `<button class="btn ghost small" onclick="openSplitOrderDialog(${idx}); closeOrderMenu()" title="卡主额度不足时,按乘客拆成多个订单">✂ 拆单</button>` : ''}
       ${findMergeableOrders(idx).length > 0 ? `<button class="btn ghost small" onclick="openMergeDialog(${idx}); closeOrderMenu()" title="与行程/价格相同的订单合并乘客">⊕ 合单</button>` : ''}

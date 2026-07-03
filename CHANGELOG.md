@@ -1,3 +1,69 @@
+## 2026-06-11 — 黑名单增强：订单菜单一键「⛔ 加入黑名单」
+
+**改了什么**
+黑名单功能已存在（Settings 里可管理、录入命中弹窗强提醒）。本次新增便捷入口：订单卡片菜单加「⛔ 加入黑名单」按钮（在「改运价」后），一键把此单所有乘客加入在线开票黑名单，不用去 Settings 手敲名字。
+
+**为什么改**
+用户要求在线开票黑名单，避免白费精力。核心功能上个 session 已做，缺的是便捷标记入口——之前只能在设置里手动敲。
+
+**功能细节**
+- 一键拉黑此单全部乘客（去重、大小写/空格不敏感）
+- 已在名单的自动跳过，提示哪些跳过
+- confirm 确认后加入，toast 反馈
+- 若设置面板开着，自动刷新黑名单列表
+- 下次录入到同名乘客 → alert 强提醒（订单仍照常录入，原有逻辑）
+
+**测试通过**
+- 去重：zhang/san 与 ZHANG/SAN 合并
+- 大小写/空格：zhang/ san 命中 ZHANG/SAN
+- 未拉黑不误判；重复加入自动跳过（toAdd=0）
+- 审计：语法✅ 重复函数0 console.log0
+
+**改动位置**
+- index.html ~14746：菜单加「⛔ 加入黑名单」按钮
+- index.html ~8450：blacklistOrderPax 函数
+
+**风险或注意事项**
+- ⚠ 黑名单存 settings.blacklist，跟随现有同步机制
+- ⚠ 按 normalizeBlacklistName 规范化后精确匹配（姓名级，非姓氏模糊）
+- ⚠ 命中仅提醒不拦截，订单照常录入（符合"强提醒"需求）
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
+## 2026-06-11 — TOTAL CNY 全格式统一采集为运价
+
+**改了什么**
+新增统一价格提取 helper `_totalFromRaw`，让所有专用格式解析器（short-circuit return）都采集 `TOTAL CNY XXXX`（及 ¥/CN¥/RMB、千分位）。此前携程横排、携程竖排、Expedia括号三个格式 short-circuit 时丢失 TOTAL 价格，现全部补齐。
+
+**为什么改**
+用户要求：`TOTAL CNY XXXX` 在任何情况下都识别为运价。排查发现多个专用解析器各自 return 时未采集 TOTAL，导致有航段无价格。
+
+**端到端结果（各格式验证）**
+全部采集到 TOTAL：
+- ✓ 携程带IATA（原已支持）
+- ✓ 携程横排（本次补）
+- ✓ 携程竖排（本次补）
+- ✓ Expedia括号（本次补）
+- ✓ Expedia总价（原已支持）
+
+**测试通过（6项+15核心回归 全过）**
+- ✓ TOTAL CNY/千分位/无CNY/横排+千分位 各写法
+- ✓ 防误伤：无TOTAL时GDS自身价格不被覆盖；无价格时不误采
+- ✓ 15项核心回归全通过
+
+**改动位置**
+- index.html ~9248：parseSingleBooking 开头定义 _totalFromRaw helper
+- index.html ~9441/9532/9599：携程竖排/横排/Expedia括号 return 采用 _totalFromRaw(rmb)
+
+**风险或注意事项**
+- ⚠ TOTAL 金额范围 100-5000000 校验，避免证件号等误采
+- ⚠ 优先匹配 "TOTAL 数字"，其次 CN¥/¥ 前缀；rmb 已有值时 helper 用 fallback 不覆盖
+- ⚠ 这是统一入口，未来新增 short-circuit 格式也应 rmb: _totalFromRaw(rmb)
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-11 — 解析器新增：Expedia "City (IATA) to City (IATA) on Day" 详细格式
 
 **改了什么**
