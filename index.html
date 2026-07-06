@@ -11220,6 +11220,45 @@ function parseSingleBooking(raw) {
       }
     }
 
+    // 0b. PLUS-JOINED fare: "公务25260+22101" / "经济舱8000+6000+800" —
+    //    optional cabin word, then 2-3 amounts joined by "+".
+    //    Convention: first = adult, second = child, third = infant.
+    //    If only two amounts and the second is < 30% of the first, it's an
+    //    infant fare (child fares run 75-90% of adult; infant ~10%).
+    const plusFare = trimmed.match(
+      /^(公务|商务|头等|经济|超经|超级经济)?\s*舱?\s*(\d{3,6})(?:\.\d+)?\s*\+\s*(\d{3,6})(?:\.\d+)?(?:\s*\+\s*(\d{3,6})(?:\.\d+)?)?\s*$/
+    );
+    if (plusFare) {
+      const cabinW = plusFare[1] || '';
+      const a1 = parseFloat(plusFare[2]);
+      const a2 = parseFloat(plusFare[3]);
+      const a3 = plusFare[4] ? parseFloat(plusFare[4]) : null;
+      // With a cabin prefix the intent is unambiguous (floor 100); a bare "N+M"
+      // line needs a higher floor (500) so stray small numbers can't match.
+      const lo = cabinW ? 100 : 500;
+      const inRange = (v) => v >= lo && v <= 500000;
+      if (inRange(a1) && inRange(a2) && (a3 === null || inRange(a3))) {
+        if (!parsedFareByType) parsedFareByType = {};
+        parsedFareByType.adult = a1;
+        if (a3 !== null) {
+          parsedFareByType.child = a2;
+          parsedFareByType.infant = a3;
+        } else if (a2 < a1 * 0.3) {
+          parsedFareByType.infant = a2;
+        } else {
+          parsedFareByType.child = a2;
+        }
+        if (!rmb) rmb = a1;  // adult fare seeds rmb
+        if (cabinW && parsedCabin === undefined) {
+          const cw = { '公务':'商务舱','商务':'商务舱','头等':'头等舱','经济':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱' };
+          parsedCabin = cw[cabinW] || undefined;
+        }
+        _d(trimmed, '✅ FARE-PLUS', `adult:${a1} ${a3!==null?`child:${a2} infant:${a3}`:(a2<a1*0.3?`infant:${a2}`:`child:${a2}`)}${cabinW?` cabin:${cabinW}`:''}`);
+        matched = true;
+        continue;
+      }
+    }
+
     // 1. Chinese prefix: "大人运价... 43648 CNY", "婴儿运价... INF 3425 CNY"
     // 2. Inline fare code: "01 DNW00KRK       INF  3045 CNY" or "01 ABC  CNN  43558 CNY"
     // Same-line MULTIPLE "类型：金额" pairs, optionally each TOTAL-prefixed:
