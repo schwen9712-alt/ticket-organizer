@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.11-P\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.13-E\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.11-P</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.13-E</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9391,6 +9391,21 @@ function extractDOB(text) {
 }
 
 function parseSingleBooking(raw) {
+  // ── Single-line GDS rescue ──────────────────────────────────────────────────
+  // Pastes from chat apps sometimes lose ALL newlines, flattening a GDS booking
+  // ("1.  UA153 … DK1 …  2.  UA152 …  NAME/NAME 女 date … 成人25260 儿童22101")
+  // into one line. When the whole input is ≤2 non-empty lines AND carries a GDS
+  // segment signature, re-insert breaks before structural markers so the normal
+  // line-based scan works. Multi-line input is untouched.
+  if (raw.split(/\r?\n/).filter(l => l.trim()).length <= 2
+      && /\d\s*\.\s+[A-Z][A-Z0-9]\d{2,4}\s+.*DK\d/.test(raw)) {
+    raw = raw
+      .replace(/\s+(?=\d\s*\.\s+[A-Z][A-Z0-9]\d{2,4}\s)/g, '\n')                    // before "2.  UA152"
+      .replace(/\s+(?=[A-Z]{2,}\/[A-Z]{2,}(?:\s+[A-Z]+)?\s+[男女])/g, '\n')          // before "NAME/NAME 女"
+      .replace(/\s+(?=(?:大人|成人|儿童|小儿|婴儿)\s*\d{3,6}(?:\s|$))/g, '\n')        // before "成人25260"
+      .replace(/\s+(?=(?:公务|商务|头等|经济|超经|超级经济)\s*舱?\s*\d{3,6}\s*\+)/g, '\n') // before "公务25260+…"
+      .replace(/\s+(?=TOTAL\s)/gi, '\n');                                            // before TOTAL
+  }
   const lines = raw.split(/\r?\n/);
   const pax = [];
   const segs = [];
@@ -10945,6 +10960,50 @@ function parseSingleBooking(raw) {
     //   - extra spaces between fields
     //   - route separator: "-" or "→"
     //   - times optional; 24h ("20:10") or 12h with AM/PM ("6:25 PM"); arrival "+1"/"+2" offset
+    // ── eterm/黑屏 booking commands: nm (name), ss (sell segment), co (cost) ──
+    //   nm1LIN/YAN
+    //   ss  DL388  V 18JUL  PVGDTW 1
+    //   co11197元，1件行李经济
+    // "nm" pushes a bare pax; a later SSR DOCS line merges DOB/gender into it.
+    const nmName = trimmed.match(/^nm\d*\s*([A-Z]{2,})\s*\/\s*([A-Za-z]{2,}(?:\s+[A-Za-z]+)*)\s*$/i);
+    if (nmName) {
+      const name = (nmName[1] + '/' + nmName[2]).toUpperCase().replace(/\s+/g, ' ');
+      if (!pax.find(p => p.name === name)) pax.push({ name, gender: '', dob: '' });
+      _d(trimmed, '✅ PAX', `${name} (nm指令)`);
+      matched = true;
+      continue;
+    }
+    // "ss <carrier><flight> <class> <date> <ORIGDEST> [seats]" — date has no weekday.
+    const ssSeg = trimmed.match(/^ss\s+([A-Z][A-Z0-9])\s*(\d{2,4})\s+([A-Z])\s+(\d{1,2})([A-Z]{3})\s+([A-Z]{3})([A-Z]{3})(?:\s+\d{1,2})?\s*$/i);
+    if (ssSeg) {
+      const carrier = ssSeg[1].toUpperCase();
+      const flight = ssSeg[2];
+      const cls = ssSeg[3].toUpperCase();
+      const date = String(parseInt(ssSeg[4], 10)).padStart(2, '0') + ssSeg[5].toUpperCase();
+      const from = ssSeg[6].toUpperCase(), to = ssSeg[7].toUpperCase();
+      if (from !== to) {
+        segs.push({ from, to, date, flight: carrier + flight, cls, depTime: '', arrTime: '' });
+        if (!airline) airline = carrier;
+        _d(trimmed, '✅ SEGMENT', `${carrier+flight} ${from}→${to} ${date} (ss指令)`);
+        matched = true;
+        continue;
+      }
+    }
+    // "co11197元，1件行李经济" — cost note: price in 元, optional cabin word on the line.
+    const coLine = trimmed.match(/^co\s*(\d{3,6})(?:\.\d+)?\s*元/i);
+    if (coLine) {
+      const amt = parseFloat(coLine[1]);
+      if (amt >= 100 && amt <= 500000 && !rmb) rmb = amt;
+      const cabM = trimmed.match(/(超级经济舱|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)/);
+      if (cabM && parsedCabin === undefined) {
+        const cw = { '公务':'商务舱','公务舱':'商务舱','商务':'商务舱','商务舱':'商务舱','头等':'头等舱','头等舱':'头等舱','经济':'经济舱','经济舱':'经济舱','超经':'超级经济舱','超级经济':'超级经济舱','超级经济舱':'超级经济舱' };
+        parsedCabin = cw[cabM[1]];
+      }
+      _d(trimmed, '💰 TOTAL', `CNY ${amt} (co指令)`);
+      matched = true;
+      continue;
+    }
+
     const cnDateEnSeg = trimmed.match(
       /^\s*(\d{1,2})月(\d{1,2})日\s+([A-Z][A-Z0-9]|[0-9][A-Z])\s*(\d{1,4})\s+(?:(经济舱|商务舱|头等舱|公务舱|超级经济舱|超经|[A-Z])\s+)?([A-Z]{3})\s*[-→]\s*([A-Z]{3})(?:\s+(\d{1,2}:\d{2})\s*(AM|PM)?\s*[-–]\s*(\d{1,2}:\d{2})\s*(AM|PM)?(?:\+\d+)?)?/i
     );
