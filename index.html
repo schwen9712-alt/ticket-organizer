@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.13-E\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.14-C\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.13-E</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.14-C</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -11087,9 +11087,9 @@ function parseSingleBooking(raw) {
     // Also 恒途: "1. AS1352  06月03日(星期三)  洛杉矶T6 - 圣何塞胡安　圣玛利亚M  16:40  23:33"
     // Also bare dot: ". UA869  07月02日  旧金山I - 香港T1  13:45  18:55+1" (no leading digit)
     const cnSeg = trimmed.match(
-      /^\s*(?:\d+\.)?\s*\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
+      /^\s*(?:\d+\.)?\s*\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－—–]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
     ) || trimmed.match(
-      /^\s*\d+\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
+      /^\s*\d+\.\s*[\u4e00-\u9fa5]*([A-Z]{2})\s*(\d{1,4})\s+(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s*[-→－—–]\s*([\u4e00-\u9fa5A-Za-z0-9]+(?:[\s\u3000]+[\u4e00-\u9fa5A-Za-z0-9]+)*)\s+(\d{1,2}:\d{2})/
     );
     // Third form (single leading dot + optional cabin code + IATA-prefixed city names):
     //   "1. UA820 W  06月15日(星期一)  LAX洛杉矶 - HKG香港  23:55  05:40+2"
@@ -11098,7 +11098,7 @@ function parseSingleBooking(raw) {
     // city tokens carry their own 3-letter IATA prefix (LAX洛杉矶 / HKG香港). We capture
     // that prefix directly so we don't depend on the cnCityToIATA table.
     const cnSegIata = !cnSeg && trimmed.match(
-      /^\s*\d+\.\s*([A-Z]{2})\s*(\d{1,4})\s+(?:[A-Z]\s+)?(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([A-Z]{3})[\u4e00-\u9fa5A-Za-z0-9]*\s*[-→－]\s*([A-Z]{3})[\u4e00-\u9fa5A-Za-z0-9]*\s+(\d{1,2}:\d{2})/
+      /^\s*\d+\.\s*([A-Z]{2})\s*(\d{1,4})\s+(?:[A-Z]\s+)?(\d{1,2})月(\d{1,2})日(?:\s*\([^)]*\))?\s+([A-Z]{3})[\u4e00-\u9fa5A-Za-z0-9]*\s*[-→－—–]\s*([A-Z]{3})[\u4e00-\u9fa5A-Za-z0-9]*\s+(\d{1,2}:\d{2})/
     );
     if (cnSegIata) {
       const carrier = cnSegIata[1];
