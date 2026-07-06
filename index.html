@@ -11351,11 +11351,12 @@ function parseSingleBooking(raw) {
         || trimmed.match(/(?:运价|票价|净价|价格)\s*[:：]\s*(\d{4,6})\s*$/)
         // "大人价格 39410 *1" / "儿童价格 39256 *2" — price + count multiplier (no CNY)
         || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)价格\s+(\d{4,6})\s*\*\s*\d/)
-        // "婴儿 1713  0pc" / "成人 16046 2pc *4" / "儿童 8200" — bare amount right
-        // after the type word; optional baggage-pc and *N pax-count suffixes, no
-        // CNY keyword required. Full-line anchor prevents date lines ("婴儿 2026年…")
-        // and pax-count lines ("成人 2 儿童 1") from matching.
-        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s+(\d{3,6})(?:\.\d+)?\s*(?:\d+\s*pc)?\s*(?:[\*xX×]\s*\d+)?\s*$/i)
+        // "婴儿 1713  0pc" / "成人 16046 2pc *4" / "儿童 8200" / "成人25260" (glued) —
+        // bare amount right after the type word, space OPTIONAL; optional baggage-pc
+        // and *N pax-count suffixes, no CNY keyword required. Full-line anchor
+        // prevents date lines ("婴儿 2026年…") and pax-count lines ("成人 2 儿童 1")
+        // from matching (counts are 1-2 digits; \d{3,6} needs 3+).
+        || trimmed.match(/^(?:大人|成人|儿童|小儿|婴儿)\s*(\d{3,6})(?:\.\d+)?\s*(?:\d+\s*pc)?\s*(?:[\*xX×]\s*\d+)?\s*$/i)
         // "大人运价14250" / "儿童运价 14080" / "成人票价14250" — type word + 运价/票价/净价/价格
         // glued or space-separated to a bare number, NO colon and NO CNY keyword.
         // Full-line anchor + the 运价/票价 keyword keep this from over-matching.
