@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.17-O\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.18-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.17-O</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.18-R</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10128,6 +10128,7 @@ function parseSingleBooking(raw) {
   ];
 
   let segCarry = null;  // carries partial segment (carrier+flight+cls+date) waiting for next line's route
+  let travelerCount = null; // "(3 TRAVELERS)" — used to split a grand-total fare per person
   let cityCarry = null; // Expedia/OTA: carries route+cabin from a "City (XXX) XXX to City YYY CABIN" line,
                         // waiting for the next "Mon DD · time to time" line to supply date+times.
 
@@ -10380,6 +10381,31 @@ function parseSingleBooking(raw) {
         }
       }
       cityCarry = null; // date line didn't follow — abandon
+    }
+    // "ROUNDTRIP (3 TRAVELERS)" — remember the traveler count for fare splitting.
+    const tvm = trimmed.match(/\((\d{1,2})\s*TRAVELERS?\)/i);
+    if (tvm) travelerCount = parseInt(tvm[1], 10);
+
+    // Inline variant of the city/route line: route AND date+times glued on ONE
+    // line — "Hong Kong (HKG) HKG to Los Angeles LAXJul 21 . 12:40 pm to 11:15 am . Nonstop"
+    // (the two-line form below carries the route and waits for the date line).
+    {
+      const cityInline = trimmed.match(/^[A-Za-z].*?\b([A-Z]{3})\b(?:\s+[A-Z]{3})?\s+to\s+.*?([A-Z]{3})\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s*(\d{1,2})\s*[.·]\s*(\d{1,2}:\d{2})\s*([ap]m)\s*to\s*(\d{1,2}:\d{2})\s*([ap]m)/i);
+      if (cityInline) {
+        const from = cityInline[1].toUpperCase();
+        const to = cityInline[2].toUpperCase();
+        const date = String(parseInt(cityInline[4], 10)).padStart(2, '0') + cityInline[3].slice(0, 3).toUpperCase();
+        const c24 = (hm, ap) => {
+          let [h, mm] = hm.split(':').map(Number);
+          const pm = ap.toLowerCase() === 'pm';
+          if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0;
+          return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+        };
+        if (from !== to) {
+          segs.push({ from, to, date, flight: '', cls: '', depTime: c24(cityInline[5], cityInline[6]), arrTime: c24(cityInline[7], cityInline[8]) });
+          continue;
+        }
+      }
     }
     // Detect an Expedia city/route line. IATA codes may appear once or twice per
     // endpoint: "Shanghai (PVG) PVG" or "Los Angeles LAX". We take the LAST
@@ -11931,6 +11957,15 @@ function parseSingleBooking(raw) {
   if (usd && usd > 0 && !rmb && settings.rate > 0) {
     rmb = +(usd * settings.rate).toFixed(2);
   }
+
+  // "(N TRAVELERS)" + a grand-total fare and no per-pax data → convert the
+  // total to per-person (rmb is per-pax by contract) and fill paxPrices.
+  if (travelerCount > 1 && rmb && !parsedPaxPrices && pax.length === 0) {
+    rmb = +(rmb / travelerCount).toFixed(2);
+    if (usd) usd = +(usd / travelerCount).toFixed(2);
+    parsedPaxPrices = Array(travelerCount).fill(rmb);
+  }
+
 
   // Dedup segments: remove exact duplicates (same flight + date)
   const seenSegs = new Set();
