@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.18-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.19-I\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.18-R</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.19-I</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -19980,15 +19980,17 @@ function buildItineraryCopy(o) {
   const segs = (o.segments || []).filter(s => s.from || s.to || s.flight);
   const lines = [];
 
-  // TRIP type
-  let tripType = 'MULTI-CITY';
-  if (segs.length === 1) {
-    tripType = 'ONE WAY';
-  } else if (segs.length >= 2) {
-    const firstFrom = (segs[0].from || '').toUpperCase().trim();
-    const lastTo = (segs[segs.length - 1].to || '').toUpperCase().trim();
-    if (firstFrom && lastTo && firstFrom === lastTo) {
-      tripType = segs.length === 2 ? 'ROUND TRIP' : 'ROUND TRIP (MULTI-STOP)';
+  // ── TRIP confirmation — exactly one of ONE WAY / ROUND TRIP / MULTI-CITY.
+  // Prefer the order's own trip field; fall back to inferring from the route.
+  let tripType = (o.trip || '').toUpperCase();
+  if (!['ONE WAY', 'ROUND TRIP', 'MULTI-CITY'].includes(tripType)) {
+    tripType = 'MULTI-CITY';
+    if (segs.length === 1) {
+      tripType = 'ONE WAY';
+    } else if (segs.length >= 2) {
+      const firstFrom = (segs[0].from || '').toUpperCase().trim();
+      const lastTo = (segs[segs.length - 1].to || '').toUpperCase().trim();
+      if (firstFrom && lastTo && firstFrom === lastTo) tripType = 'ROUND TRIP';
     }
   }
   lines.push(`TRIP: ${tripType}`);
@@ -20026,15 +20028,45 @@ function buildItineraryCopy(o) {
     lines.push(parts.join(' '));
   });
 
-  // Approx USD price
+  // ── PASSENGERS — full details for ticketing; nationality defaults to USA.
+  const paxList = (o.passengers || []).filter(p => p && p.name);
+  if (paxList.length > 0) {
+    lines.push('');
+    paxList.forEach((p, i) => {
+      if (i > 0) lines.push('---');
+      const [last = '', first = ''] = String(p.name).split('/').map(x => x.trim().toUpperCase());
+      lines.push(`PASSENGER ${i + 1}`);
+      lines.push(`FIRST NAME : ${first || '(待补全)'}`);
+      lines.push(`LAST NAME  : ${last || '(待补全)'}`);
+      const dobDisplay = p.dob ? (typeof expandDobYear === 'function' ? expandDobYear(p.dob) : p.dob) : '(待补全)';
+      lines.push(`DOB        : ${dobDisplay}`);
+      lines.push(`GENDER     : ${p.gender || '(待补全)'}`);
+      lines.push(`NATIONALITY: ${p.nationality || 'USA'}`);
+    });
+  }
+
+  // ── FARE — the UNDISCOUNTED per-person USD fare (basePrice ÷ rate), matching
+  // the blue "人均运价 USD" row on the card. NOT the discounted revenue.
   lines.push('');
   const rate = effectiveRate(o);
-  const fp = computeFinalPrice(o);
-  let usd = null;
-  if (o.usd != null) usd = o.usd;
-  else if (fp != null && rate > 0) usd = fp / rate;
-  if (usd != null) {
-    lines.push(`APPROX. PRICE  $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`);
+  const paxCount = paxList.length || 1;
+  let usdPer = null;
+  if (o.basePrice != null && rate > 0) {
+    usdPer = o.basePrice / rate;                              // undiscounted 运价
+  } else if (o.usd != null) {
+    usdPer = o.usd;                                           // parsed USD fare (already undiscounted)
+  } else if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0 && rate > 0) {
+    const sum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
+    if (sum > 0) usdPer = sum / o.paxPrices.length / rate;    // pre-discount per-person
+  } else if (rate > 0) {
+    const fp = computeFinalPrice(o);
+    if (fp != null) usdPer = fp / paxCount / rate;            // last resort
+  }
+  if (usdPer != null) {
+    lines.push(`APPROX. PRICE  $${usdPer.toLocaleString(undefined, { maximumFractionDigits: 2 })} /PERSON`);
+    if (paxCount > 1) {
+      lines.push(`TOTAL ≈ $${(usdPer * paxCount).toLocaleString(undefined, { maximumFractionDigits: 2 })} (${paxCount} PAX)`);
+    }
   }
 
   return lines.join('\n');

@@ -1,3 +1,27 @@
+## 2026-06-19 — 复制行程重做：未打折美金运价+乘客信息(国籍默认USA)+行程确认 · v26.06.19-I
+
+**改了什么**
+buildItineraryCopy 三处重做：
+1. **行程确认单值**：TRIP 行严格输出 ONE WAY / ROUND TRIP / MULTI-CITY 之一。优先用订单 trip 字段，缺失才按路由推断；去掉旧的 "(MULTI-STOP)" 附注和重复括号
+2. **乘客信息段**：每位乘客输出 PASSENGER N / FIRST NAME / LAST NAME / DOB(展开为 26 OCT 1970) / GENDER / **NATIONALITY 默认 USA**；缺失字段标(待补全)；多人用 --- 分隔
+3. **价格改为未打折美金运价**：basePrice ÷ 汇率（与卡片蓝色"人均运价 USD"同款），标注 /PERSON；多人加 TOTAL ≈ $X (N PAX)。回退链：basePrice÷rate → o.usd → paxPrices均值÷rate → 最后才 computeFinalPrice。**不再输出折扣后收入**
+
+**端到端（截图那单还原）**
+输出与需求一致：TRIP: ROUND TRIP / 4段 / PASSENGER 1 完整含 NATIONALITY: USA / APPROX. PRICE $7,390.88 /PERSON（=50272÷6.8019，非×90%后的6,651）
+
+**测试通过（6项+25核心解析回归 全过）**
+- ✓ 多乘客 TOTAL 行、MULTI-CITY 推断、缺失字段待补全、o.usd/paxPrices 回退、折扣不渗入价格
+
+**改动位置**
+- index.html ~19979：buildItineraryCopy 重写
+
+**风险或注意事项**
+- ⚠ 国籍字段乘客数据暂无存储，固定输出 USA（可传 p.nationality 覆盖）
+- ⚠ 一口价订单走最后回退（无折扣概念，语义不变）
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-18 — Expedia往返无航班号+N TRAVELERS总价平摊 · v26.06.18-R
 
 **改了什么**
