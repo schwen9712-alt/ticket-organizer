@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.19-I\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.20-T\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.19-I</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.20-T</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9715,6 +9715,62 @@ function parseSingleBooking(raw) {
         fareByType: null, unrecognizedLines: [],
         waitingForRelease: _waitRelease
       };
+    }
+  }
+
+  // ── Delta.com booking-page dump ───────────────────────────────────────────
+  // Signature: a comma-joined flight list line ("DL388,DL337") + a dot route line
+  // ("PVG.MCO"). Legs are reconstructed from: layover codes ("Layover ... (DTW)"),
+  // standalone am/pm time lines in order (dep/arr pairs), per-leg class letters
+  // "(G)" / "(W)", and the Amount Due total "¥13,637 CNY".
+  {
+    const dlFlightsM = raw.match(/^\s*([A-Z]{2}\d{2,4}(?:\s*,\s*[A-Z]{2}\d{2,4})+)\s*$/m);
+    const dlRouteM = raw.match(/^\s*([A-Z]{3})\.([A-Z]{3})\s*$/m);
+    if (dlFlightsM && dlRouteM) {
+      const dlFlights = dlFlightsM[1].split(/\s*,\s*/).map(f => f.toUpperCase());
+      // Stop chain: overall origin → layover codes (in order) → overall destination
+      const layovers = [...raw.matchAll(/Layover[^()\n]*\(([A-Z]{3})\)/gi)].map(m => m[1].toUpperCase());
+      const stops = [dlRouteM[1].toUpperCase(), ...layovers, dlRouteM[2].toUpperCase()];
+      // Date: "Tue, Jul 21..." (weekday, month, day — possibly glued to a time)
+      const dm = raw.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s*,?\s*(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*(\d{1,2})/i);
+      const dlDate = dm ? String(parseInt(dm[2], 10)).padStart(2, '0') + dm[1].slice(0, 3).toUpperCase() : '';
+      // Standalone am/pm time lines, in document order → dep/arr pairs per leg
+      const dlTimes = [...raw.matchAll(/^\s*(\d{1,2}):(\d{2})\s*([ap]m)\s*$/gim)].map(m => {
+        let h = parseInt(m[1], 10); const pm = m[3].toLowerCase() === 'pm';
+        if (pm && h < 12) h += 12; if (!pm && h === 12) h = 0;
+        return String(h).padStart(2, '0') + ':' + m[2];
+      });
+      // Per-leg booking-class letters: "... Classic (G)"
+      const dlCls = [...raw.matchAll(/\(([A-Z])\)\s*$/gm)].map(m => m[1]);
+      if (dlFlights.length === stops.length - 1) {
+        const dlSegs = dlFlights.map((f, i) => ({
+          from: stops[i], to: stops[i + 1], date: dlDate, flight: f,
+          cls: dlCls[i] || '',
+          depTime: dlTimes[i * 2] || '', arrTime: dlTimes[i * 2 + 1] || ''
+        })).filter(s => s.from !== s.to);
+        if (dlSegs.length > 0) {
+          dlSegs.forEach(s => segs.push(s));
+          if (!airline) airline = dlFlights[0].slice(0, 2);
+          // Cabin from the first leg's product name
+          if (parsedCabin == null) {
+            if (/Premium\s+Select/i.test(raw)) parsedCabin = '超级经济舱';
+            else if (/Delta\s*One|Business/i.test(raw)) parsedCabin = '商务舱';
+            else if (/\bFirst\b/i.test(raw)) parsedCabin = '头等舱';
+          }
+          // Amount Due total: "¥13,637 CNY" (the only ¥ with a CNY suffix)
+          const dueM = raw.match(/[¥￥]\s*([\d,]+(?:\.\d+)?)\s*CNY/i);
+          const dueV = dueM ? parseFloat(dueM[1].replace(/,/g, '')) : null;
+          return {
+            pax, segs, airline, rmb: (dueV && dueV >= 100) ? dueV : _totalFromRaw(rmb), usd: null, trip: undefined,
+            discount: null, cabin: parsedCabin ?? null, paxPrices: null,
+            customRate: null, pnr: null, productDiscount: null, productMarker: null, productNote: null,
+            urgent: false, ticketSeqNote: undefined,
+            basicFare: false, basicFareLabel: '',
+            fareByType: null, unrecognizedLines: [],
+            waitingForRelease: _waitRelease
+          };
+        }
+      }
     }
   }
 
