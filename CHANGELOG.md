@@ -1,3 +1,21 @@
+## 2026-06-28 — AI标记美化：悬浮徽章不再挤歪网格 · v26.06.28-J
+
+**改了什么**
+用户反馈"不美观"——根因：✨AI·N 徽章被 insertBefore 插进 airline-usd-row 的**网格第一格**，把整行列全部推歪（内容错位、"未分配"截断、✕换行）。修复：
+1. 徽章 CSS 改为 **position:absolute 悬浮在行左上角**（top:-9px; left:10px），完全脱离网格/弹性流，列对齐零影响；加白色描边圈与行边框区隔；pointer-events:none 不挡点击
+2. .ai-pick 加 position:relative 作为定位锚
+3. JS 改 appendChild（绝对定位子元素不参与布局，追加即可）
+4. 字号 10→9.5、行高收紧、white-space:nowrap 防徽章内换行
+
+**测试通过（8项全过）**
+- ✓ 原有解析/剥离/双目标装饰全部保持
+
+**改动位置**
+- CSS .ai-pick / .ai-pick-badge；applyAiPickMarks 两处 appendChild
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-27 — AI标记修复：美金面板行同步高亮 · v26.06.27-H
 
 **改了什么**
