@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.24-A\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.25-B\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.24-A</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.25-B</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3380,6 +3380,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   </div>
 
   <!-- Current order preview + actions -->
+
   <div class="section">
     <div class="section-title"><span class="num">6</span>PREVIEW <span class="zh">当前订单预览</span></div>
     <div class="preview-area" id="previewArea">
@@ -3443,6 +3444,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     </div>
   </div>
 
+  <div class="section" id="smartSuggestSection" style="display:none;">
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span style="display:flex;align-items:center;gap:8px;"><span class="num" style="background:#7c3aed;">💡</span>智能出单建议 <span class="zh">按上单时间与代理自动分析</span></span>
+      <button class="btn small" id="aiAdviceBtn" onclick="aiTicketingAdvice()" title="发送当前待出票队列摘要给 Claude，获取调度建议（需在设置配置 API Key）">🤖 AI深度分析</button>
+    </div>
+    <div id="smartSuggestList"></div>
+    <div id="aiAdviceBox" style="display:none; margin-top:10px;"></div>
+  </div>
+
   <div class="airline-usd-panel" id="airlineUsdPanel" style="display:none;">
     <div class="airline-usd-header">
       <span class="title">💳 各订单美金金额</span>
@@ -3485,14 +3495,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="airline-usd-grid" id="airlineUsdGrid"></div>
   </div>
 
-  <div class="section" id="smartSuggestSection" style="display:none;">
-    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <span style="display:flex;align-items:center;gap:8px;"><span class="num" style="background:#7c3aed;">💡</span>智能出单建议 <span class="zh">按上单时间与代理自动分析</span></span>
-      <button class="btn small" id="aiAdviceBtn" onclick="aiTicketingAdvice()" title="发送当前待出票队列摘要给 Claude，获取调度建议（需在设置配置 API Key）">🤖 AI深度分析</button>
-    </div>
-    <div id="smartSuggestList"></div>
-    <div id="aiAdviceBox" style="display:none; margin-top:10px;"></div>
-  </div>
 
   <div class="section">
     <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
