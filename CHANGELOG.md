@@ -1,3 +1,24 @@
+## 2026-06-27 — AI标记修复：美金面板行同步高亮 · v26.06.27-H
+
+**改了什么**
+用户反馈"没有动画效果"——根因：AI标记只挂在下方主订单卡（.order-collapse-header），而用户实际盯的是顶部「各订单美金金额」面板的紧凑行，且该行**没有 data-order-id**，标记函数无法定位。三处修复：
+1. renderAirlineUsdPanel 的行创建加 `row.dataset.orderId = o.id`
+2. applyAiPickMarks 升级为**双目标装饰**：主卡头 + 美金行都加 ai-pick 光晕类和 ✨AI·N 流光徽章
+3. renderAirlineUsdPanel 末尾加重挂钩子（面板自身重渲染后标记不丢）
+
+**测试通过（8项）**
+- ✓ 原6项（PRIORITY解析/剥离/提示语/主卡类/AI·1/AI·2徽章）
+- ✓ 新增：美金行获得 ai-pick 类、美金行徽章 AI·1
+
+**改动位置**
+- ~13486：美金行 dataset.orderId；applyAiPickMarks 双目标；renderAirlineUsdPanel 尾部钩子
+
+**风险或注意事项**
+- ⚠ 美金行较紧凑，徽章占一点行首空间；小屏下徽章随行缩放
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-26 — AI优先订单动画标记（✨AI·N 高亮）· v26.06.26-G
 
 **改了什么**

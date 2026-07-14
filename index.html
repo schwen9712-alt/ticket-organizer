@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.26-G\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.27-H\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.26-G</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.27-H</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13485,6 +13485,7 @@ function renderAirlineUsdPanel(orders) {
       const row = document.createElement('div');
       row.className = 'airline-usd-row';
       row.dataset.agent = o.agent || '(未指定)';
+      if (o.id) row.dataset.orderId = o.id;  // enables AI-pick marks on this compact row
       if (bgColor) row.style.background = bgColor;
       if (!hasPrice) row.style.background = '#fff5f2';
       const mixed = detectMixedCabin(o);
@@ -13646,6 +13647,9 @@ function renderAirlineUsdPanel(orders) {
   if (window._usdAgentHighlight) {
     setTimeout(() => applyAgentHighlight(window._usdAgentHighlight), 30);
   }
+
+  // AI-pick marks live on these rows — re-apply after every panel render
+  if (typeof applyAiPickMarks === 'function') setTimeout(applyAiPickMarks, 0);
 }
 
 // Airline summary bar — compact visual showing total USD per airline, sorted largest first
@@ -14270,14 +14274,19 @@ function applyAiPickMarks() {
     if (!AI_PICKS || AI_PICKS.size === 0) return;
     AI_PICKS.forEach((rank, id) => {
       const sel = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(String(id)) : String(id);
+      const mkBadge = () => {
+        const b = document.createElement('span');
+        b.className = 'ai-pick-badge';
+        b.title = 'AI建议优先出票 · 第' + rank + '位';
+        b.textContent = '✨ AI·' + rank;
+        return b;
+      };
+      // Main pending card header
       const h = document.querySelector(`.order-collapse-header[data-order-id="${sel}"]`);
-      if (!h) return;
-      h.classList.add('ai-pick');
-      const b = document.createElement('span');
-      b.className = 'ai-pick-badge';
-      b.title = 'AI建议优先出票 · 第' + rank + '位';
-      b.textContent = '✨ AI·' + rank;
-      h.insertBefore(b, h.firstChild);
+      if (h) { h.classList.add('ai-pick'); h.insertBefore(mkBadge(), h.firstChild); }
+      // Compact row in the 各订单美金金额 panel (the always-visible top view)
+      const r = document.querySelector(`.airline-usd-row[data-order-id="${sel}"]`);
+      if (r) { r.classList.add('ai-pick'); r.insertBefore(mkBadge(), r.firstChild); }
     });
   } catch (e) {}
 }
