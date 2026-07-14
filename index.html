@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.28-J\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.29-K\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.28-J</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.29-K</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5563,20 +5563,21 @@ input[type="text"], input[type="number"], textarea {
   border-color: rgba(124,58,237,.5) !important;
 }
 .ai-pick-badge {
-  /* Floats over the row's top-left corner — position:absolute removes it from
-     the grid/flex flow entirely, so column alignment is untouched. */
+  /* Tiny corner chip INSIDE the row's top-right — fully within bounds so no
+     parent overflow can ever clip it; absolute = zero grid/flex impact. */
   position: absolute;
-  top: -9px; left: 10px; z-index: 6;
+  top: 2px; right: 2px; z-index: 6;
   display: inline-flex; align-items: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 9.5px; font-weight: 800; letter-spacing: .04em;
-  line-height: 1.4; white-space: nowrap;
-  color: #fff; padding: 1.5px 8px; border-radius: 9px;
+  font-size: 8.5px; font-weight: 800; letter-spacing: .03em;
+  line-height: 1.35; white-space: nowrap;
+  color: #fff; padding: 1px 6px; border-radius: 3px 5px 3px 7px;
   background: linear-gradient(110deg, #7c3aed, #a855f7 45%, #7c3aed 90%);
   background-size: 200% 100%;
   animation: aiPickShimmer 2.6s linear infinite;
-  box-shadow: 0 1px 4px rgba(124,58,237,.4), 0 0 0 2px var(--paper, #fff);
+  box-shadow: 0 1px 3px rgba(124,58,237,.35);
   pointer-events: none;
+  opacity: .95;
 }
 @keyframes aiPickShimmer { 0% { background-position: 0% 0; } 100% { background-position: 200% 0; } }
 @media (prefers-reduced-motion: reduce) {
