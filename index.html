@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.23-S\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.24-A\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.23-S</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.24-A</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3483,6 +3483,15 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div id="airlineSummaryBar" style="margin-bottom:8px;"></div>
     <div id="agentSummaryBar" style="margin-bottom:12px;"></div>
     <div class="airline-usd-grid" id="airlineUsdGrid"></div>
+  </div>
+
+  <div class="section" id="smartSuggestSection" style="display:none;">
+    <div class="section-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span style="display:flex;align-items:center;gap:8px;"><span class="num" style="background:#7c3aed;">💡</span>智能出单建议 <span class="zh">按上单时间与代理自动分析</span></span>
+      <button class="btn small" id="aiAdviceBtn" onclick="aiTicketingAdvice()" title="发送当前待出票队列摘要给 Claude，获取调度建议（需在设置配置 API Key）">🤖 AI深度分析</button>
+    </div>
+    <div id="smartSuggestList"></div>
+    <div id="aiAdviceBox" style="display:none; margin-top:10px;"></div>
   </div>
 
   <div class="section">
@@ -14208,12 +14217,150 @@ function autoLinkByPassenger() {
   if (changed) persistOrders();
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SMART TICKETING SUGGESTIONS — local rule engine over 上单时间 + 代理,
+// plus an optional Claude-powered deep-dive (reuses the existing AI plumbing).
+// ════════════════════════════════════════════════════════════════════════════
+
+function _sgFmtAge(h) {
+  return h < 24 ? `${Math.floor(h)}小时` : `${(h / 24).toFixed(1)}天`;
+}
+
+function _sgOrdLink(x) {
+  const label = `#${x.i + 1} ${escapeHtml(x.o.agent || '?')}`;
+  if (x.o.id) return `<a href="javascript:void(0)" onclick="scrollToOrderById('${escapeAttr(String(x.o.id))}')" style="color:var(--accent-deep);font-weight:700;text-decoration:none;">${label}</a>`;
+  return `<b>${label}</b>`;
+}
+
+function renderSmartSuggestions() {
+  const sec = document.getElementById('smartSuggestSection');
+  const list = document.getElementById('smartSuggestList');
+  if (!sec || !list) return;
+  const pending = STATE.orders
+    .map((o, i) => ({ o, i }))
+    .filter(({ o }) => isMeaningfulOrder(o) && o.tableLabel !== 'G');
+  if (pending.length === 0) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+
+  const now = Date.now();
+  const sugg = [];
+
+  // ── 1. 上单时间：久等分级预警 ──────────────────────────────────────────────
+  const aged = pending
+    .filter(({ o }) => o.createdAt)
+    .map(x => ({ ...x, ageH: (now - x.o.createdAt) / 3600000 }))
+    .sort((a, b) => b.ageH - a.ageH);
+  const crit = aged.filter(x => x.ageH >= 48);
+  const warn = aged.filter(x => x.ageH >= 24 && x.ageH < 48);
+  if (crit.length) {
+    sugg.push({ icon: '🔴', html: `<b>${crit.length} 单已等待超过 48 小时</b>，运价/放位随时可能失效，建议最优先处理：${crit.slice(0, 3).map(_sgOrdLink).join('、')}${crit.length > 3 ? ` 等` : ''}` });
+  } else if (warn.length) {
+    sugg.push({ icon: '🟠', html: `<b>${warn.length} 单已等待超过 24 小时</b>，建议今天内出：${warn.slice(0, 3).map(_sgOrdLink).join('、')}` });
+  } else if (aged.length) {
+    sugg.push({ icon: '🟢', html: `所有待出单等待都在 24 小时内，最久的是 ${_sgOrdLink(aged[0])}（${_sgFmtAge(aged[0].ageH)}）` });
+  }
+
+  // ── 2. 代理：批量集中出票 ──────────────────────────────────────────────────
+  const byAgent = {};
+  pending.forEach(({ o }) => { const a = o.agent || '未标代理'; byAgent[a] = (byAgent[a] || 0) + 1; });
+  const batch = Object.entries(byAgent).filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1]);
+  if (batch.length) {
+    sugg.push({ icon: '📦', html: `可集中出票：${batch.map(([a, n]) => `<b>${escapeHtml(a)}</b> ${n} 单`).join('、')}（同代理连续处理，减少切换成本）` });
+  }
+
+  // ── 3. 代理：今日上单节奏 vs 近两周日均（出票历史） ─────────────────────────
+  const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+  const todayNew = {};
+  pending.forEach(({ o }) => {
+    if (o.createdAt >= dayStart.getTime()) { const a = o.agent || '未标代理'; todayNew[a] = (todayNew[a] || 0) + 1; }
+  });
+  const hist = {}; const since = now - 14 * 86400000;
+  (settings.ticketed || []).forEach(t => {
+    if (t.ticketedAt >= since) { const a = t.agent || '未标代理'; hist[a] = (hist[a] || 0) + 1; }
+  });
+  Object.entries(todayNew).forEach(([a, n]) => {
+    const avg = (hist[a] || 0) / 14;
+    if (n >= 3 && avg > 0 && n > avg * 2) {
+      sugg.push({ icon: '📈', html: `<b>${escapeHtml(a)}</b> 今日已上 ${n} 单，明显高于近两周日均 ${avg.toFixed(1)} 单 — 留意付款与放位节奏` });
+    }
+  });
+
+  // ── 4. 阻塞项：缺运价 / 等放位 ─────────────────────────────────────────────
+  const noFare = pending.filter(({ o }) => {
+    try { const v = _orderUsd(o, o.rate || settings.rate); return !(v > 0); } catch (e) { return false; }
+  });
+  if (noFare.length) {
+    sugg.push({ icon: '⚠️', html: `<b>${noFare.length} 单缺运价</b>无法出票，先补价：${noFare.slice(0, 3).map(_sgOrdLink).join('、')}` });
+  }
+  const waiting = pending.filter(({ o }) => o.waitingForRelease);
+  if (waiting.length) {
+    sugg.push({ icon: '🔒', html: `${waiting.length} 单标记<b>等放位</b>，出票前先确认位子已放` });
+  }
+
+  const row = (s) => `<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 10px;border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:5px;background:#fff;font-size:12px;line-height:1.55;"><span style="flex-shrink:0;">${s.icon}</span><span>${s.html}</span></div>`;
+  list.innerHTML = sugg.length
+    ? sugg.slice(0, 6).map(row).join('')
+    : '<div class="hint">暂无特别建议 — 按列表顺序正常出票即可</div>';
+}
+
+// 🤖 Deep-dive: send a compact queue summary to Claude for scheduling advice.
+async function aiTicketingAdvice() {
+  const key = loadAnthropicKey();
+  if (!key) { toast('请先在设置里配置 Anthropic API Key'); return; }
+  const btn = document.getElementById('aiAdviceBtn');
+  const box = document.getElementById('aiAdviceBox');
+  const pending = STATE.orders.filter(o => isMeaningfulOrder(o) && o.tableLabel !== 'G');
+  if (!pending.length) { toast('当前没有待出票订单'); return; }
+
+  const now = Date.now();
+  const lines = pending.map((o, i) => {
+    const ageH = o.createdAt ? ((now - o.createdAt) / 3600000).toFixed(1) : '?';
+    let usdV = null; try { const _v = _orderUsd(o, o.rate || settings.rate); usdV = _v > 0 ? _v : null; } catch (e) {}
+    const flags = [o.waitingForRelease ? '等放位' : '', o.urgent ? '加急' : '', usdV == null ? '缺运价' : ''].filter(Boolean).join('/') || '-';
+    return `${i + 1}. 代理:${o.agent || '?'} 等待:${ageH}h 金额:${usdV != null ? '$' + Math.round(usdV) : '?'} 乘客:${(o.passengers || []).length}人 标记:${flags}`;
+  }).join('\n');
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 分析中…'; }
+  box.style.display = '';
+  box.innerHTML = '<div class="hint">🤖 Claude 正在分析当前队列…</div>';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: `你是机票代理的出票调度助手。当前待出票队列（按录入顺序）：\n\n${lines}\n\n当前时间：${new Date().toLocaleString('zh-CN')}\n\n请给出 3-5 条具体、可执行的出票调度建议（先出哪些及原因、哪些有风险、代理层面的提醒）。直接列点，每条一行，简洁中文，不要客套开场。`
+        }]
+      })
+    });
+    if (!res.ok) throw new Error('API ' + res.status);
+    const data = await res.json();
+    const txt = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    if (!txt) throw new Error('空响应');
+    box.innerHTML = `<div style="padding:10px 12px;border:1px solid #7c3aed33;border-radius:var(--r-sm);background:#7c3aed08;font-size:12.5px;line-height:1.7;">🤖 <b>Claude 调度建议</b><br>${escapeHtml(txt).replace(/\n/g, '<br>')}</div>`;
+  } catch (e) {
+    box.innerHTML = `<div class="hint" style="color:var(--red);">❌ AI 分析失败：${escapeHtml(e.message)}</div>`;
+  }
+  if (btn) { btn.disabled = false; btn.textContent = '🤖 AI深度分析'; }
+}
+
 function renderPendingList() {
   const area = document.getElementById('pendingArea');
   if (!area) return;
 
   // Auto-detect same-passenger cross-order links before rendering
   autoLinkByPassenger();
+
+  // Smart ticketing suggestions panel (refreshes with the list)
+  if (typeof renderSmartSuggestions === 'function') renderSmartSuggestions();
 
   const allMeaningful = STATE.orders
     .map((o, i) => ({ o, i }))
