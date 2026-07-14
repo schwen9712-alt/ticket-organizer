@@ -1,3 +1,31 @@
+## 2026-06-26 — AI优先订单动画标记（✨AI·N 高亮）· v26.06.26-G
+
+**改了什么**
+AI 深度分析的建议现在会**落到订单列表上**：
+1. 提示词升级：要求 Claude 在建议末尾额外输出机器可读的一行 `PRIORITY: 3,1,7`（按优先顺序，最多5个）——比解析自由文本可靠
+2. 解析该行 → AI_PICKS（订单id→优先名次），展示文本中剥离该行，代之以"✨ 已在下方订单列表用动画标记 N 个优先订单"
+3. 对应订单卡获得：
+   - 呼吸紫色光晕边框（aiPickGlow 2.2s 循环）
+   - 卡头 ✨AI·1 / ✨AI·2 渐变流光徽章（AI·1 最优先）
+   - prefers-reduced-motion 下退化为静态描边
+4. 标记随 renderPendingList 自动重挂（钩子 setTimeout 后置，等卡片渲染完成）；出票后订单离开列表标记自然消失；再次点 AI 分析则替换
+5. **缺陷修复**：重渲染调用移出 try/catch 并自带保护——渲染小故障不再把成功的 AI 建议覆盖成错误提示
+
+**测试通过（6项+5项解析抽查）**
+- ✓ PRIORITY 解析映射（乱序 2,1,3）、展示文本剥离、提示语、ai-pick 类、AI·1/AI·2 徽章内容
+- ✓ SSR/plusFare/Delta/eterm/横排新变体 解析抽查全过
+
+**改动位置**
+- CSS ~5560：aiPickGlow/aiPickShimmer/.ai-pick/.ai-pick-badge
+- JS：AI_PICKS + applyAiPickMarks（renderSmartSuggestions 前）；renderPendingList 钩子；aiTicketingAdvice 提示词与解析
+
+**风险或注意事项**
+- ⚠ AI 偶尔可能不按格式输出 PRIORITY 行 → 无标记但建议正常显示（优雅降级）
+- ⚠ 标记不持久化，刷新页面后消失（设计如此：建议有时效性）
+
+**回滚方式**
+从 .backups/ 找上一版覆盖。
+---
 ## 2026-06-25 — 建议面板位置修正：横幅下方、美金面板上方 · v26.06.25-B
 
 **改了什么**
