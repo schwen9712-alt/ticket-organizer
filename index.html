@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.02-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.03-S\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.02-R</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.03-S</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3467,7 +3467,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
           <button onclick="this.previousElementSibling.value='';filterPendingOrders('');const main=document.getElementById('pendingSearchInput'); if(main) main.value='';this.previousElementSibling.focus()"
             style="position:absolute;right:2px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;" title="清除（Esc）">✕</button>
         </div>
-        <button class="btn small" onclick="copyBuyingList()" title="按航司汇总未分配订单的美金票面 → Buying NNNK AMEX BP-XX 收单需求，复制到剪贴板">📋 收单需求</button>
+        <button class="btn small" id="buyingListBtn" onclick="copyBuyingList()" title="第一次点：高亮全部待收订单进入选择模式；点订单行可取消/恢复；再点按钮确认复制">📋 收单需求</button>
         <button id="bulkModeToggle" onclick="toggleBulkMode()"
           title="进入批量操作模式：勾选多个订单后一次性撤单"
           style="padding:5px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11.5px;background:#fff;color:var(--ink);cursor:pointer;font-family:inherit;font-weight:600;">📋 批量</button>
@@ -5584,6 +5584,14 @@ input[type="text"], input[type="number"], textarea {
 @media (prefers-reduced-motion: reduce) {
   .ai-pick { animation: none; box-shadow: 0 0 0 1.5px rgba(124,58,237,.6); }
   .ai-pick-badge { animation: none; }
+}
+
+/* ── Buying-list selection mode: green ring on rows queued for the post ─── */
+.buy-selected {
+  outline: 2px solid #0a8f4a !important;
+  outline-offset: -2px;
+  background: #f0faf4 !important;
+  box-shadow: 0 0 0 1px rgba(10,143,74,.2);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -13669,6 +13677,7 @@ function renderAirlineUsdPanel(orders) {
 
   // AI-pick marks live on these rows — re-apply after every panel render
   if (typeof applyAiPickMarks === 'function') setTimeout(applyAiPickMarks, 0);
+  if (typeof _applyBuySelectMarks === 'function') setTimeout(_applyBuySelectMarks, 0);
 }
 
 // Airline summary bar — compact visual showing total USD per airline, sorted largest first
@@ -14286,9 +14295,8 @@ function _sgOrdLink(x) {
 // ── BUYING LIST（收单需求）─────────────────────────────────────────────────
 // 未分配卡主的待出订单，按航司合并美金票面（未打折，即卡上实际刷的数）：
 //   points = USD × 100 → "Buying 288K AMEX BP-UA"（$2,884 → 288K）
-function _buildBuyingList() {
+function _buyEligibleEntries() {
   const rate = settings.rate || 7.2;
-  // 一单一行（每个订单分开出票分开收）；同航司的行排在一起，不求和。
   const entries = [];
   STATE.orders.forEach(o => {
     if (!isMeaningfulOrder(o)) return;
@@ -14302,10 +14310,15 @@ function _buildBuyingList() {
     let usdTotal = 0;
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
-    entries.push({ al, usd: usdTotal });
+    entries.push({ id: o.id, al, usd: usdTotal });
   });
+  return entries;
+}
+
+function _buildBuyingList(onlyIdSet) {
+  let entries = _buyEligibleEntries();
+  if (onlyIdSet) entries = entries.filter(e => onlyIdSet.has(e.id));
   if (entries.length === 0) return '';
-  // 航司排序：该航司合计金额大的组在前；组内按单笔金额降序
   const groupSum = {};
   entries.forEach(e => { groupSum[e.al] = (groupSum[e.al] || 0) + e.usd; });
   entries.sort((a, b) => (groupSum[b.al] - groupSum[a.al]) || (a.al === b.al ? (b.usd - a.usd) : (a.al < b.al ? -1 : 1)));
@@ -14318,11 +14331,67 @@ function _buildBuyingList() {
     .join('\n');
 }
 
+// ── Two-step selection mode ────────────────────────────────────────────────
+let BUY_SELECT = null;      // null = 未激活；Set<orderId> = 选择模式中已勾选的单
+let BUY_ELIGIBLE = null;    // 进入模式时的合规单快照（防止把已分配的点进来）
+let _buySelListenerOn = false;
+
+function _applyBuySelectMarks() {
+  try {
+    document.querySelectorAll('.buy-selected').forEach(el => el.classList.remove('buy-selected'));
+    if (!BUY_SELECT) return;
+    BUY_SELECT.forEach(id => {
+      const sel = (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(String(id)) : String(id);
+      const r = document.querySelector(`.airline-usd-row[data-order-id="${sel}"]`);
+      if (r) r.classList.add('buy-selected');
+    });
+    const btn = document.getElementById('buyingListBtn');
+    if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
+  } catch (e) {}
+}
+
+function _installBuySelListener() {
+  if (_buySelListenerOn) return;
+  const panel = document.getElementById('airlineUsdPanel');
+  if (!panel || !panel.addEventListener) return;
+  panel.addEventListener('click', (ev) => {
+    if (!BUY_SELECT) return;
+    const row = ev.target && ev.target.closest ? ev.target.closest('.airline-usd-row[data-order-id]') : null;
+    if (!row) return;
+    ev.stopPropagation(); ev.preventDefault();
+    const id = row.dataset.orderId;
+    if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { toast('该单已分配卡主或不在收单范围'); return; }
+    if (BUY_SELECT.has(id)) { BUY_SELECT.delete(id); row.classList.remove('buy-selected'); }
+    else { BUY_SELECT.add(id); row.classList.add('buy-selected'); }
+    const btn = document.getElementById('buyingListBtn');
+    if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
+  }, true);
+  _buySelListenerOn = true;
+}
+
 async function copyBuyingList() {
-  const text = _buildBuyingList();
-  if (!text) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
+  const btn = document.getElementById('buyingListBtn');
+  if (!BUY_SELECT) {
+    // ── 第一次点击：进入选择模式，高亮全部合规单 ──
+    const elig = _buyEligibleEntries();
+    if (elig.length === 0) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
+    BUY_ELIGIBLE = new Set(elig.map(e => e.id));
+    BUY_SELECT = new Set(elig.map(e => e.id));
+    _installBuySelListener();
+    _applyBuySelectMarks();
+    if (btn) { btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`; btn.classList.add('accent'); }
+    toast('已高亮全部待收订单\n点击订单行可取消/恢复选择\n调整完再点「✓ 确认复制」');
+    return;
+  }
+  // ── 第二次点击：只复制仍选中的 ──
+  const n = BUY_SELECT.size;
+  const text = n > 0 ? _buildBuyingList(BUY_SELECT) : '';
+  BUY_SELECT = null; BUY_ELIGIBLE = null;
+  _applyBuySelectMarks();
+  if (btn) { btn.textContent = '📋 收单需求'; btn.classList.remove('accent'); }
+  if (!text) { toast('已取消（未选择任何订单）'); return; }
   await copyText(text);
-  toast('✓ 收单需求已复制：\n' + text.split('\n').slice(0, 4).join('\n') + (text.split('\n').length > 4 ? '\n…' : ''));
+  toast(`✓ 已复制 ${n} 条收单需求：\n` + text.split('\n').slice(0, 4).join('\n') + (n > 4 ? '\n…' : ''));
 }
 
 // AI-recommended priority orders (set by aiTicketingAdvice) → animated marks.
