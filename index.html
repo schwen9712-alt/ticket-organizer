@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.30-P\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.02-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.30-P</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.02-R</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3467,6 +3467,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
           <button onclick="this.previousElementSibling.value='';filterPendingOrders('');const main=document.getElementById('pendingSearchInput'); if(main) main.value='';this.previousElementSibling.focus()"
             style="position:absolute;right:2px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;" title="清除（Esc）">✕</button>
         </div>
+        <button class="btn small" onclick="copyBuyingList()" title="按航司汇总未分配订单的美金票面 → Buying NNNK AMEX BP-XX 收单需求，复制到剪贴板">📋 收单需求</button>
         <button id="bulkModeToggle" onclick="toggleBulkMode()"
           title="进入批量操作模式：勾选多个订单后一次性撤单"
           style="padding:5px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11.5px;background:#fff;color:var(--ink);cursor:pointer;font-family:inherit;font-weight:600;">📋 批量</button>
@@ -14280,6 +14281,48 @@ function _sgOrdLink(x) {
   const label = `#${x.i + 1} ${escapeHtml(x.o.agent || '?')}`;
   if (x.o.id) return `<a href="javascript:void(0)" onclick="scrollToOrderById('${escapeAttr(String(x.o.id))}')" style="color:var(--accent-deep);font-weight:700;text-decoration:none;">${label}</a>`;
   return `<b>${label}</b>`;
+}
+
+// ── BUYING LIST（收单需求）─────────────────────────────────────────────────
+// 未分配卡主的待出订单，按航司合并美金票面（未打折，即卡上实际刷的数）：
+//   points = USD × 100 → "Buying 288K AMEX BP-UA"（$2,884 → 288K）
+function _buildBuyingList() {
+  const rate = settings.rate || 7.2;
+  // 一单一行（每个订单分开出票分开收）；同航司的行排在一起，不求和。
+  const entries = [];
+  STATE.orders.forEach(o => {
+    if (!isMeaningfulOrder(o)) return;
+    if (o.tableLabel === 'G') return;          // 表G 走 Chase 流程，不在此列
+    if (o.cardholderId) return;                // 已分配卡主 → 不需要再收
+    let al = (o.airline || '').toUpperCase();
+    if (!al && o.segments && o.segments[0] && o.segments[0].flight) {
+      al = String(o.segments[0].flight).slice(0, 2).toUpperCase();
+    }
+    if (!/^[A-Z0-9]{2}$/.test(al)) return;
+    let usdTotal = 0;
+    try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
+    if (!(usdTotal > 0)) return;
+    entries.push({ al, usd: usdTotal });
+  });
+  if (entries.length === 0) return '';
+  // 航司排序：该航司合计金额大的组在前；组内按单笔金额降序
+  const groupSum = {};
+  entries.forEach(e => { groupSum[e.al] = (groupSum[e.al] || 0) + e.usd; });
+  entries.sort((a, b) => (groupSum[b.al] - groupSum[a.al]) || (a.al === b.al ? (b.usd - a.usd) : (a.al < b.al ? -1 : 1)));
+  return entries
+    .map(e => {
+      const k = Math.round(e.usd / 10);        // USD×100 点 ÷1000 = USD/10 → K
+      return k > 0 ? `Buying ${k}K AMEX BP-${e.al}` : null;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
+async function copyBuyingList() {
+  const text = _buildBuyingList();
+  if (!text) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
+  await copyText(text);
+  toast('✓ 收单需求已复制：\n' + text.split('\n').slice(0, 4).join('\n') + (text.split('\n').length > 4 ? '\n…' : ''));
 }
 
 // AI-recommended priority orders (set by aiTicketingAdvice) → animated marks.
