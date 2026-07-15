@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.06.29-K\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.06.30-P\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.29-K</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.06.30-P</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -12805,16 +12805,23 @@ async function parsePNR() {
   // stored in o.proposals[]. The user picks one; o.segments mirrors the selected.
   const newOrders = [];
   const _allUnrecognized = [];  // lines no parser branch consumed, across all chunks
+  let _aiFbToastShown = false;  // AI-fallback status toast — once per parse
   for (const chunk of bookings) {
     const chunkProposals = splitChunkByProposals(chunk);
 
     // Parse each proposal separately, then combine results.
     // Primary proposal (index 0) provides passengers, discount, cabin, etc.
     // Subsequent proposals contribute only their segments + their own rmb.
-    const parsedProposals = chunkProposals
+    let parsedProposals = chunkProposals
       .map(sb => ({ ...parseSingleBooking(sb.text), proposalLabel: sb.proposalLabel }))
       .filter(p => p.pax.length > 0 || p.segs.length > 0);
-    if (parsedProposals.length === 0) continue;
+    if (parsedProposals.length === 0) {
+      // ── AI FALLBACK: rules got nothing from this chunk — try Claude ──
+      if (!_aiFbToastShown && loadAnthropicKey()) { toast('🤖 规则未识别，AI 解析中…'); _aiFbToastShown = true; }
+      const aiRes = await _aiFallbackParse(chunk);
+      if (aiRes) { parsedProposals = [aiRes]; }
+      else continue;
+    }
     // Accumulate unrecognized lines across all proposals/chunks (deduped)
     parsedProposals.forEach(p => (p.unrecognizedLines || []).forEach(l => {
       if (!_allUnrecognized.includes(l)) _allUnrecognized.push(l);
@@ -13001,6 +13008,7 @@ async function parsePNR() {
         if (!primary.usd && settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
       }
     }
+    if (primary.aiParsed) o.aiParsed = true;  // AI-recognized — needs human review badge
     newOrders.push(o);
   }
 
@@ -13534,6 +13542,9 @@ function renderAirlineUsdPanel(orders) {
       const mixedBadge = mixed.isMixed
         ? `<span class="ui-badge ui-badge--mix" title="${escapeAttr(mixed.tooltip)}">混舱</span>`
         : '';
+      const aiRowBadge = o.aiParsed
+        ? `<span class="ui-badge" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:9px;" title="AI识别 · 出票前请核对">🤖AI</span>`
+        : '';
       const releaseBadge = o.waitingForRelease
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
         : '';
@@ -13618,7 +13629,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -15053,6 +15064,16 @@ function renderPendingList() {
         summarySpan.className = 'collapse-summary';
         summarySpan.textContent = summaryParts.join('  ·  ');
         header.appendChild(summarySpan);
+
+        // AI-fallback recognized — remind to verify before ticketing
+        if (o.aiParsed) {
+          const aiWrap = document.createElement('span');
+          aiWrap.className = 'ui-badge';
+          aiWrap.style.cssText = 'margin-left:6px;background:#7c3aed;color:#fff;border-color:#7c3aed;';
+          aiWrap.title = '此单由 AI 兜底识别 — 出票前请核对航段/乘客/价格';
+          aiWrap.textContent = '🤖 AI识别';
+          header.appendChild(aiWrap);
+        }
 
         // Imminent-departure chip (24h / 48h / 72h) — inserted after the
         // summary so it sits next to date/route. Returns '' for >72h.
@@ -26894,6 +26915,69 @@ async function _aiParsePassport(key, b64, mediaType) {
 
 // Parse an itinerary image → extract flight info → rawInput → auto-parse.
 // Uses Sonnet: itinerary formats are varied and need more reasoning.
+// ── AI FALLBACK TEXT PARSER ─────────────────────────────────────────────────
+// When every rule branch fails on a booking chunk (0 pax + 0 segs), send the
+// raw text to Claude (haiku — cheap structured extraction). Returns a
+// parseSingleBooking-shaped object with aiParsed:true, or null.
+async function _aiFallbackParse(chunkText) {
+  const key = loadAnthropicKey();
+  if (!key) return null;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
+        messages: [{ role: 'user', content:
+`从下面的机票预订文本中提取结构化信息，只输出一个 JSON 对象，不要任何解释、不要 markdown 围栏。
+
+字段规范：
+{"segments":[{"flight":"UA857","date":"25SEP","from":"SFO","to":"PVG","depTime":"13:00","arrTime":"17:25","cls":"P"}],
+ "passengers":[{"name":"WANG/WENJUN","gender":"MALE","dob":"26OCT70"}],
+ "rmb":null,"usd":null,"fareByType":null,"cabin":null,"trip":null}
+
+规则：
+- flight=航司两字码+数字；date=DD+三字母月份大写(25SEP)；from/to=IATA三字码大写（中文城市要转换成IATA）；时间HH:MM 24小时制，没有则""
+- name=姓/名 全大写；gender=MALE/FEMALE/""；dob=DDMONYY(26OCT70)，没有则""
+- rmb=每人人民币运价数字；usd=每人美元运价；若是总价须除以人数；fareByType={"adult":..,"child":..,"infant":..}仅在按人群分开报价时给（人民币）
+- cabin只能是 经济舱/商务舱/超级经济舱/头等舱 之一或null（公务舱=商务舱）；trip只能是 ONE WAY/ROUND TRIP/MULTI-CITY 或null
+- 识别不出的字段用 null/""/[]，绝不编造
+
+文本：
+${chunkText}` }]
+      })
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    let txt = (data.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+    txt = txt.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    const j = JSON.parse(txt);
+    const segs = (Array.isArray(j.segments) ? j.segments : [])
+      .map(s => ({ flight: String(s.flight || '').toUpperCase().replace(/\s+/g, ''), date: String(s.date || '').toUpperCase(), from: String(s.from || '').toUpperCase(), to: String(s.to || '').toUpperCase(), depTime: String(s.depTime || ''), arrTime: String(s.arrTime || ''), cls: String(s.cls || '').toUpperCase().slice(0, 1) }))
+      .filter(s => /^[A-Z]{3}$/.test(s.from) && /^[A-Z]{3}$/.test(s.to) && s.from !== s.to);
+    const pax = (Array.isArray(j.passengers) ? j.passengers : [])
+      .map(p => ({ name: String(p.name || '').toUpperCase().replace(/\s*\/\s*/, '/').trim(), gender: /^(MALE|FEMALE)$/i.test(p.gender) ? String(p.gender).toUpperCase() : '', dob: String(p.dob || '').toUpperCase() }))
+      .filter(p => p.name.includes('/'));
+    if (segs.length === 0 && pax.length === 0) return null;
+    const num = (v, lo, hi) => { const n = parseFloat(v); return isFinite(n) && n >= lo && n <= hi ? n : null; };
+    let fbt = null;
+    if (j.fareByType && typeof j.fareByType === 'object') {
+      const f = {};
+      ['adult', 'child', 'infant'].forEach(k => { const v = num(j.fareByType[k], 100, 5000000); if (v) f[k] = v; });
+      if (Object.keys(f).length) fbt = f;
+    }
+    const cabinOk = ['经济舱', '商务舱', '超级经济舱', '头等舱'].includes(j.cabin) ? j.cabin : null;
+    const tripOk = ['ONE WAY', 'ROUND TRIP', 'MULTI-CITY'].includes(j.trip) ? j.trip : undefined;
+    return { pax, segs, airline: segs[0] ? segs[0].flight.slice(0, 2) : null,
+      rmb: num(j.rmb, 100, 5000000), usd: num(j.usd, 50, 100000), trip: tripOk,
+      discount: null, cabin: cabinOk, paxPrices: null, customRate: null, pnr: null,
+      productDiscount: null, productMarker: null, productNote: null, urgent: false,
+      ticketSeqNote: undefined, basicFare: false, basicFareLabel: '',
+      fareByType: fbt, unrecognizedLines: [], waitingForRelease: false, aiParsed: true };
+  } catch (e) { return null; }
+}
+
 async function _aiParseItinerary(key, b64, mediaType) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
