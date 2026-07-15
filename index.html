@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.06-V\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.07-W\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.06-V</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.07-W</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13545,9 +13545,10 @@ function renderAirlineUsdPanel(orders) {
         const markerLabel = (o.specialDiscountNote || '产品').match(/产[\w\d一二三四五六七八九十]*/)?.[0] || '产品';
         urLine = `<div style="font-size:10px;font-weight:700;color:#0070c9;margin-top:1px;font-family:'JetBrains Mono',monospace;letter-spacing:0.03em;" title="${markerLabel} @2cpp = ${pointsNeeded.toLocaleString()} UR">● ${kStr} UR</div>`;
       }
+      const _fixClick = o.id ? `onclick="event.stopPropagation();usdQuickFix('${escapeAttr(String(o.id))}')" style="cursor:pointer;" title="点击直接修改美金票面（自动换算存回）"` : '';
       const amountDisplay = hasPrice
-        ? `<span class="amount" style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;"><span>$${totalUsd.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>${urLine}</span>`
-        : `<span class="amount" style="color:var(--red); font-weight:700;">⚠ 缺运价</span>`;
+        ? `<span class="amount" ${_fixClick} style="display:flex;flex-direction:column;align-items:flex-end;line-height:1.2;cursor:pointer;"><span>$${totalUsd.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>${urLine}</span>`
+        : `<span class="amount" ${_fixClick} style="color:var(--red); font-weight:700;cursor:pointer;">⚠ 缺运价</span>`;
       const mixedBadge = mixed.isMixed
         ? `<span class="ui-badge ui-badge--mix" title="${escapeAttr(mixed.tooltip)}">混舱</span>`
         : '';
@@ -14370,6 +14371,24 @@ function _installBuySelListener() {
     if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
   }, true);
   _buySelListenerOn = true;
+}
+
+// 一键修正美金票面：输入美金总价 → 按汇率换算成每人 basePrice 存回
+async function usdQuickFix(orderId) {
+  const o = STATE.orders.find(x => String(x.id) === String(orderId));
+  if (!o) return;
+  const rate = o.rate || settings.rate || 7.2;
+  const pax = (o.passengers || []).length || 1;
+  let cur = 0; try { cur = _orderUsd(o, rate); } catch (e) {}
+  const inp = prompt(`美金总价（${pax}人整单，汇率${rate}）：`, cur > 0 ? String(Math.round(cur)) : '');
+  if (inp == null) return;
+  const usd = parseFloat(String(inp).replace(/[$,\s]/g, ''));
+  if (!(usd > 0 && usd < 1000000)) { toast('金额无效'); return; }
+  o.basePrice = +((usd * rate) / pax).toFixed(2);   // 每人票面（人民币）
+  o.paxPrices = null;                                // 清除旧的每人价，改走 basePrice
+  try { await storageSet('ticket-organizer-pending', STATE.orders); if (typeof fbScheduleWrite === 'function') fbScheduleWrite(); } catch (e) {}
+  toast(`✓ 已改为 $${usd.toLocaleString()}（每人 ¥${o.basePrice.toLocaleString()}）`);
+  try { renderPendingList(); } catch (e) {}
 }
 
 async function copyBuyingList() {
