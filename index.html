@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.03-S\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.04-T\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.03-S</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.04-T</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14310,7 +14310,7 @@ function _buyEligibleEntries() {
     let usdTotal = 0;
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
-    entries.push({ id: o.id, al, usd: usdTotal });
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!o.buyPostedAt });
   });
   return entries;
 }
@@ -14319,9 +14319,7 @@ function _buildBuyingList(onlyIdSet) {
   let entries = _buyEligibleEntries();
   if (onlyIdSet) entries = entries.filter(e => onlyIdSet.has(e.id));
   if (entries.length === 0) return '';
-  const groupSum = {};
-  entries.forEach(e => { groupSum[e.al] = (groupSum[e.al] || 0) + e.usd; });
-  entries.sort((a, b) => (groupSum[b.al] - groupSum[a.al]) || (a.al === b.al ? (b.usd - a.usd) : (a.al < b.al ? -1 : 1)));
+  entries.sort((a, b) => a.usd - b.usd);  // 从小到大
   return entries
     .map(e => {
       const k = Math.round(e.usd / 10);        // USD×100 点 ÷1000 = USD/10 → K
@@ -14376,20 +14374,30 @@ async function copyBuyingList() {
     const elig = _buyEligibleEntries();
     if (elig.length === 0) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
     BUY_ELIGIBLE = new Set(elig.map(e => e.id));
-    BUY_SELECT = new Set(elig.map(e => e.id));
+    // 默认只勾选"上次复制后新增"的单（没打过 buyPostedAt 的）；已发过的可点击行补选
+    const fresh = elig.filter(e => !e.posted);
+    BUY_SELECT = new Set(fresh.map(e => e.id));
     _installBuySelListener();
     _applyBuySelectMarks();
     if (btn) { btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`; btn.classList.add('accent'); }
-    toast('已高亮全部待收订单\n点击订单行可取消/恢复选择\n调整完再点「✓ 确认复制」');
+    const postedN = elig.length - fresh.length;
+    toast(`默认选中新增 ${fresh.length} 单` + (postedN ? `（已发过的 ${postedN} 单未选，可点行补选）` : '') + '\n点击订单行可取消/恢复\n调整完再点「✓ 确认复制」');
     return;
   }
   // ── 第二次点击：只复制仍选中的 ──
   const n = BUY_SELECT.size;
+  const copiedSet = new Set(BUY_SELECT);
   const text = n > 0 ? _buildBuyingList(BUY_SELECT) : '';
   BUY_SELECT = null; BUY_ELIGIBLE = null;
   _applyBuySelectMarks();
   if (btn) { btn.textContent = '📋 收单需求'; btn.classList.remove('accent'); }
   if (!text) { toast('已取消（未选择任何订单）'); return; }
+  // 给本次复制的单打"已发"时间戳（随订单持久化+云同步，下次默认不再选中）
+  try {
+    STATE.orders.forEach(o => { if (copiedSet.has(o.id)) o.buyPostedAt = Date.now(); });
+    await storageSet('ticket-organizer-pending', STATE.orders);
+    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
+  } catch (e) {}
   await copyText(text);
   toast(`✓ 已复制 ${n} 条收单需求：\n` + text.split('\n').slice(0, 4).join('\n') + (n > 4 ? '\n…' : ''));
 }
