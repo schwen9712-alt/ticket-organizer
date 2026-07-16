@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.12-B\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.15-E\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.12-B</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.15-E</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10447,9 +10447,10 @@ function parseSingleBooking(raw) {
     }
     // ── USD typed fares: "成人 4453.73 USD/人，儿童4423.73 USD" ────────────────
     {
-      const uf = trimmed.match(/成人\s*([\d,]+(?:\.\d+)?)\s*(?:USD|美金|美元)(?:\s*\/\s*人)?\s*[,，]\s*(?:儿童|小儿)\s*([\d,]+(?:\.\d+)?)\s*(?:USD|美金|美元)/i);
-      if (uf) {
-        const ua = parseFloat(uf[1].replace(/,/g, '')), uc = parseFloat(uf[2].replace(/,/g, ''));
+      const uf = trimmed.match(/(?:成人|大人)\s*[:：]?\s*([\d,]+(?:\.\d+)?)\s*(USD|美金|美元)?(?:\s*\/\s*人)?\s*[,，]\s*(?:儿童|小儿)\s*[:：]?\s*([\d,]+(?:\.\d+)?)\s*(USD|美金|美元)?/i);
+      // USD 判定：有币种标，或两个金额都带小数（如 4304.33/4214.33 的美金特征）
+      if (uf && (uf[2] || uf[4] || (uf[1].includes('.') && uf[3].includes('.')))) {
+        const ua = parseFloat(uf[1].replace(/,/g, '')), uc = parseFloat(uf[3].replace(/,/g, ''));
         if (ua >= 50 && ua <= 100000) {
           if (!usd) usd = ua;
           if (settings.rate > 0) {
@@ -12831,6 +12832,18 @@ async function parsePNR() {
       if (aiRes) { parsedProposals = [aiRes]; }
       else continue;
     }
+    // 运价强需求：有结构无价 → AI 只补运价
+    for (const p of parsedProposals) {
+      if ((p.segs.length || p.pax.length) && !p.rmb && !p.usd && !p.paxPrices && !p.fareByType) {
+        const fr = await _aiFareRescue(chunk);
+        if (fr) {
+          if (fr.rmb) p.rmb = fr.rmb;
+          if (fr.usd) p.usd = fr.usd;
+          if (fr.fareByType) p.fareByType = fr.fareByType;
+          p.aiParsed = true;  // 紫徽章提醒核对
+        }
+      }
+    }
     // Accumulate unrecognized lines across all proposals/chunks (deduped)
     parsedProposals.forEach(p => (p.unrecognizedLines || []).forEach(l => {
       if (!_allUnrecognized.includes(l)) _allUnrecognized.push(l);
@@ -14311,7 +14324,8 @@ function _buyEligibleEntries() {
     let usdTotal = 0;
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
-    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1 });
+    const hasChild = !!(o.fareByType && o.fareByType.child) || (o.passengers || []).some(p => p && (p.forcedType === 'CHILD' || p.forcedType === 'INFANT'));
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild });
   });
   return entries;
 }
@@ -14327,7 +14341,9 @@ function _buildBuyingList(onlyIdSet) {
       if (k <= 0) return null;
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
-      if (e.pax >= 2) {
+      if (e.pax >= 2 && e.hasChild) {
+        split = ` (${e.pax} pax, no split)`;  // 含儿童价：儿童不能单独出票，不可拆
+      } else if (e.pax >= 2) {
         const pp = e.usd / e.pax;
         const combos = [];
         for (let k = 2; k < e.pax; k++) combos.push(`${k}p=$${Math.round(pp * k).toLocaleString()}`);
@@ -27109,6 +27125,28 @@ async function _aiParsePassport(key, b64, mediaType) {
 
 // Parse an itinerary image → extract flight info → rawInput → auto-parse.
 // Uses Sonnet: itinerary formats are varied and need more reasoning.
+// 运价强需求补救：结构识别成功但无价 → AI 只提取运价
+async function _aiFareRescue(chunkText) {
+  const key = loadAnthropicKey();
+  if (!key) return null;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 300,
+        messages: [{ role: 'user', content: '从机票预订文本提取运价，只输出JSON：{"rmb":每人人民币或null,"usd":每人美元或null,"fareByType":{"adult":..,"child":..,"infant":..}或null}。总价须除以人数；识别不出用null；绝不编造。\n\n' + chunkText }] })
+    });
+    if (!res.ok) return null;
+    const d = await res.json();
+    let t = (d.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('').trim().replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'');
+    const j = JSON.parse(t);
+    const num=(v,lo,hi)=>{const n=parseFloat(v);return isFinite(n)&&n>=lo&&n<=hi?n:null;};
+    const out={rmb:num(j.rmb,100,5000000),usd:num(j.usd,50,100000),fareByType:null};
+    if (j.fareByType&&typeof j.fareByType==='object'){const f={};['adult','child','infant'].forEach(k=>{const v=num(j.fareByType[k],100,5000000);if(v)f[k]=v;});if(Object.keys(f).length)out.fareByType=f;}
+    return (out.rmb||out.usd||out.fareByType)?out:null;
+  } catch(e){ return null; }
+}
+
 // ── AI FALLBACK TEXT PARSER ─────────────────────────────────────────────────
 // When every rule branch fails on a booking chunk (0 pax + 0 segs), send the
 // raw text to Claude (haiku — cheap structured extraction). Returns a
