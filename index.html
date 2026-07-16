@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.09-Y\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.10-Z\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.09-Y</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.10-Z</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14373,6 +14373,16 @@ function _installBuySelListener() {
     else { BUY_SELECT.add(id); row.classList.add('buy-selected'); }
     const btn = document.getElementById('buyingListBtn');
     if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
+  }, true);
+  // 双击任意订单行 = 全选（双击前的两次单击互相抵消，净效果即全选）
+  panel.addEventListener('dblclick', (ev) => {
+    if (!BUY_SELECT || !BUY_ELIGIBLE) return;
+    const row = ev.target && ev.target.closest ? ev.target.closest('.airline-usd-row[data-order-id]') : null;
+    if (!row) return;
+    ev.stopPropagation(); ev.preventDefault();
+    BUY_SELECT = new Set(BUY_ELIGIBLE);
+    _applyBuySelectMarks();
+    toast(`✓ 已全选 ${BUY_SELECT.size} 单`);
   }, true);
   _buySelListenerOn = true;
 }
