@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.15-G\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-I\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.15-G</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-I</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5592,6 +5592,22 @@ input[type="text"], input[type="number"], textarea {
   outline-offset: -2px;
   background: #f0faf4 !important;
   box-shadow: 0 0 0 1px rgba(10,143,74,.2);
+}
+/* 双击启用变种输出的单：蓝色虚线环 + 「变种」角标（可与绿色选中环叠加） */
+.buy-variant {
+  position: relative;
+  outline-style: dashed !important;
+  outline-color: #1d5fd0 !important;
+}
+.buy-variant::after {
+  content: '变种';
+  position: absolute;
+  top: -1px; right: -1px;
+  background: #1d5fd0; color: #fff;
+  font-size: 9px; font-weight: 700;
+  padding: 1px 6px; border-radius: 0 0 0 6px;
+  letter-spacing: 0.08em;
+  pointer-events: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -14409,7 +14425,7 @@ function _buyEligibleEntries() {
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
     const hasChild = !!(o.fareByType && o.fareByType.child) || (o.passengers || []).some(p => p && (p.forcedType === 'CHILD' || p.forcedType === 'INFANT'));
-    // v26.07.15-G：儿童无独立运价（与成人同价/无分档）→ 视同成人可自由拆分；
+    // v26.07.16-G：儿童无独立运价（与成人同价/无分档）→ 视同成人可自由拆分；
     // 有独立儿童价 → 成人配对拆（-F 逻辑）；含婴儿 → 永远强约束。
     const constrained = _orderHasInfant(o) || (hasChild && _hasDistinctChildFare(o));
     const childSplit = constrained ? _buySplitPlan(o, usdTotal) : null;
@@ -14418,45 +14434,64 @@ function _buyEligibleEntries() {
   return entries;
 }
 
-function _buildBuyingList(onlyIdSet) {
+function _buildBuyingList(onlyIdSet, variantIdSet) {
   let entries = _buyEligibleEntries();
   if (onlyIdSet) entries = entries.filter(e => onlyIdSet.has(e.id));
   if (entries.length === 0) return '';
   entries.sort((a, b) => a.usd - b.usd);  // 从小到大
-  return entries
+  const blocks = entries
     .map(e => {
       const k = Math.round(e.usd / 10);        // USD×100 点 ÷1000 = USD/10 → K
       if (k <= 0) return null;
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
+      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && !e.hasChild;
       if (e.pax >= 2 && e.hasChild) {
         // 含儿童：儿童不能单独出票。有成人可配对时给出拆法，否则整单不可拆。
         split = e.childSplit ? ` (${e.pax} pax, ${e.childSplit})` : ` (${e.pax} pax, no split)`;
-      } else if (e.pax >= 2) {
+      } else if (e.pax >= 2 && !useVariant) {
         const pp = e.usd / e.pax;
         const combos = [];
-        for (let k = 2; k < e.pax; k++) combos.push(`${k}p=$${Math.round(pp * k).toLocaleString()}`);
+        for (let n = 2; n < e.pax; n++) combos.push(`${n}p=$${Math.round(pp * n).toLocaleString()}`);
         split = ` (${e.pax} pax, $${Math.round(pp).toLocaleString()} each` + (combos.length ? ` · ${combos.join(' · ')}` : '') + ')';
+      } else if (useVariant) {
+        split = ` (${e.pax} pax)`;
       }
-      return `Buying ${k}K AMEX BP-${e.al}${split}`;
+      let block = `Buying ${k}K AMEX BP-${e.al}${split}`;
+      if (useVariant) {
+        // 变种：单人K × 份数（1..N-1），纯尺寸行，无任何后缀标记
+        const kPer = Math.round(e.usd / e.pax / 10);
+        for (let n = 1; n < e.pax; n++) {
+          if (kPer * n > 0) block += `\nBuying ${kPer * n}K AMEX BP-${e.al}`;
+        }
+      }
+      return block;
     })
-    .filter(Boolean)
-    .join('\n');
+    .filter(Boolean);
+  // 有变种块时用空行分隔各单，避免变种行归属混淆
+  return blocks.join(blocks.some(b => b.includes('\n')) ? '\n\n' : '\n');
 }
 
 // ── Two-step selection mode ────────────────────────────────────────────────
 let BUY_SELECT = null;      // null = 未激活；Set<orderId> = 选择模式中已勾选的单
 let BUY_ELIGIBLE = null;    // 进入模式时的合规单快照（防止把已分配的点进来）
+let BUY_VARIANT = null;     // Set<orderId>：双击启用「变种输出」的单（仅限自由拆分单）
+let BUY_META = null;        // Map<orderId, entry>：进入模式时的合规单明细快照
 let _buySelListenerOn = false;
 
 function _applyBuySelectMarks() {
   try {
     document.querySelectorAll('.buy-selected').forEach(el => el.classList.remove('buy-selected'));
+    document.querySelectorAll('.buy-variant').forEach(el => el.classList.remove('buy-variant'));
     if (!BUY_SELECT) return;
     BUY_SELECT.forEach(id => {
       const sel = _cssEsc(id);
       const r = document.querySelector(`.airline-usd-row[data-order-id="${sel}"]`);
       if (r) r.classList.add('buy-selected');
+    });
+    if (BUY_VARIANT) BUY_VARIANT.forEach(id => {
+      const r = document.querySelector(`.airline-usd-row[data-order-id="${_cssEsc(id)}"]`);
+      if (r) r.classList.add('buy-variant');
     });
     const btn = document.getElementById('buyingListBtn');
     if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
@@ -14479,17 +14514,42 @@ function _installBuySelListener() {
     const btn = document.getElementById('buyingListBtn');
     if (btn) btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`;
   }, true);
-  // 双击任意订单行 = 全选（双击前的两次单击互相抵消，净效果即全选）
+  // 双击订单行 = 切换该单「变种输出」（双击附带的两次单击互相抵消，选中状态不变）
+  // 双击面板空白处 = 全选（原 07-10 功能挪到空白处，仍然保留）
   panel.addEventListener('dblclick', (ev) => {
     if (!BUY_SELECT || !BUY_ELIGIBLE) return;
     const row = ev.target && ev.target.closest ? ev.target.closest('.airline-usd-row[data-order-id]') : null;
-    if (!row) return;
     ev.stopPropagation(); ev.preventDefault();
-    BUY_SELECT = new Set(BUY_ELIGIBLE);
-    _applyBuySelectMarks();
-    toast(`✓ 已全选 ${BUY_SELECT.size} 单`);
+    if (!row) {
+      BUY_SELECT = new Set(BUY_ELIGIBLE);
+      _applyBuySelectMarks();
+      toast(`✓ 已全选 ${BUY_SELECT.size} 单`);
+      return;
+    }
+    _toggleBuyVariant(row.dataset.orderId, row);
   }, true);
   _buySelListenerOn = true;
+}
+
+// 切换某单的「变种输出」：主行简化为 (N pax)，下附 1..N-1 各档 `Buying kK AMEX BP-XX`
+// 仅自由拆分单可用；独立儿童价/含婴儿单（配对约束）与单人单不支持。
+function _toggleBuyVariant(id, row) {
+  if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { toast('该单已分配卡主或不在收单范围'); return; }
+  const meta = BUY_META ? BUY_META.get(id) : null;
+  if (!meta || meta.pax < 2) { toast('单人订单没有变种'); return; }
+  if (meta.hasChild) { toast('该单含独立儿童价/婴儿，需挂成人配对出票，不支持变种'); return; }
+  if (!BUY_VARIANT) BUY_VARIANT = new Set();
+  if (BUY_VARIANT.has(id)) {
+    BUY_VARIANT.delete(id);
+    if (row) row.classList.remove('buy-variant');
+    toast('已关闭变种输出');
+  } else {
+    BUY_VARIANT.add(id);
+    if (!BUY_SELECT.has(id)) BUY_SELECT.add(id);   // 启用变种默认要复制它
+    _applyBuySelectMarks();
+    const kPer = Math.round(meta.usd / meta.pax / 10);
+    toast(`✓ 已启用变种：${meta.pax}人单 → ${kPer}K × 1..${meta.pax - 1} 各档`);
+  }
 }
 
 // 一键修正美金票面：输入美金总价 → 按汇率换算成每人 basePrice 存回
@@ -14517,6 +14577,8 @@ async function copyBuyingList() {
     const elig = _buyEligibleEntries();
     if (elig.length === 0) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
     BUY_ELIGIBLE = new Set(elig.map(e => e.id));
+    BUY_META = new Map(elig.map(e => [e.id, e]));
+    BUY_VARIANT = new Set();
     // 默认只勾选"上次复制后新增"的单（没打过 buyPostedAt 的）；已发过的可点击行补选
     const fresh = elig.filter(e => !e.posted);
     BUY_SELECT = new Set(fresh.map(e => e.id));
@@ -14524,14 +14586,14 @@ async function copyBuyingList() {
     _applyBuySelectMarks();
     if (btn) { btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`; btn.classList.add('accent'); }
     const postedN = elig.length - fresh.length;
-    toast(`默认选中新增 ${fresh.length} 单` + (postedN ? `（已发过的 ${postedN} 单未选，可点行补选）` : '') + '\n点击订单行可取消/恢复\n调整完再点「✓ 确认复制」');
+    toast(`默认选中新增 ${fresh.length} 单` + (postedN ? `（已发过的 ${postedN} 单未选，可点行补选）` : '') + '\n点击行=选/不选 · 双击行=变种输出\n调整完再点「✓ 确认复制」');
     return;
   }
   // ── 第二次点击：只复制仍选中的 ──
   const n = BUY_SELECT.size;
   const copiedSet = new Set(BUY_SELECT);
-  const text = n > 0 ? _buildBuyingList(BUY_SELECT) : '';
-  BUY_SELECT = null; BUY_ELIGIBLE = null;
+  const text = n > 0 ? _buildBuyingList(BUY_SELECT, BUY_VARIANT) : '';
+  BUY_SELECT = null; BUY_ELIGIBLE = null; BUY_VARIANT = null; BUY_META = null;
   _applyBuySelectMarks();
   if (btn) { btn.textContent = '📋 收单需求'; btn.classList.remove('accent'); }
   if (!text) { toast('已取消（未选择任何订单）'); return; }
