@@ -1,3 +1,21 @@
+## 2026-07-15 — 儿童无独立运价=可自由拆分 · v26.07.15-G
+
+三级规则定型：①儿童**有独立儿童价**（child≠成人参照价）→ 成人配对拆（-F 逻辑）；②儿童**无独立运价**（与成人同价或无分档，如 5人单儿童=成人 ¥38,511）→ 视同成人，回到纯成人组合小计 `(5 pax, $5,682 each · 2p=… · 3p=… · 4p=…)`；③**含婴儿**（标记/婴儿价/DOB<2）→ 任何情况强约束，走配对拆。fareByType.child 存在但无成人参照价 → 保守视为独立儿童价。paxPrices 不等额也视为分档。
+
+**测试**：端到端跑真实 _buildBuyingList，5 场景（本单自由拆、上单配对拆回归、婴儿强约束、强制儿童标记无分档、只有儿童价认不出人）全过。
+
+**改动位置**：新增 _hasDistinctChildFare / _orderHasInfant（_buySplitPlan 前）；_buyEligibleEntries 门控改 constrained。
+
+**回滚**：.backups/ 上一版。
+---
+## 2026-07-15 — 含儿童单可按成人配对拆 · v26.07.15-F
+
+放宽昨日 -E 的一刀切：儿童/婴儿仍不能单独出票，但每个成人开一组、未成年人轮转挂靠 → 成人≥2 且能识别出谁是儿童（DOB/强制标记）时输出拆法：2成人+2儿童 → `Buying 1468K AMEX BP-UA (4 pax, splits as 1A+1C x2 · $7,338 each)`；组不等额时 `1A+1C=$7,338 + 1A=$3,682 x2`。1成人带娃、无成人、或只知含儿童价但认不出具体是谁 → 维持 (N pax, no split)。各组金额按分档运价/每人价加权从整单USD摊回，与K数同源。纯成人组合小计逻辑不动。
+
+**改动位置**：_buySplitPlan（新增，_buyEligibleEntries 前）；entries 增 childSplit 字段；_buildBuyingList 含儿童分支。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-15 — 含儿童多人单不可拆 · v26.07.15-E
 
 收单需求：多人单若含儿童（fareByType.child 或 forcedType CHILD/INFANT）→ 儿童不能单独出票 → 不输出拆分组合，行尾标 (N pax, no split)。纯成人多人单组合照旧。

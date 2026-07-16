@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.15-E\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.15-G\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.15-E</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.15-G</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14309,6 +14309,90 @@ function _sgOrdLink(x) {
 // ── BUYING LIST（收单需求）─────────────────────────────────────────────────
 // 未分配卡主的待出订单，按航司合并美金票面（未打折，即卡上实际刷的数）：
 //   points = USD × 100 → "Buying 288K AMEX BP-UA"（$2,884 → 288K）
+// 儿童是否有「独立儿童运价」：有 → 儿童必须挂成人出票；没有（与成人同价或
+// 根本没分档）→ 儿童视同成人，可自由拆分。fareByType.child 存在但找不到成人
+// 参照价时保守视为独立。
+function _hasDistinctChildFare(o) {
+  const fb = o.fareByType || {};
+  if (fb.child != null) {
+    const adultRef = fb.adult != null ? Number(fb.adult) : (o.basePrice != null ? Number(o.basePrice) : null);
+    if (adultRef == null) return true;
+    return Number(fb.child) !== adultRef;
+  }
+  if (Array.isArray(o.paxPrices) && o.paxPrices.length >= 2) {
+    const vals = o.paxPrices.map(Number).filter(v => v > 0);
+    if (vals.length >= 2 && Math.max(...vals) !== Math.min(...vals)) return true;
+  }
+  return false;
+}
+
+// 订单是否含婴儿（强制标记 / 婴儿分档价 / DOB<2岁）——婴儿永远不能单独出票。
+function _orderHasInfant(o) {
+  if (o.fareByType && o.fareByType.infant != null) return true;
+  const segs = (o.proposals && o.proposals[o.selectedProposalIdx] && o.proposals[o.selectedProposalIdx].segments) || o.segments || [];
+  const d0 = segs[0] ? segs[0].date : null;
+  return (o.passengers || []).some(p => {
+    if (!p) return false;
+    if (p.forcedType === 'INFANT') return true;
+    if (p.dob && d0) { const a = calculateAgeAtFlight(p.dob, d0); return a != null && a < 2; }
+    return false;
+  });
+}
+
+// 含儿童多人单的拆分方案：儿童/婴儿不能单独出票，但可挂在成人名下拆卡收。
+// 每个成人开一组，未成年人轮转分配 → 每组必含 1 成人。成人 <2 时无法拆出
+// ≥2 组 → 返回 null（保持 no split）。乘客类型识别缺失（无 DOB/强制标记，
+// 只有 fareByType.child）时同样返回 null——不知道谁是儿童就不给拆法。
+// 各组金额按分档运价/每人价加权，从整单 USD 摊回，保证与 K 数同源。
+function _buySplitPlan(o, usdTotal) {
+  const paxList = o.passengers || [];
+  const segs = (o.proposals && o.proposals[o.selectedProposalIdx] && o.proposals[o.selectedProposalIdx].segments) || o.segments || [];
+  const d0 = segs[0] ? segs[0].date : null;
+  const typeOf = (p) => {
+    if (!p) return 'A';
+    if (p.forcedType === 'INFANT') return 'I';
+    if (p.forcedType === 'CHILD') return 'C';
+    if (p.dob && d0) {
+      const a = calculateAgeAtFlight(p.dob, d0);
+      if (a != null) { if (a < 2) return 'I'; if (a < 12) return 'C'; }
+    }
+    return 'A';
+  };
+  const fb = o.fareByType || {};
+  const wOf = (p, i) => {
+    if (Array.isArray(o.paxPrices) && Number(o.paxPrices[i]) > 0) return Number(o.paxPrices[i]);
+    const t = typeOf(p);
+    if (t === 'C' && fb.child != null) return Number(fb.child);
+    if (t === 'I' && fb.infant != null) return Number(fb.infant);
+    if (fb.adult != null) return Number(fb.adult);
+    return 1;
+  };
+  const typed = paxList.map((p, i) => ({ t: typeOf(p), w: wOf(p, i) }));
+  if (!typed.length) return null;
+  const adults = typed.filter(x => x.t === 'A');
+  const minors = typed.filter(x => x.t !== 'A');
+  if (!minors.length || adults.length < 2) return null;
+  const wSum = typed.reduce((s, x) => s + x.w, 0) || 1;
+  const groups = adults.map(a => [a]);
+  minors.forEach((m, i) => { groups[i % groups.length].push(m); });
+  const seen = new Map();
+  groups.forEach(g => {
+    const cnt = { A: 0, C: 0, I: 0 };
+    g.forEach(x => { cnt[x.t]++; });
+    const label = ['A', 'C', 'I'].filter(k => cnt[k]).map(k => cnt[k] + k).join('+');
+    const usd = Math.round(usdTotal * g.reduce((s, x) => s + x.w, 0) / wSum);
+    const key = label + '|' + usd;
+    if (!seen.has(key)) seen.set(key, { label, usd, m: 0 });
+    seen.get(key).m++;
+  });
+  const parts = Array.from(seen.values());
+  if (parts.length === 1) {
+    return `splits as ${parts[0].label} x${parts[0].m} · $${parts[0].usd.toLocaleString()} each`;
+  }
+  parts.sort((a, b) => b.usd - a.usd);
+  return 'splits as ' + parts.map(p => `${p.label}=$${p.usd.toLocaleString()}${p.m > 1 ? ' x' + p.m : ''}`).join(' + ');
+}
+
 function _buyEligibleEntries() {
   const rate = settings.rate || 7.2;
   const entries = [];
@@ -14325,7 +14409,11 @@ function _buyEligibleEntries() {
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
     const hasChild = !!(o.fareByType && o.fareByType.child) || (o.passengers || []).some(p => p && (p.forcedType === 'CHILD' || p.forcedType === 'INFANT'));
-    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild });
+    // v26.07.15-G：儿童无独立运价（与成人同价/无分档）→ 视同成人可自由拆分；
+    // 有独立儿童价 → 成人配对拆（-F 逻辑）；含婴儿 → 永远强约束。
+    const constrained = _orderHasInfant(o) || (hasChild && _hasDistinctChildFare(o));
+    const childSplit = constrained ? _buySplitPlan(o, usdTotal) : null;
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit });
   });
   return entries;
 }
@@ -14342,7 +14430,8 @@ function _buildBuyingList(onlyIdSet) {
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
       if (e.pax >= 2 && e.hasChild) {
-        split = ` (${e.pax} pax, no split)`;  // 含儿童价：儿童不能单独出票，不可拆
+        // 含儿童：儿童不能单独出票。有成人可配对时给出拆法，否则整单不可拆。
+        split = e.childSplit ? ` (${e.pax} pax, ${e.childSplit})` : ` (${e.pax} pax, no split)`;
       } else if (e.pax >= 2) {
         const pp = e.usd / e.pax;
         const combos = [];
