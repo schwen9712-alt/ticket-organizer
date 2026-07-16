@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.08-X\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.09-Y\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.08-X</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.09-Y</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14311,7 +14311,7 @@ function _buyEligibleEntries() {
     let usdTotal = 0;
     try { usdTotal = _orderUsd(o, o.rate || rate); } catch (e) {}
     if (!(usdTotal > 0)) return;
-    entries.push({ id: o.id, al, usd: usdTotal, posted: !!o.buyPostedAt, pax: (o.passengers || []).length || 1 });
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1 });
   });
   return entries;
 }
