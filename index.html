@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.10-Z\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.11-A\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.10-Z</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.11-A</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14400,7 +14400,7 @@ async function usdQuickFix(orderId) {
   if (!(usd > 0 && usd < 1000000)) { toast('金额无效'); return; }
   o.basePrice = +((usd * rate) / pax).toFixed(2);   // 每人票面（人民币）
   o.paxPrices = null;                                // 清除旧的每人价，改走 basePrice
-  try { await storageSet('ticket-organizer-pending', STATE.orders); if (typeof fbScheduleWrite === 'function') fbScheduleWrite(); } catch (e) {}
+  try { await persistOrdersNow(); if (typeof fbScheduleWrite === 'function') fbScheduleWrite(); } catch (e) {}
   toast(`✓ 已改为 $${usd.toLocaleString()}（每人 ¥${o.basePrice.toLocaleString()}）`);
   try { renderPendingList(); } catch (e) {}
 }
@@ -14433,7 +14433,7 @@ async function copyBuyingList() {
   // 给本次复制的单打"已发"时间戳（随订单持久化+云同步，下次默认不再选中）
   try {
     STATE.orders.forEach(o => { if (copiedSet.has(o.id)) o.buyPostedAt = Date.now(); });
-    await storageSet('ticket-organizer-pending', STATE.orders);
+    await persistOrdersNow();
     if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   } catch (e) {}
   await copyText(text);
