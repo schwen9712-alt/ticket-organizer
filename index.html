@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.11-A\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.12-B\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.11-A</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.12-B</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14444,6 +14444,29 @@ async function copyBuyingList() {
 let AI_PICKS = null; // Map<orderId, rank 1..5>
 
 // Safe CSS.escape (older engines lack it)
+// 姓名存疑检测：多数姓氏 vs 近似离群姓（编辑距离≤1或前缀关系）→ 提示可能写错
+function _nameSuspects(o) {
+  const pax = (o.passengers || []).filter(p => p && p.name && p.name.includes('/'));
+  if (pax.length < 3) return [];
+  const cnt = {};
+  pax.forEach(p => { const s = p.name.split('/')[0].trim(); cnt[s] = (cnt[s] || 0) + 1; });
+  const sur = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  const [maj, majN] = sur[0];
+  if (majN < 2) return [];
+  const near = (a, b) => {
+    if (a === b) return false;
+    if (a.startsWith(b) || b.startsWith(a)) return Math.abs(a.length - b.length) === 1;
+    if (a.length === b.length) { let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d === 1; }
+    return false;
+  };
+  const out = [];
+  pax.forEach(p => {
+    const s = p.name.split('/')[0].trim();
+    if (cnt[s] === 1 && near(s, maj)) out.push(`${p.name}：姓 ${s} 与同行多数姓 ${maj} 仅差一字，可能写错/提供错`);
+  });
+  return out;
+}
+
 function _cssEsc(v) { return (typeof CSS !== 'undefined' && CSS.escape) ? CSS.escape(String(v)) : String(v); }
 
 function applyAiPickMarks() {
@@ -15234,6 +15257,16 @@ function renderPendingList() {
           aiWrap.title = '此单由 AI 兜底识别 — 出票前请核对航段/乘客/价格';
           aiWrap.textContent = '🤖 AI识别';
           header.appendChild(aiWrap);
+        }
+        // 姓名存疑警告（近似离群姓）
+        const _ns = _nameSuspects(o);
+        if (_ns.length) {
+          const w = document.createElement('span');
+          w.className = 'ui-badge';
+          w.style.cssText = 'margin-left:6px;background:#b45309;color:#fff;border-color:#b45309;';
+          w.title = _ns.join('\n') + '\n（照常录入，出票前请与代理核对）';
+          w.textContent = '⚠ 姓名存疑';
+          header.appendChild(w);
         }
 
         // Imminent-departure chip (24h / 48h / 72h) — inserted after the
