@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-I\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-J\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-I</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-J</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14469,7 +14469,13 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
     })
     .filter(Boolean);
   // 有变种块时用空行分隔各单，避免变种行归属混淆
-  return blocks.join(blocks.some(b => b.includes('\n')) ? '\n\n' : '\n');
+  let out = blocks.join(blocks.some(b => b.includes('\n')) ? '\n\n' : '\n');
+  // 批内含可自由拆分的多人单 → 追加英文脚注，向卖家说明可按任意人数供货；
+  // 全单人/全受约束批次不加。"unless marked otherwise" 兜住 no split / splits as 单。
+  if (entries.some(e => e.pax >= 2 && !e.hasChild)) {
+    out += '\n\nNote: multi-pax orders can be split freely — take 1, 2, or more pax (unless marked otherwise).';
+  }
+  return out;
 }
 
 // ── Two-step selection mode ────────────────────────────────────────────────
