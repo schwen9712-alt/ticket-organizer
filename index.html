@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-J\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-K\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-J</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-K</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14398,15 +14398,19 @@ function _buySplitPlan(o, usdTotal) {
     const label = ['A', 'C', 'I'].filter(k => cnt[k]).map(k => cnt[k] + k).join('+');
     const usd = Math.round(usdTotal * g.reduce((s, x) => s + x.w, 0) / wSum);
     const key = label + '|' + usd;
-    if (!seen.has(key)) seen.set(key, { label, usd, m: 0 });
+    if (!seen.has(key)) seen.set(key, { label, usd, n: g.length, m: 0 });
     seen.get(key).m++;
   });
   const parts = Array.from(seen.values());
+  let text;
   if (parts.length === 1) {
-    return `splits as ${parts[0].label} x${parts[0].m} · $${parts[0].usd.toLocaleString()} each`;
+    text = `splits as ${parts[0].label} x${parts[0].m} · $${parts[0].usd.toLocaleString()} each`;
+  } else {
+    parts.sort((a, b) => b.usd - a.usd);
+    text = 'splits as ' + parts.map(p => `${p.label}=$${p.usd.toLocaleString()}${p.m > 1 ? ' x' + p.m : ''}`).join(' + ');
   }
-  parts.sort((a, b) => b.usd - a.usd);
-  return 'splits as ' + parts.map(p => `${p.label}=$${p.usd.toLocaleString()}${p.m > 1 ? ' x' + p.m : ''}`).join(' + ');
+  // groups：拆分单位明细（usd/人数/组成/可用份数），供变种输出与开关提示使用
+  return { text, groups: parts.map(p => ({ usd: p.usd, n: p.n, label: p.label, m: p.m })) };
 }
 
 function _buyEligibleEntries() {
@@ -14445,11 +14449,11 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
       if (k <= 0) return null;
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
-      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && !e.hasChild;
-      if (e.pax >= 2 && e.hasChild) {
+      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && (!e.hasChild || !!e.childSplit);
+      if (e.pax >= 2 && e.hasChild && !useVariant) {
         // 含儿童：儿童不能单独出票。有成人可配对时给出拆法，否则整单不可拆。
-        split = e.childSplit ? ` (${e.pax} pax, ${e.childSplit})` : ` (${e.pax} pax, no split)`;
-      } else if (e.pax >= 2 && !useVariant) {
+        split = e.childSplit ? ` (${e.pax} pax, ${e.childSplit.text})` : ` (${e.pax} pax, no split)`;
+      } else if (e.pax >= 2 && !e.hasChild && !useVariant) {
         const pp = e.usd / e.pax;
         const combos = [];
         for (let n = 2; n < e.pax; n++) combos.push(`${n}p=$${Math.round(pp * n).toLocaleString()}`);
@@ -14459,10 +14463,17 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
       }
       let block = `Buying ${k}K AMEX BP-${e.al}${split}`;
       if (useVariant) {
-        // 变种：单人K × 份数（1..N-1），纯尺寸行，无任何后缀标记
-        const kPer = Math.round(e.usd / e.pax / 10);
-        for (let n = 1; n < e.pax; n++) {
-          if (kPer * n > 0) block += `\nBuying ${kPer * n}K AMEX BP-${e.al}`;
+        if (e.hasChild && e.childSplit) {
+          // 受约束单变种：输出去重后的拆分单位（如 213K 自由成人、424K 成人+儿童绑定组），
+          // 不做单位间加总，避免相近金额并排（424/426）让卖家困惑。
+          const units = Array.from(new Set(e.childSplit.groups.map(g => Math.round(g.usd / 10)).filter(u => u > 0))).sort((a, b) => a - b);
+          units.forEach(u => { block += `\nBuying ${u}K AMEX BP-${e.al}`; });
+        } else {
+          // 自由拆分单变种：单人K × 份数（1..N-1），纯尺寸行，无任何后缀标记
+          const kPer = Math.round(e.usd / e.pax / 10);
+          for (let n = 1; n < e.pax; n++) {
+            if (kPer * n > 0) block += `\nBuying ${kPer * n}K AMEX BP-${e.al}`;
+          }
         }
       }
       return block;
@@ -14543,7 +14554,7 @@ function _toggleBuyVariant(id, row) {
   if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { toast('该单已分配卡主或不在收单范围'); return; }
   const meta = BUY_META ? BUY_META.get(id) : null;
   if (!meta || meta.pax < 2) { toast('单人订单没有变种'); return; }
-  if (meta.hasChild) { toast('该单含独立儿童价/婴儿，需挂成人配对出票，不支持变种'); return; }
+  if (meta.hasChild && !meta.childSplit) { toast('该单拆不了：儿童/婴儿需挂成人，当前人员结构无法成组'); return; }
   if (!BUY_VARIANT) BUY_VARIANT = new Set();
   if (BUY_VARIANT.has(id)) {
     BUY_VARIANT.delete(id);
@@ -14553,8 +14564,13 @@ function _toggleBuyVariant(id, row) {
     BUY_VARIANT.add(id);
     if (!BUY_SELECT.has(id)) BUY_SELECT.add(id);   // 启用变种默认要复制它
     _applyBuySelectMarks();
-    const kPer = Math.round(meta.usd / meta.pax / 10);
-    toast(`✓ 已启用变种：${meta.pax}人单 → ${kPer}K × 1..${meta.pax - 1} 各档`);
+    if (meta.hasChild && meta.childSplit) {
+      const u = meta.childSplit.groups.map(g => `${Math.round(g.usd / 10)}K${g.m > 1 ? '×' + g.m : ''}(${g.label})`).join(' + ');
+      toast(`✓ 已启用变种：拆分单位 ${u}\n（A=成人价 C=儿童价 I=婴儿，C/I 需挂成人）`);
+    } else {
+      const kPer = Math.round(meta.usd / meta.pax / 10);
+      toast(`✓ 已启用变种：${meta.pax}人单 → ${kPer}K × 1..${meta.pax - 1} 各档`);
+    }
   }
 }
 
