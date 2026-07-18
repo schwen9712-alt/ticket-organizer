@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-M\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-O\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-M</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-O</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3217,41 +3217,6 @@ SUN/KAILAI MS 女 28SEP08
   <div class="section">
     <div class="section-title"><span class="num">2</span>PASSENGERS <span class="zh">乘客</span></div>
 
-    <!-- AI image upload — passport + itinerary -->
-    <div id="aiParseZone" style="display:none; margin-bottom:12px;">
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
-        <!-- Passport upload -->
-        <label id="passportDropZone" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:16px 10px; background:rgba(124,58,237,0.04); border:1.5px dashed rgba(124,58,237,0.35); border-radius:var(--r-md); cursor:pointer; transition:background 0.15s, border-color 0.15s; text-align:center;"
-          ondragover="event.preventDefault(); this.style.background='rgba(124,58,237,0.10)'; this.style.borderColor='rgba(124,58,237,0.7)';"
-          ondragleave="this.style.background=''; this.style.borderColor='';"
-          ondrop="event.preventDefault(); this.style.background=''; this.style.borderColor=''; handleAiImageDrop(event.dataTransfer.files[0], 'passport')"
-          onmouseover="this.style.background='rgba(124,58,237,0.07)'"
-          onmouseout="this.style.background='rgba(124,58,237,0.04)'">
-          <input type="file" accept="image/*" style="display:none;" onchange="handleAiImageDrop(this.files[0], 'passport')">
-          <span style="font-size:22px;">🛂</span>
-          <span style="font-size:11.5px; font-weight:700; color:#7c3aed;">护照图片</span>
-          <span style="font-size:10px; color:var(--muted);">拍照 / 截图 / 拖入</span>
-        </label>
-        <!-- Itinerary upload -->
-        <label id="itinDropZone" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; padding:16px 10px; background:rgba(30,120,220,0.04); border:1.5px dashed rgba(30,120,220,0.35); border-radius:var(--r-md); cursor:pointer; transition:background 0.15s, border-color 0.15s; text-align:center;"
-          ondragover="event.preventDefault(); this.style.background='rgba(30,120,220,0.10)'; this.style.borderColor='rgba(30,120,220,0.7)';"
-          ondragleave="this.style.background=''; this.style.borderColor='';"
-          ondrop="event.preventDefault(); this.style.background=''; this.style.borderColor=''; handleAiImageDrop(event.dataTransfer.files[0], 'itinerary')"
-          onmouseover="this.style.background='rgba(30,120,220,0.07)'"
-          onmouseout="this.style.background='rgba(30,120,220,0.04)'">
-          <input type="file" accept="image/*" style="display:none;" onchange="handleAiImageDrop(this.files[0], 'itinerary')">
-          <span style="font-size:22px;">✈</span>
-          <span style="font-size:11.5px; font-weight:700; color:#1a70d6;">行程图片</span>
-          <span style="font-size:10px; color:var(--muted);">截图 / 拍照 / 拖入</span>
-        </label>
-      </div>
-      <div id="aiParseStatus" style="display:none; padding:10px 14px; background:var(--cream); border-radius:var(--r-sm); font-size:12px; color:var(--ink); font-family:'JetBrains Mono',monospace;"></div>
-    </div>
-    <!-- Show AI zone only when key is configured; otherwise show hint to configure -->
-    <div id="aiParseNoKey" style="margin-bottom:10px; padding:8px 12px; background:rgba(124,58,237,0.04); border:1px solid rgba(124,58,237,0.18); border-radius:var(--r-sm); font-size:11.5px; color:var(--muted); display:flex; align-items:center; justify-content:space-between; gap:8px;">
-      <span>🤖 配置 Anthropic API Key 后可上传图片自动识别护照/行程</span>
-      <button onclick="document.getElementById('settingsGearBtn').click()" style="padding:3px 10px; font-size:11px; background:none; border:1px solid rgba(124,58,237,0.4); color:#7c3aed; border-radius:var(--r-sm); cursor:pointer; white-space:nowrap;">前往设置 →</button>
-    </div>
 
     <div class="mrz-paste-zone" style="background:#fff8e7; border:1px dashed var(--accent); border-radius:4px; padding:10px 12px; margin-bottom:10px;">
       <div style="font-size:12px; color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
@@ -3719,9 +3684,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 
   <div class="section" style="border-left: 3px solid #7c3aed;">
-    <div class="section-title"><span class="num" style="background:#7c3aed;">🤖</span>AI 图片识别 <span class="zh">自动解析行程图片和护照</span></div>
+    <div class="section-title"><span class="num" style="background:#7c3aed;">🤖</span>ANTHROPIC AI API <span class="zh">粘贴兜底识别 · 缺价补价 · 出票排期建议</span></div>
     <div class="hint" style="margin-bottom:12px;">
-      配置 Anthropic API Key 后，可直接上传<strong>行程截图</strong>或<strong>护照照片</strong>，AI 自动识别并填入表单。<br>
+      配置 Anthropic API Key 后启用三项文字 AI：<strong>粘贴内容规则识别失败时兜底解析</strong>、<strong>订单缺运价时 AI 补价</strong>、<strong>出票排期建议</strong>。<br>
       默认<strong>只存本设备</strong>。勾选「同步到其他设备」后会用密码加密上 Firebase，新设备输同一密码即可解锁。<br>
       获取 Key：前往 <a href="https://console.anthropic.com/settings/keys" target="_blank" style="color:#7c3aed;">console.anthropic.com</a> → API Keys → Create Key
     </div>
@@ -3779,43 +3744,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     </details>
   </div>
 
-  <div class="section" style="border-left: 3px solid #0f9d58;">
-    <div class="section-title"><span class="num" style="background:#0f9d58;">📊</span>GOOGLE SHEETS 实时同步 <span class="zh">每次出票自动推一行到 Google Sheet</span></div>
-    <div class="hint" style="margin-bottom:12px;">
-      每次出票后自动向 Google Sheet 追加一行（代理应收 + 卡主应付）。基于 Google Apps Script，无需 OAuth，只需部署一次。<br>
-      <strong>配置步骤：</strong><br>
-      1. 新建一个 Google Sheet（专用表格）<br>
-      2. 菜单 → <strong>扩展程序 → Apps 脚本</strong> → 粘贴下方代码 → 保存<br>
-      3. <strong>部署 → 新建部署 → 网络应用</strong>；执行身份：我；权限：所有人 → 复制网址<br>
-      4. 把网址粘贴到下方输入框 → 点「连接测试」
-    </div>
-    <div style="margin-bottom:12px;">
-      <button class="btn ghost small" onclick="showGsScriptCode()" style="border-color:#0f9d58; color:#0f9d58;">📋 复制 Apps Script 代码</button>
-    </div>
-    <div id="gsSyncStatus" style="padding:8px 12px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:12px;">
-      <span id="gsSyncStatusText">未配置</span>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">Apps Script Web App URL</div>
-        <div class="desc">格式：https://script.google.com/macros/s/…/exec</div>
-      </div>
-      <div style="display:flex; gap:4px; flex-wrap:wrap;">
-        <input type="text" id="s-gsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec"
-          style="width:320px; font-size:11px; font-family:'JetBrains Mono',monospace; padding:6px 8px;" autocomplete="off">
-        <button class="btn small" onclick="saveGsUrl()" style="background:#0f9d58; border-color:#0f9d58; color:#fff;">保存</button>
-        <button class="btn small ghost" onclick="testGsConnection()">连接测试</button>
-        <button class="btn small ghost" onclick="clearGsUrl()" style="color:var(--red);">清除</button>
-      </div>
-    </div>
-    <div class="setting-row">
-      <div>
-        <div class="label">补推历史出票</div>
-        <div class="desc">把已出票记录全部推送到 Sheet（已存在的会自动跳过，不会重复）</div>
-      </div>
-      <button class="btn small ghost" onclick="gsPushAllTicketed()">⬆ 补推全部</button>
-    </div>
-  </div>
 
 
 
@@ -12832,6 +12760,13 @@ async function parsePNR() {
   const newOrders = [];
   const _allUnrecognized = [];  // lines no parser branch consumed, across all chunks
   let _aiFbToastShown = false;  // AI-fallback status toast — once per parse
+  // key 缺失提示：AI 功能静默跳过前告知原因与恢复路径（与「AI 解析中」共用一次性旗标）
+  function _aiKeyMissingHint(what) {
+    if (_aiFbToastShown || loadAnthropicKey()) return false;
+    _aiFbToastShown = true;
+    toast(`⚠ ${what}，但本浏览器未配置 Anthropic API Key\nAI 识别/补价未启用 → 设置 → Anthropic API Key 填入 sk-ant- 后重试`);
+    return true;
+  }
   for (const chunk of bookings) {
     const chunkProposals = splitChunkByProposals(chunk);
 
@@ -12844,6 +12779,7 @@ async function parsePNR() {
     if (parsedProposals.length === 0) {
       // ── AI FALLBACK: rules got nothing from this chunk — try Claude ──
       if (!_aiFbToastShown && loadAnthropicKey()) { toast('🤖 规则未识别，AI 解析中…'); _aiFbToastShown = true; }
+      else _aiKeyMissingHint('规则未识别该段');
       const aiRes = await _aiFallbackParse(chunk);
       if (aiRes) { parsedProposals = [aiRes]; }
       else continue;
@@ -12851,6 +12787,7 @@ async function parsePNR() {
     // 运价强需求：有结构无价 → AI 只补运价
     for (const p of parsedProposals) {
       if ((p.segs.length || p.pax.length) && !p.rmb && !p.usd && !p.paxPrices && !p.fareByType) {
+        _aiKeyMissingHint('该单缺运价');
         const fr = await _aiFareRescue(chunk);
         if (fr) {
           if (fr.rmb) p.rmb = fr.rmb;
@@ -22496,14 +22433,6 @@ function toggleAgentSettled(list, idx) {
   o.agentSettled = !o.agentSettled;
   o.agentSettledAt = o.agentSettled ? Date.now() : null;
   persistOrders();
-  // Sync settled status to Google Sheets
-  if (o.agentSettled && o.id) {
-    const url = loadGsUrl();
-    if (url) fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'settled', subtype:'agent', orderId:o.id,
-        settledDate: new Date(o.agentSettledAt).toLocaleDateString('zh-CN') })
-    }).catch(()=>{});
-  }
   renderBillingPanel();
 }
 
@@ -22513,14 +22442,6 @@ function toggleChSettled(list, idx) {
   o.chSettled = !o.chSettled;
   o.chSettledAt = o.chSettled ? Date.now() : null;
   persistOrders();
-  // Sync settled status to Google Sheets
-  if (o.chSettled && o.id) {
-    const url = loadGsUrl();
-    if (url) fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ type:'settled', subtype:'cardholder', orderId:o.id,
-        settledDate: new Date(o.chSettledAt).toLocaleDateString('zh-CN') })
-    }).catch(()=>{});
-  }
   renderBillingPanel();
 }
 
@@ -25514,7 +25435,7 @@ async function doMarkTicketed(idx) {
     return;
   }
 
-  // Auto rolling backup removed — Firebase + Google Sheets are the safety nets.
+  // Auto rolling backup removed — Firebase 实时同步 is the safety net.
 
   try {
     const rate = effectiveRate(o);
@@ -25555,9 +25476,6 @@ async function doMarkTicketed(idx) {
     settings.ticketed = settings.ticketed || [];
     settings.ticketed.unshift(entry);
     await storageSet('ticket-organizer-settings', settings);
-
-    // Push to Google Sheets (fire-and-forget, won't block ticketing)
-    gsPushOrder(entry).catch(() => {});
 
     // Refresh billing badge (new ticketed order = new unsettled item)
     if (typeof renderBillingPanel === 'function') {
@@ -26701,7 +26619,6 @@ async function fbApplyRemote(remote, isInitial) {
     if (typeof updateCounts === 'function') updateCounts();
     if (typeof renderTicketed === 'function') renderTicketed();
     if (typeof updateAiKeyStatus === 'function') updateAiKeyStatus();
-    if (typeof refreshAiParseZone === 'function') refreshAiParseZone();
     if (!isInitial) toast('↓ 已合并远程更新');
   } finally {
     _fbApplyingRemote = false;
@@ -26807,182 +26724,6 @@ function fbHookPersistence() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// GOOGLE SHEETS SYNC
-// Pushes one row per ticketed order to a Google Sheet via Apps Script Web App.
-// No OAuth needed — user deploys the script themselves, we just POST JSON.
-// ═══════════════════════════════════════════════════════════════════════════
-const GS_URL_KEY = 'ticket-organizer-gs-url';
-
-function loadGsUrl() {
-  try { return localStorage.getItem(GS_URL_KEY) || ''; } catch(e) { return ''; }
-}
-
-function saveGsUrl() {
-  const inp = document.getElementById('s-gsScriptUrl');
-  const url = (inp?.value || '').trim();
-  if (!url) { toast('请输入 Apps Script URL'); return; }
-  if (!url.includes('script.google.com')) {
-    toast('URL 格式不对，应包含 script.google.com');
-    return;
-  }
-  try {
-    localStorage.setItem(GS_URL_KEY, url);
-    if (inp) inp.value = '';
-    updateGsSyncStatus();
-    toast('✓ Google Sheets URL 已保存');
-  } catch(e) { toast('保存失败：' + e.message); }
-}
-
-function clearGsUrl() {
-  if (!confirm('确认清除 Google Sheets 同步 URL？')) return;
-  try { localStorage.removeItem(GS_URL_KEY); } catch(e) {}
-  updateGsSyncStatus();
-  toast('✓ 已清除');
-}
-
-function updateGsSyncStatus() {
-  const el = document.getElementById('gsSyncStatusText');
-  if (!el) return;
-  const url = loadGsUrl();
-  if (url) {
-    const short = url.replace('https://script.google.com/macros/s/', '').slice(0, 20) + '…';
-    el.innerHTML = `<span style="color:#0f9d58; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${short}</span>`;
-  } else {
-    el.innerHTML = `<span style="color:var(--muted);">未配置 · 每次出票后将自动推送到 Google Sheet</span>`;
-  }
-}
-
-async function testGsConnection() {
-  const url = loadGsUrl();
-  if (!url) { toast('请先保存 URL'); return; }
-  try {
-    // Apps Script redirects through googleusercontent.com which blocks CORS reads.
-    // Use no-cors (opaque response) — we can't read the body, but a successful
-    // fetch means the request reached the server.
-    await fetch(url, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'ping' })
-    });
-    toast('✓ 请求已发送 · 请检查 Google Sheet 是否收到（或查看 Apps Script 执行日志）');
-  } catch(e) {
-    toast('❌ 网络错误：' + e.message);
-  }
-}
-
-// Push one ticketed order to Google Sheets (both agent + cardholder rows)
-async function gsPushOrder(order) {
-  const url = loadGsUrl();
-  if (!url || !order) return;
-  const rate = settings.rate || 7.25;
-  const pax  = (order.passengers||[]).map(p=>p.name).join('、');
-  const route = (order.segments||[]).map(s=>(s.from||'')+'→'+(s.to||'')).join(' ');
-  const date  = order.ticketedAt ? new Date(order.ticketedAt).toLocaleDateString('zh-CN') : '';
-
-  const basePayload = {
-    orderId : order.id || '',
-    date,
-    pax,
-    route,
-    airline : order.airline || '',
-    cabin   : order.cabin || '',
-    pnr     : order.pnr || order.tkt || '',
-  };
-
-  const fetchOpts = (body) => ({
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  // 1. Agent row
-  const rev = computeFinalPrice(order) || 0;
-  try {
-    await fetch(url, fetchOpts({
-      ...basePayload,
-      type    : 'agent',
-      agent   : order.agent || '',
-      amount  : Math.round(rev),
-      discount: order.discount != null ? order.discount + '%' : '',
-    }));
-  } catch(e) { /* silent */ }
-
-  // 2. Cardholder row
-  if (order.cardholderId && order.cardholderFee) {
-    const ch = (settings.cardholders||[]).find(c=>c.id===order.cardholderId);
-    try {
-      await fetch(url, fetchOpts({
-        ...basePayload,
-        type       : 'cardholder',
-        cardholder : ch?.name || order.cardholderId,
-        usd        : Number(order.cardholderFee.toFixed(2)),
-        rmb        : Math.round(order.cardholderFee * rate),
-      }));
-    } catch(e) { /* silent */ }
-  }
-}
-
-// Push all historical ticketed orders (skips existing via dedup in Apps Script)
-async function gsPushAllTicketed() {
-  const url = loadGsUrl();
-  if (!url) { toast('请先配置 Google Sheets URL'); return; }
-  const list = (settings.ticketed || []);
-  if (list.length === 0) { toast('暂无已出票记录'); return; }
-  toast(`正在推送 ${list.length} 条已出票记录…`);
-  let pushed = 0;
-  for (const o of list) {
-    await gsPushOrder(o);
-    pushed++;
-  }
-  toast(`✓ 已推送 ${pushed} 条到 Google Sheets`);
-}
-
-// Show the Apps Script code in a modal for easy copy-paste
-function showGsScriptCode() {
-  const code = `/**
- * Ticket Organizer — Google Apps Script 收单器
- * 部署步骤：
- * 1. 打开 Google Sheet → 扩展程序 → Apps 脚本
- * 2. 粘贴此代码 → 保存
- * 3. 部署 → 新建部署 → 网络应用
- *    执行身份：我  |  权限：所有人
- * 4. 复制 Web 应用网址 → 粘贴到 Ticket Organizer 设置
- */
-const AGENT_SHEET='代理应收',CH_SHEET='卡主应付';
-function doPost(e){try{const d=JSON.parse(e.postData.contents);if(d.type==='agent')return _wa(d);if(d.type==='cardholder')return _wc(d);if(d.type==='settled')return _ms(d);if(d.type==='ping')return _ok({message:'连接成功 ✓'});return _err('unknown type')}catch(err){return _err(err.toString())}}
-function doGet(){return _ok({message:'Ticket Organizer Sheets 同步器运行中 ✓'})}
-function _wa(d){const ss=SpreadsheetApp.getActiveSpreadsheet();const s=_gc(ss,AGENT_SHEET,['出票日期','代理','乘客','航路','航司','舱位','编码/票号','应收金额(RMB)','折扣%','状态','结算日期','订单ID']);if(d.orderId&&_re(s,d.orderId,12))return _ok({skipped:true});s.appendRow([d.date||'',d.agent||'',d.pax||'',d.route||'',d.airline||'',d.cabin||'',d.pnr||'',d.amount||0,d.discount||'','未收款','',d.orderId||'']);_af(s);return _ok({written:true})}
-function _wc(d){if(!d.cardholder)return _ok({skipped:'no ch'});const ss=SpreadsheetApp.getActiveSpreadsheet();const s=_gc(ss,CH_SHEET,['出票日期','卡主','乘客','航路','航司','编码/票号','费用(USD)','费用(RMB)','状态','结算日期','订单ID']);if(d.orderId&&_re(s,d.orderId,11))return _ok({skipped:true});s.appendRow([d.date||'',d.cardholder||'',d.pax||'',d.route||'',d.airline||'',d.pnr||'',d.usd||0,d.rmb||0,'未付款','',d.orderId||'']);_af(s);return _ok({written:true})}
-function _ms(d){const ss=SpreadsheetApp.getActiveSpreadsheet();const sn=d.subtype==='agent'?AGENT_SHEET:CH_SHEET;const ic=d.subtype==='agent'?12:11;const sc=d.subtype==='agent'?10:9;const dc=d.subtype==='agent'?11:10;const s=ss.getSheetByName(sn);if(!s)return _err('sheet not found');const vals=s.getDataRange().getValues();for(let i=1;i<vals.length;i++){if(String(vals[i][ic-1])===String(d.orderId)){s.getRange(i+1,sc).setValue(d.subtype==='agent'?'已收款':'已付款');s.getRange(i+1,dc).setValue(d.settledDate||new Date().toLocaleDateString('zh-CN'));return _ok({updated:true})}}return _ok({updated:false})}
-function _gc(ss,name,headers){let s=ss.getSheetByName(name);if(!s){s=ss.insertSheet(name);s.appendRow(headers);s.setFrozenRows(1);s.getRange(1,1,1,headers.length).setBackground('#1a1a2e').setFontColor('#ffffff').setFontWeight('bold')}return s}
-function _re(s,id,c){return s.getDataRange().getValues().some((r,i)=>i>0&&String(r[c-1])===String(id))}
-function _af(s){const r=s.getLastRow();if(r<2)return;s.getRange(r,1,1,s.getLastColumn()).setBackground(r%2===0?'#f8f9fa':'#ffffff')}
-function _ok(p){return ContentService.createTextOutput(JSON.stringify({success:true,...p})).setMimeType(ContentService.MimeType.JSON)}
-function _err(m){return ContentService.createTextOutput(JSON.stringify({success:false,error:m})).setMimeType(ContentService.MimeType.JSON)}`;
-
-  document.getElementById('gsCodeOverlay')?.remove();
-  const html = `
-    <div id="gsCodeOverlay" style="position:fixed;inset:0;background:rgba(12,27,42,0.6);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px"
-      onclick="if(event.target.id==='gsCodeOverlay')document.getElementById('gsCodeOverlay').remove()">
-      <div style="background:var(--ink);border-radius:var(--r-lg);width:min(700px,95vw);max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.5);">
-        <div style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.1);">
-          <span style="color:#fff;font-weight:700;font-size:14px;">📋 Apps Script 代码</span>
-          <div style="display:flex;gap:8px;">
-            <button onclick="navigator.clipboard.writeText(document.getElementById('gsCodeText').value);toast('✓ 代码已复制')" style="padding:6px 14px;background:#0f9d58;border:none;color:#fff;border-radius:var(--r-sm);cursor:pointer;font-weight:700;font-size:12px;">复制代码</button>
-            <button onclick="document.getElementById('gsCodeOverlay').remove()" style="padding:6px 10px;background:rgba(255,255,255,0.1);border:none;color:#fff;border-radius:var(--r-sm);cursor:pointer;">✕</button>
-          </div>
-        </div>
-        <textarea id="gsCodeText" readonly style="flex:1;padding:16px;background:transparent;color:#e8e8e8;font-family:'JetBrains Mono',monospace;font-size:11px;border:none;outline:none;resize:none;line-height:1.6;">${escapeHtml(code)}</textarea>
-      </div>
-    </div>`;
-  const c = document.createElement('div');
-  c.innerHTML = html;
-  document.body.appendChild(c.firstElementChild);
-}
-
 
 const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';
 const ANTHROPIC_PW_STORAGE  = 'ticket-organizer-anthropic-pw';
@@ -27072,7 +26813,6 @@ async function unlockAnthropicKey() {
     localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
     saveAnthropicPw(pw);
     updateAiKeyStatus();
-    refreshAiParseZone();
     toast('✓ Key 已解锁并保存到本设备');
   } catch(e) {
     toast('✕ 密码错误或数据损坏');
@@ -27105,12 +26845,12 @@ async function saveAnthropicKey() {
         pw = prompt('设置同步密码（最少 6 个字符，新设备需用此密码解锁）：');
         if (!pw || pw.length < 6) {
           toast('密码至少 6 个字符。Key 已保存但未同步。');
-          updateAiKeyStatus(); refreshAiParseZone();
+          updateAiKeyStatus();
           return;
         }
         if (prompt('再输一次确认：') !== pw) {
           toast('两次密码不一致。Key 已保存但未同步。');
-          updateAiKeyStatus(); refreshAiParseZone();
+          updateAiKeyStatus();
           return;
         }
         saveAnthropicPw(pw);
@@ -27133,14 +26873,13 @@ async function saveAnthropicKey() {
       toast('✓ API Key 已保存（仅本设备）');
     }
     updateAiKeyStatus();
-    refreshAiParseZone();
   } catch(e) {
     toast('保存失败：' + e.message);
   }
 }
 
 async function clearAnthropicKey() {
-  if (!confirm('确认清除 Anthropic API Key？清除后图片识别功能将不可用。\n（若云端有加密 Key，本机也会一并清除）')) return;
+  if (!confirm('确认清除 Anthropic API Key？清除后 AI 兜底识别 / 补价 / 排期建议将不可用。\n（若云端有加密 Key，本机也会一并清除）')) return;
   try { localStorage.removeItem(ANTHROPIC_KEY_STORAGE); } catch(e) {}
 
   // 顺手清云端密文 + 本机密码
@@ -27152,165 +26891,9 @@ async function clearAnthropicKey() {
   clearAnthropicPw();
 
   updateAiKeyStatus();
-  refreshAiParseZone();
   toast('✓ API Key 已清除');
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// AI IMAGE PARSING — passport photos + itinerary screenshots
-// Model strategy:
-//   Passport → claude-haiku-4-5-20251001 (fast, cheap, structured extraction)
-//   Itinerary → claude-sonnet-4-6 (complex, varied formats need more reasoning)
-// Key stored locally only (never synced to cloud).
-// ═══════════════════════════════════════════════════════════════════════════
-
-// Compress an image File to ≤800px wide JPEG before sending to API.
-// Reduces payload from ~3MB → ~50KB, cutting latency from 5-10s to 1-2s.
-function _compressImage(file, maxPx = 800, quality = 0.82) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
-      const w = Math.round(img.width  * scale);
-      const h = Math.round(img.height * scale);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      canvas.toBlob(blob => {
-        const reader = new FileReader();
-        reader.onload = () => resolve({
-          b64: reader.result.split(',')[1],
-          mediaType: 'image/jpeg',
-          origSize: file.size,
-          newSize: blob.size
-        });
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      }, 'image/jpeg', quality);
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
-}
-
-// Show/hide the AI upload zone based on whether key is configured.
-function refreshAiParseZone() {
-  const key = loadAnthropicKey();
-  const zone = document.getElementById('aiParseZone');
-  const noKey = document.getElementById('aiParseNoKey');
-  if (zone) zone.style.display = key ? '' : 'none';
-  if (noKey) noKey.style.display = key ? 'none' : '';
-}
-
-// Set status message in the AI parse status bar
-function _aiStatus(msg, color) {
-  const el = document.getElementById('aiParseStatus');
-  if (!el) return;
-  el.style.display = msg ? '' : 'none';
-  el.style.color = color || 'var(--ink)';
-  el.textContent = msg;
-}
-
-// Main entry point — called from drop/file-input handlers
-async function handleAiImageDrop(file, mode) {
-  if (!file) return;
-  const key = loadAnthropicKey();
-  if (!key) { toast('请先在设置里配置 Anthropic API Key'); return; }
-  if (!file.type.startsWith('image/')) { toast('请上传图片文件（JPG/PNG/WEBP）'); return; }
-
-  _aiStatus(`🔄 压缩图片中…`);
-  let imgData;
-  try {
-    // Compress before sending — biggest single performance win
-    imgData = await _compressImage(file);
-    const saved = Math.round((1 - imgData.newSize / imgData.origSize) * 100);
-    _aiStatus(`🔄 正在识别${mode === 'passport' ? '护照' : '行程'}… (压缩 ${saved}%，${Math.round(imgData.newSize/1024)}KB)`);
-  } catch(e) {
-    // Compression failed — fall back to raw file
-    const reader = new FileReader();
-    const b64 = await new Promise((res, rej) => {
-      reader.onload = () => res(reader.result.split(',')[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(file);
-    });
-    imgData = { b64, mediaType: file.type || 'image/jpeg', origSize: file.size, newSize: file.size };
-    _aiStatus(`🔄 正在识别${mode === 'passport' ? '护照' : '行程'}…`);
-  }
-
-  try {
-    if (mode === 'passport') await _aiParsePassport(key, imgData.b64, imgData.mediaType);
-    else await _aiParseItinerary(key, imgData.b64, imgData.mediaType);
-  } catch(e) {
-    _aiStatus(`❌ 识别失败：${e.message}`, 'var(--red)');
-  }
-}
-
-// Parse a passport image → extract passenger info → add to current order.
-// Uses Haiku: structured field extraction doesn't need Sonnet reasoning.
-async function _aiParsePassport(key, b64, mediaType) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 200,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
-          { type: 'text', text: 'Extract passport data. Reply ONLY with JSON, no markdown:\n{"surname":"ZHANG","given":"WEI","dob":"01JAN90","gender":"MALE","passport_no":"E12345678","expiry":"01JAN30"}\ndob/expiry format: DDMMMYY. gender: MALE or FEMALE. Empty string if unclear.' }
-        ]
-      }]
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API ${res.status}`);
-  }
-  const data = await res.json();
-  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-  let parsed;
-  try { parsed = JSON.parse(text.replace(/```json|```/g, '').trim()); }
-  catch(e) { throw new Error('AI 返回格式异常，请重试'); }
-
-  const { surname, given, dob, gender, passport_no, expiry } = parsed;
-  if (!surname && !given) throw new Error('未能识别姓名，请确保图片清晰');
-
-  const name = `${(surname||'').toUpperCase()}/${(given||'').toUpperCase()}`;
-  const o = curr();
-  if (!o) return;
-  const existing = o.passengers.find(p => p.name === name);
-  if (existing) {
-    if (!existing.dob && dob) existing.dob = dob;
-    if (!existing.gender && gender) existing.gender = gender;
-    if (!existing.passport && passport_no) existing.passport = passport_no;
-    if (!existing.passportExpiry && expiry) existing.passportExpiry = expiry;
-  } else {
-    o.passengers.push({ name, gender: gender||'', dob: dob||'', passport: passport_no||'', passportExpiry: expiry||'' });
-  }
-  if (surname && given) {
-    settings.knownPax = settings.knownPax || [];
-    if (!settings.knownPax.find(k => k.last === surname.toUpperCase() && k.first === given.toUpperCase())) {
-      settings.knownPax.push({ last: surname.toUpperCase(), first: given.toUpperCase(), dob: dob||'', gender: gender||'' });
-      await storageSet('ticket-organizer-settings', settings);
-      renderKnownPax();
-    }
-  }
-  renderPassengers();
-  renderPreview();
-  _aiStatus(`✓ 已识别：${name} ${dob||''} ${gender||''}${passport_no ? ' · 护照 '+passport_no : ''}`, 'var(--green)');
-  persistOrders();
-}
-
-// Parse an itinerary image → extract flight info → rawInput → auto-parse.
-// Uses Sonnet: itinerary formats are varied and need more reasoning.
 // 运价强需求补救：结构识别成功但无价 → AI 只提取运价
 async function _aiFareRescue(chunkText) {
   const key = loadAnthropicKey();
@@ -27396,46 +26979,6 @@ ${chunkText}` }]
   } catch (e) { return null; }
 }
 
-async function _aiParseItinerary(key, b64, mediaType) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': key,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: b64 } },
-          { type: 'text', text: 'Extract flight segments from this itinerary image. Output plain text only, one segment per line:\n<DD>月<MM>日 <CARRIER> <FLIGHT> <ORIG>-<DEST> <DEP>-<ARR>\nLast line: TOTAL CNY <AMOUNT>\nExample:\n7月15日 UA 1195 LAX-SFO 20:10-21:38\n7月15日 UA 805 SFO-ICN 23:55-04:20+2\nTOTAL CNY 24986\nUse IATA codes. +1/+2 for next day arrival. No markdown.' }
-        ]
-      }]
-    })
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API ${res.status}`);
-  }
-  const data = await res.json();
-  const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('').trim();
-  if (!text) throw new Error('AI 未返回内容，请重试');
-
-  const rawInput = document.getElementById('rawInput');
-  if (rawInput) {
-    rawInput.value = text;
-    _aiStatus(`✓ 已识别行程，正在解析…`, '#1a70d6');
-    setTimeout(async () => {
-      await parsePNR();
-      _aiStatus(`✓ 行程已识别并解析完成`, 'var(--green)');
-    }, 300);
-  }
-}
-
 function updateAiKeyStatus() {
   const el = document.getElementById('aiKeyStatusText');
   if (!el) return;
@@ -27456,7 +26999,7 @@ function updateAiKeyStatus() {
     html = `<span style="color:#e67e22; font-weight:700;">🔒 云端有加密 Key，本机未解锁</span>
       <button class="btn small" onclick="unlockAnthropicKey()" style="margin-left:8px; background:#7c3aed; border-color:#7c3aed; color:#fff;">🔓 输密码解锁</button>`;
   } else {
-    html = `<span style="color:var(--muted);">未配置 · 配置后可上传图片自动识别</span>`;
+    html = `<span style="color:var(--muted);">未配置 · 配置后启用 AI 兜底识别 / 补价 / 排期建议</span>`;
   }
   el.innerHTML = html;
 
@@ -27746,9 +27289,7 @@ async function mergeImportData(event) {
   loadDeviceName();        // load this device's friendly name from localStorage
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
-  updateGsSyncStatus();    // show Google Sheets sync status in settings
   updateFbStatus();        // show Firebase sync status in settings
-  refreshAiParseZone();    // show/hide AI image upload zone based on key
 
   // ── Firebase real-time sync: init at startup ────────────────────────────
   // Hook persistence functions BEFORE init, so the very first changes also sync.

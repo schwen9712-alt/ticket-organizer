@@ -1,3 +1,25 @@
+## 2026-07-16 — 清理：去除 Google Sheets 同步与 AI 图片识别 · v26.07.16-O
+
+按用户要求整体移除两个子系统，净减 467 行 / 25.8KB：
+**① Google Sheets 同步（全删）**：设置区整个 section、Apps Script 代码弹窗、URL 存取（GS_URL_KEY/loadGsUrl/saveGsUrl/clearGsUrl/updateGsSyncStatus/testGsConnection）、出票推送（gsPushOrder/gsPushAllTicketed）、代理/卡主结算状态回写两处、初始化调用。
+**② AI 图片识别（全删）**：乘客区护照/行程拖拽上传（aiParseZone/aiParseNoKey）、handleAiImageDrop/_aiParsePassport/_aiParseItinerary/_compressImage/_aiStatus/refreshAiParseZone 及全部调用点。
+**③ AI API 配置地重塑**：设置区原「AI 图片识别」section 改为「🤖 ANTHROPIC AI API」，文案改为三项文字 AI（粘贴兜底解析/缺价补价/排期建议）；key 保存/清除/加密同步/密码解锁机制原样保留；状态文案与清除确认文案同步更新。
+**明确保留**：SheetJS Excel 月度对账导出、订单「添加截图」（其 compressImage 与被删 _compressImage 是两个函数）、MRZ 机读码粘贴、_aiFallbackParse/_aiFareRescue/aiTicketingAdvice、-N 的缺 key 提示。
+
+**测试**：22 项孤儿引用全零、8 项保留项在位、hint+test4-7 共 29 项回归全过、语法与基线一致、console.log=0、无重复函数。
+
+**回滚**：.backups/ 上一版。
+---
+## 2026-07-16 — AI 兜底缺 key 时不再静默 · v26.07.16-N
+
+用户报告「AI识别录入功能不见了」。排查结论：**不是回归**——loadAnthropicKey/_aiFallbackParse/_aiFareRescue 三段与基线逐字节一致（md5 比对）；根因是 API Key 存 localStorage、按浏览器×URL 隔离（既有已拍板设计），当前浏览器 key 为空 → AI 兜底与补价静默跳过、未识别段被无声丢弃。改动：粘贴函数内新增 _aiKeyMissingHint（闭包共享每次粘贴重置的一次性旗标），规则解析失败或缺运价且无 key 时提示「⚠ …未配置 Anthropic API Key → 设置填入 sk-ant- 后重试」。有 key 时行为零变化。
+
+**测试**：4 项断言（提示一次/文案/同批去重/有key不打扰）+ test4-7 共 25 项回归全过。
+
+**改动位置**：粘贴函数 _aiFbToastShown 处新增内嵌 helper；兜底分支 else；补价分支前置。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-16 — 等待放位单不进收分需求 · v26.07.16-M
 
 订单处于「等待放位」（waitingForRelease，代理未释放座位）时：① 不进入收单合规池——不出现在收单选择、不计入默认勾选、不出现在复制文本；② 点击/双击该行给出具体原因「该单等待放位中，暂不进入收单需求（放位后自动恢复）」；③ 空批提示更新为「已分配卡主/表G/等待放位不计入」。点「✓已放位」后自动恢复合规，无需其他操作。
