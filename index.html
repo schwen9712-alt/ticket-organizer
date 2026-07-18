@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-K\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-L\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-K</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-L</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14601,14 +14601,21 @@ async function copyBuyingList() {
     BUY_ELIGIBLE = new Set(elig.map(e => e.id));
     BUY_META = new Map(elig.map(e => [e.id, e]));
     BUY_VARIANT = new Set();
-    // 默认只勾选"上次复制后新增"的单（没打过 buyPostedAt 的）；已发过的可点击行补选
+    // 默认只勾选"上次复制后新增"的单（没打过 buyPostedAt 的）；已发过的可点击行补选。
+    // 全部都在1小时内发过（无新增）→ 视为重发意图，默认全选。
     const fresh = elig.filter(e => !e.posted);
     BUY_SELECT = new Set(fresh.map(e => e.id));
+    const repostAll = BUY_SELECT.size === 0;
+    if (repostAll) BUY_SELECT = new Set(BUY_ELIGIBLE);
     _installBuySelListener();
     _applyBuySelectMarks();
     if (btn) { btn.textContent = `✓ 确认复制 (${BUY_SELECT.size})`; btn.classList.add('accent'); }
     const postedN = elig.length - fresh.length;
-    toast(`默认选中新增 ${fresh.length} 单` + (postedN ? `（已发过的 ${postedN} 单未选，可点行补选）` : '') + '\n点击行=选/不选 · 双击行=变种输出\n调整完再点「✓ 确认复制」');
+    if (repostAll) {
+      toast(`全部 ${elig.length} 单已在1小时内发过 → 默认全选重发\n点击行=选/不选 · 双击行=变种 · 双击空白处=全选\n调整完再点「✓ 确认复制」`);
+    } else {
+      toast(`默认选中新增 ${fresh.length} 单` + (postedN ? `（已发过的 ${postedN} 单未选，可点行补选，双击空白处=全选）` : '') + '\n点击行=选/不选 · 双击行=变种输出\n调整完再点「✓ 确认复制」');
+    }
     return;
   }
   // ── 第二次点击：只复制仍选中的 ──
