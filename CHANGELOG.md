@@ -1,3 +1,13 @@
+## 2026-07-16 — 缺航段结构补救：AI 第三介入口 · v26.07.16-P
+
+用户实测「有 AI key 也无法加载」的粘贴（SSR DOCS + TOTAL CNY + 乱码行程）。根因链：SSR 行被规则解析出乘客 → 全量 AI 兜底被跳过；TOTAL CNY 19933 也被规则识别 → 补价分支也不触发；乱码行程做不出航段 → isMeaningfulOrder（要求≥1有效航段）不成立 → 整单在全应用不可见，表现为"粘了没反应"。修复：新增第三个 AI 介入口——parsedProposals 全部 0 航段但认出乘客时，调 _aiFallbackParse 补结构，经 _mergeAiStructure 合并：航段整体采用 AI，已有字段（规则价/舱位等）不覆盖，乘客按姓名去重（保 SSR 细节），打 aiParsed 紫徽章提醒核对；AI 也补不出时明确提示「无法生成可见订单」。缺 key 时走 _aiKeyMissingHint。
+
+**测试**：_mergeAiStructure 10 项断言（含用户场景逐字段）+ hint/test4-7 共 29 项回归全过，语法与基线一致。
+
+**改动位置**：粘贴循环兜底分支后插入补救块；_aiFallbackParse 后新增 _mergeAiStructure。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-16 — 清理：去除 Google Sheets 同步与 AI 图片识别 · v26.07.16-O
 
 按用户要求整体移除两个子系统，净减 467 行 / 25.8KB：

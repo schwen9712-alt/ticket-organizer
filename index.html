@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-O\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-P\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-O</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-P</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -12783,6 +12783,17 @@ async function parsePNR() {
       const aiRes = await _aiFallbackParse(chunk);
       if (aiRes) { parsedProposals = [aiRes]; }
       else continue;
+    }
+    // ── 结构补救：规则认出乘客（如仅 SSR/名单行）但 0 航段 ─────────────────
+    // 这种单会因 isMeaningfulOrder 不成立而整单不可见（"粘了没反应"）。
+    // 让 AI 全量兜底补航段；规则产出优先保留，乘客按姓名去重合并。
+    if (parsedProposals.every(p => p.segs.length === 0) && parsedProposals.some(p => p.pax.length > 0)) {
+      if (!_aiFbToastShown && loadAnthropicKey()) { toast('🤖 规则缺航段，AI 补全结构中…'); _aiFbToastShown = true; }
+      else _aiKeyMissingHint('该段认出乘客但缺航段');
+      const aiRes2 = await _aiFallbackParse(chunk);
+      if (!_mergeAiStructure(parsedProposals[0], aiRes2) && loadAnthropicKey()) {
+        toast('⚠ AI 未能补出航段，该段无法生成可见订单，请补充行程后重贴');
+      }
     }
     // 运价强需求：有结构无价 → AI 只补运价
     for (const p of parsedProposals) {
@@ -26977,6 +26988,25 @@ ${chunkText}` }]
       ticketSeqNote: undefined, basicFare: false, basicFareLabel: '',
       fareByType: fbt, unrecognizedLines: [], waitingForRelease: false, aiParsed: true };
   } catch (e) { return null; }
+}
+
+// 结构补救合并：把 AI 兜底结果的航段与缺失字段并入规则解析的 primary。
+// 规则产出优先（已有字段不覆盖）；乘客按姓名去重合并，保住 SSR 细节。
+// 返回是否真的补上了航段（补上才有意义，其余字段搭车）。
+function _mergeAiStructure(primary, aiRes) {
+  if (!primary || !aiRes || !Array.isArray(aiRes.segs) || aiRes.segs.length === 0) return false;
+  primary.segs = aiRes.segs;
+  if (!primary.rmb && aiRes.rmb) primary.rmb = aiRes.rmb;
+  if (!primary.usd && aiRes.usd) primary.usd = aiRes.usd;
+  if (!primary.fareByType && aiRes.fareByType) primary.fareByType = aiRes.fareByType;
+  if (!primary.cabin && aiRes.cabin) primary.cabin = aiRes.cabin;
+  if (!primary.trip && aiRes.trip) primary.trip = aiRes.trip;
+  if (!primary.airline && aiRes.airline) primary.airline = aiRes.airline;
+  (aiRes.pax || []).forEach(ap => {
+    if (ap && ap.name && !(primary.pax || []).some(p => p && p.name === ap.name)) primary.pax.push(ap);
+  });
+  primary.aiParsed = true;
+  return true;
 }
 
 function updateAiKeyStatus() {
