@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-L\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-M\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-L</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-M</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14420,6 +14420,7 @@ function _buyEligibleEntries() {
     if (!isMeaningfulOrder(o)) return;
     if (o.tableLabel === 'G') return;          // 表G 走 Chase 流程，不在此列
     if (o.cardholderId) return;                // 已分配卡主 → 不需要再收
+    if (o.waitingForRelease) return;           // 等待放位：还没机位，不进收分需求
     let al = (o.airline || '').toUpperCase();
     if (!al && o.segments && o.segments[0] && o.segments[0].flight) {
       al = String(o.segments[0].flight).slice(0, 2).toUpperCase();
@@ -14525,7 +14526,7 @@ function _installBuySelListener() {
     if (!row) return;
     ev.stopPropagation(); ev.preventDefault();
     const id = row.dataset.orderId;
-    if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { toast('该单已分配卡主或不在收单范围'); return; }
+    if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { _buyIneligibleToast(id); return; }
     if (BUY_SELECT.has(id)) { BUY_SELECT.delete(id); row.classList.remove('buy-selected'); }
     else { BUY_SELECT.add(id); row.classList.add('buy-selected'); }
     const btn = document.getElementById('buyingListBtn');
@@ -14550,8 +14551,13 @@ function _installBuySelListener() {
 
 // 切换某单的「变种输出」：主行简化为 (N pax)，下附 1..N-1 各档 `Buying kK AMEX BP-XX`
 // 仅自由拆分单可用；独立儿童价/含婴儿单（配对约束）与单人单不支持。
+// 不合规提示：等待放位单给出具体原因，其余用通用文案。
+function _buyIneligibleToast(id) {
+  const o = (STATE.orders || []).find(x => x && x.id === id);
+  toast(o && o.waitingForRelease ? '该单等待放位中，暂不进入收单需求（放位后自动恢复）' : '该单已分配卡主或不在收单范围');
+}
 function _toggleBuyVariant(id, row) {
-  if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { toast('该单已分配卡主或不在收单范围'); return; }
+  if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { _buyIneligibleToast(id); return; }
   const meta = BUY_META ? BUY_META.get(id) : null;
   if (!meta || meta.pax < 2) { toast('单人订单没有变种'); return; }
   if (meta.hasChild && !meta.childSplit) { toast('该单拆不了：儿童/婴儿需挂成人，当前人员结构无法成组'); return; }
@@ -14597,7 +14603,7 @@ async function copyBuyingList() {
   if (!BUY_SELECT) {
     // ── 第一次点击：进入选择模式，高亮全部合规单 ──
     const elig = _buyEligibleEntries();
-    if (elig.length === 0) { toast('没有未分配的待出订单（已分配卡主/表G不计入）'); return; }
+    if (elig.length === 0) { toast('没有可收单的待出订单（已分配卡主/表G/等待放位不计入）'); return; }
     BUY_ELIGIBLE = new Set(elig.map(e => e.id));
     BUY_META = new Map(elig.map(e => [e.id, e]));
     BUY_VARIANT = new Set();
