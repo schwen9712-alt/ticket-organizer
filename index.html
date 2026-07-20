@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-Q\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-Q</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-R</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13288,6 +13288,37 @@ function _renderPreviewNow() {
 // Full list of pending orders, for pending tab
 // Simple one-line-per-order USD list for pending orders.
 // Format: 订单 #N · 航司 · N人 · $金额
+// 快速修正未识别航司：弹窗输入两位代码，落库并全量刷新（分组/收分/卡片徽章同步）。
+function fixOrderAirline(orderId) {
+  const o = (STATE.orders || []).find(x => x && x.id === orderId);
+  if (!o) { toast('订单不存在'); return false; }
+  const who = [...new Set((o.passengers || []).map(p => (p.name || '').split('/')[0]).filter(Boolean))].join('/') || '该单';
+  const v = prompt(`为 ${who} 的订单输入两位航司代码（如 UA / CX / 3U）`, '');
+  if (v == null) return false;
+  const code = v.trim().toUpperCase();
+  if (!/^[A-Z0-9]{2}$/.test(code)) { toast('✗ 航司代码须为两位字母/数字'); return false; }
+  o.airline = code;
+  persistOrders();
+  renderPendingList();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  renderAirlineUsdPanel(meaningful);
+  if (typeof BUY_SELECT !== 'undefined' && BUY_SELECT) _applyBuySelectMarks();
+  toast(`✓ 已设为 ${code} · 分组/收分/折扣规则已按新航司生效`);
+  return true;
+}
+
+// 批量补码：组头「—」徽章入口，按面板顺序逐单弹窗；取消即中止剩余。
+function fixUnknownAirlinesGroup() {
+  const targets = (STATE.orders || []).filter(o => o && o.id && isMeaningfulOrder(o) && o.tableLabel !== 'G' && !o.airline);
+  if (!targets.length) { toast('没有未识别航司的订单'); return; }
+  let done = 0;
+  for (const o of targets) {
+    if (!fixOrderAirline(o.id)) break;
+    done++;
+  }
+  if (targets.length > 1) toast(`本轮补码完成 ${done}/${targets.length} 单`);
+}
+
 function renderAirlineUsdPanel(orders) {
   const panel = document.getElementById('airlineUsdPanel');
   const grid = document.getElementById('airlineUsdGrid');
@@ -13449,8 +13480,8 @@ function renderAirlineUsdPanel(orders) {
     `;
     headerRow.innerHTML = `
       <span style="display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono',monospace;">
-        <span style="background:${hdrColor};color:#fff;border-radius:3px;padding:1px 7px;font-size:12px;letter-spacing:0.08em;font-weight:700;">
-          ${escapeHtml(al)}
+        <span ${al === '—' ? `onclick="fixUnknownAirlinesGroup()" title="未识别航司 · 点击逐单设置代码"` : ''} style="background:${hdrColor};color:#fff;border-radius:3px;padding:1px 7px;font-size:12px;letter-spacing:0.08em;font-weight:700;${al === '—' ? 'cursor:pointer;border:1px dashed rgba(255,255,255,0.7);' : ''}">
+          ${escapeHtml(al)}${al === '—' ? ' ✎' : ''}
         </span>
         <span style="font-weight:500;color:var(--muted);">${group.length} 单</span>
         <span style="font-weight:400;font-size:10px;color:var(--muted);">小→大</span>
@@ -13502,6 +13533,10 @@ function renderAirlineUsdPanel(orders) {
         ? `⚠ 此订单未填运价 — 点击查看`
         : (mixed.isMixed ? `混舱订单 · ${mixed.tooltip}` : `点击跳转到订单 #${displayIdx + 1}`);
       row.onclick = () => scrollToOrderById(o.id);
+      if (!o.airline && o.id) {
+        row.ondblclick = (ev) => { ev.stopPropagation(); ev.preventDefault(); fixOrderAirline(o.id); };
+        row.title = '⚠ 未识别航司 — 双击设置代码；' + row.title;
+      }
       const perPaxText = hasPaxPrices && paxCount > 1
         ? `<span style="color:var(--accent); font-weight:600;" title="多人不同价: ${o.paxPrices.map(p => '¥'+p).join(' + ')}">多人价</span>`
         : (paxCount > 1 && hasPrice ? `$${perPaxUsd.toLocaleString(undefined, {maximumFractionDigits: 0})}/人` : '');
