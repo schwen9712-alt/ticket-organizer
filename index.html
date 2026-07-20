@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-R\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-S\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-R</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-S</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9369,6 +9369,44 @@ function extractDOB(text) {
   return `${day}${mon}${year}`;
 }
 
+// ── 英文标签乘客格式："First Joseph  Last Shvarts" + "06-09-2005"（月-日-年）──
+// 规则：名字取 LAST/FIRST；生日按用户规范 MM-DD-YYYY，首位>12 时自动按 DD-MM 解读；
+// 生日可在同一行，或紧跟其后的「纯日期行」（避免误吞行程日期）；仅成功解出生日才消费该行。
+function _parseFirstLastPax(lines) {
+  const MN3 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const dateRe = /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/;
+  const bareDateRe = /^\s*\d{1,2}[-\/]\d{1,2}[-\/]\d{4}\s*(?:月日年|生日|出生日期|DOB)?\s*$/i;
+  const nameRe = /\bFirst(?:\s*name)?\b\s*[:：]?\s*([A-Za-z][A-Za-z'’\- ]*?)\s*\bLast(?:\s*name)?\b\s*[:：]?\s*([A-Za-z][A-Za-z'’\- ]*?)\s*$/i;
+  const mdyToDob = (a, b, y) => {
+    let mm = parseInt(a, 10), dd = parseInt(b, 10);
+    if (mm > 12 && dd <= 12) { const t = mm; mm = dd; dd = t; }   // 首位>12 → 实为日
+    if (!(mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31)) return '';
+    return String(dd).padStart(2, '0') + MN3[mm - 1] + String(parseInt(y, 10) % 100).padStart(2, '0');
+  };
+  const out = { pax: [], consumed: new Set() };
+  for (let i = 0; i < lines.length; i++) {
+    const line = String(lines[i] || '');
+    const dm = line.match(dateRe);
+    const rest = dm ? line.replace(dm[0], ' ') : line;
+    const nm = rest.match(nameRe);
+    if (!nm) continue;
+    const clean = (s) => s.trim().replace(/\s+/g, ' ').toUpperCase();
+    const first = clean(nm[1]), last = clean(nm[2]);
+    if (!first || !last) continue;
+    let dob = dm ? mdyToDob(dm[1], dm[2], dm[3]) : '';
+    let dobLine = null;
+    if (!dob && i + 1 < lines.length && bareDateRe.test(String(lines[i + 1] || ''))) {
+      const dm2 = String(lines[i + 1]).match(dateRe);
+      const d2 = dm2 ? mdyToDob(dm2[1], dm2[2], dm2[3]) : '';
+      if (d2) { dob = d2; dobLine = String(lines[i + 1]); }
+    }
+    out.pax.push({ name: `${last}/${first}`, dob, gender: '', paxType: 'ADULT' });
+    out.consumed.add(line);
+    if (dobLine != null) { out.consumed.add(dobLine); i++; }
+  }
+  return out;
+}
+
 function parseSingleBooking(raw) {
   // ── Shared parse-scope constants (consolidated from per-block copies) ──────
   const _MN3 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -10368,7 +10406,11 @@ function parseSingleBooking(raw) {
     if (rule.startsWith('⬜') && _isReportableUnrec(line)) _unrec.push(line);
   };
 
+  // First/Last 英文标签乘客：预扫描（含跨行生日），命中行在主循环中跳过
+  const _flRes = _parseFirstLastPax(expandedLines);
+  _flRes.pax.forEach(fp => { if (!pax.find(p => p.name === fp.name)) pax.push(fp); });
   for (const line of expandedLines) {
+    if (_flRes.consumed.has(line)) { _d(line, '✅ PAX', 'First/Last 乘客'); continue; }
     // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
     const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
 
