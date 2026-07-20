@@ -1,3 +1,13 @@
+## 2026-07-16 — 收分需求主航司按大段判定 · v26.07.16-Q
+
+混舱联程（如 CX548 HKG→HND + AA168 HND→JFK）此前收分行标首段航司 CX；改为**大段航司**：内置约百个常用机场坐标（中港台/日韩/东南亚/北美/加/欧中东澳新），按航段大圆距离份额取多数（本例 AA≈79% → `Buying …K AMEX BP-AA`）。退化链：任一航段机场无坐标 → 段数多数决；平票 → 保持订单原航司（首段）。**只改收分标签**，订单级 airline 不动（表A/表Y 折扣规则依赖它）。变种行与开关提示经 entry.al 自动同步。
+
+**测试**：10 项新断言（两条基准距离、本单判定、单航司/缺坐标/平票/段数多数/数字码/无航班号、端到端 BP-AA）+ test4-7/hint/merge 共 39 项回归全过。
+
+**改动位置**：BUYING 段新增 _APT/_airportDist/_buyDominantAirline；_buyEligibleEntries 的 al 派生。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-16 — 缺航段结构补救：AI 第三介入口 · v26.07.16-P
 
 用户实测「有 AI key 也无法加载」的粘贴（SSR DOCS + TOTAL CNY + 乱码行程）。根因链：SSR 行被规则解析出乘客 → 全量 AI 兜底被跳过；TOTAL CNY 19933 也被规则识别 → 补价分支也不触发；乱码行程做不出航段 → isMeaningfulOrder（要求≥1有效航段）不成立 → 整单在全应用不可见，表现为"粘了没反应"。修复：新增第三个 AI 介入口——parsedProposals 全部 0 航段但认出乘客时，调 _aiFallbackParse 补结构，经 _mergeAiStructure 合并：航段整体采用 AI，已有字段（规则价/舱位等）不覆盖，乘客按姓名去重（保 SSR 细节），打 aiParsed 紫徽章提醒核对；AI 也补不出时明确提示「无法生成可见订单」。缺 key 时走 _aiKeyMissingHint。

@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-P\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-Q\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-P</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-Q</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14273,6 +14273,66 @@ function _sgOrdLink(x) {
 // ── BUYING LIST（收单需求）─────────────────────────────────────────────────
 // 未分配卡主的待出订单，按航司合并美金票面（未打折，即卡上实际刷的数）：
 //   points = USD × 100 → "Buying 288K AMEX BP-UA"（$2,884 → 288K）
+// 常用机场坐标（lat, lon）— 用于按航段大圆距离判定收分需求的主航司。
+// 覆盖中港台/日韩/东南亚/北美/加拿大/欧洲中东澳新常用点；缺失的机场自动降级为段数多数决。
+const _APT = {
+  PVG:[31.14,121.81],SHA:[31.20,121.34],PEK:[40.08,116.58],PKX:[39.51,116.41],CAN:[23.39,113.30],SZX:[22.64,113.81],
+  CTU:[30.56,103.95],TFU:[30.31,104.44],CKG:[29.72,106.64],KMG:[24.99,102.74],XIY:[34.44,108.75],HGH:[30.23,120.43],
+  NKG:[31.74,118.86],WUH:[30.78,114.21],CSX:[28.19,113.22],XMN:[24.54,118.13],FOC:[25.93,119.66],TAO:[36.36,120.09],
+  TSN:[39.12,117.35],DLC:[38.97,121.54],SHE:[41.64,123.48],HRB:[45.62,126.25],URC:[43.91,87.47],
+  HKG:[22.31,113.91],MFM:[22.15,113.59],TPE:[25.08,121.23],TSA:[25.07,121.55],KHH:[22.58,120.35],
+  NRT:[35.76,140.39],HND:[35.55,139.78],KIX:[34.43,135.24],ITM:[34.79,135.44],NGO:[34.86,136.81],FUK:[33.59,130.45],
+  CTS:[42.78,141.69],OKA:[26.20,127.65],ICN:[37.46,126.44],GMP:[37.56,126.80],PUS:[35.18,128.94],
+  SIN:[1.36,103.99],BKK:[13.69,100.75],DMK:[13.91,100.60],KUL:[2.75,101.71],CGK:[-6.13,106.66],MNL:[14.51,121.02],
+  SGN:[10.82,106.65],HAN:[21.22,105.81],PNH:[11.55,104.84],DEL:[28.56,77.10],BOM:[19.09,72.87],
+  LAX:[33.94,-118.41],SFO:[37.62,-122.38],SJC:[37.36,-121.93],OAK:[37.72,-122.22],SAN:[32.73,-117.19],SNA:[33.68,-117.87],
+  ONT:[34.06,-117.60],SEA:[47.45,-122.31],PDX:[45.59,-122.60],LAS:[36.08,-115.15],PHX:[33.44,-112.01],DEN:[39.86,-104.67],
+  DFW:[32.90,-97.04],IAH:[29.98,-95.34],AUS:[30.19,-97.67],ORD:[41.97,-87.91],MDW:[41.79,-87.75],MSP:[44.88,-93.22],
+  DTW:[42.21,-83.35],ATL:[33.64,-84.43],MIA:[25.79,-80.29],FLL:[26.07,-80.15],MCO:[28.43,-81.31],TPA:[27.98,-82.53],
+  JAX:[30.49,-81.69],CLT:[35.21,-80.94],RDU:[35.88,-78.79],IAD:[38.95,-77.46],DCA:[38.85,-77.04],BWI:[39.18,-76.67],
+  PHL:[39.87,-75.24],JFK:[40.64,-73.78],LGA:[40.78,-73.87],EWR:[40.69,-74.17],BOS:[42.36,-71.01],HNL:[21.32,-157.92],
+  SLC:[40.79,-111.98],SMF:[38.70,-121.59],SBP:[35.24,-120.64],STL:[38.75,-90.37],BNA:[36.13,-86.67],PIT:[40.49,-80.23],
+  CLE:[41.41,-81.85],CVG:[39.05,-84.66],MCI:[39.30,-94.71],SAT:[29.53,-98.47],MSY:[29.99,-90.26],RSW:[26.54,-81.76],
+  YVR:[49.19,-123.18],YYZ:[43.68,-79.63],YUL:[45.47,-73.74],YYC:[51.13,-114.01],
+  LHR:[51.47,-0.45],CDG:[49.01,2.55],FRA:[50.03,8.57],AMS:[52.31,4.76],ZRH:[47.46,8.55],MUC:[48.35,11.79],
+  IST:[41.26,28.74],DXB:[25.25,55.36],DOH:[25.27,51.61],AUH:[24.43,54.65],
+  SYD:[-33.95,151.18],MEL:[-37.67,144.84],AKL:[-37.01,174.79],GUM:[13.48,144.80],SPN:[15.12,145.73]
+};
+
+// 两机场大圆距离（km）；任一机场无坐标 → null
+function _airportDist(a, b) {
+  const A = _APT[String(a || '').toUpperCase()], B = _APT[String(b || '').toUpperCase()];
+  if (!A || !B) return null;
+  const r = Math.PI / 180, R = 6371;
+  const dLat = (B[0] - A[0]) * r, dLon = (B[1] - A[1]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(A[0] * r) * Math.cos(B[0] * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// 收分需求主航司 = 大段航司：按航段大圆距离份额取多数（混舱联程认主承运）。
+// 任一航段坐标缺失 → 退化为段数多数决；平票 → 保持订单原航司（首段）。
+function _buyDominantAirline(o) {
+  const rawSegs = ((o.proposals && o.proposals[o.selectedProposalIdx] && o.proposals[o.selectedProposalIdx].segments) || o.segments || []);
+  const codeOf = (s) => { const m = String((s && s.flight) || '').toUpperCase().match(/^[A-Z0-9]{2}/); return m ? m[0] : ''; };
+  const coded = rawSegs.map(s => ({ c: codeOf(s), from: s && s.from, to: s && s.to })).filter(x => x.c);
+  const fallback = (o.airline || '').toUpperCase();
+  if (!coded.length) return fallback;
+  const dists = coded.map(x => _airportDist(x.from, x.to));
+  const share = {};
+  if (dists.every(d => d != null && d > 0)) {
+    coded.forEach((x, i) => { share[x.c] = (share[x.c] || 0) + dists[i]; });
+  } else {
+    coded.forEach(x => { share[x.c] = (share[x.c] || 0) + 1; });
+  }
+  let best = '', bv = -1, tie = false;
+  for (const [c, v] of Object.entries(share)) {
+    if (v > bv) { best = c; bv = v; tie = false; }
+    else if (v === bv) { tie = true; }
+  }
+  if (tie) return fallback || best;
+  return best || fallback;
+}
+
 // 儿童是否有「独立儿童运价」：有 → 儿童必须挂成人出票；没有（与成人同价或
 // 根本没分档）→ 儿童视同成人，可自由拆分。fareByType.child 存在但找不到成人
 // 参照价时保守视为独立。
@@ -14369,7 +14429,8 @@ function _buyEligibleEntries() {
     if (o.tableLabel === 'G') return;          // 表G 走 Chase 流程，不在此列
     if (o.cardholderId) return;                // 已分配卡主 → 不需要再收
     if (o.waitingForRelease) return;           // 等待放位：还没机位，不进收分需求
-    let al = (o.airline || '').toUpperCase();
+    // 主航司按大段（航段距离份额多数）判定，混舱联程认主承运；退化链见 _buyDominantAirline
+    let al = _buyDominantAirline(o);
     if (!al && o.segments && o.segments[0] && o.segments[0].flight) {
       al = String(o.segments[0].flight).slice(0, 2).toUpperCase();
     }
