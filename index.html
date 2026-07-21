@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-T\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-U\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-T</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-U</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15941,6 +15941,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="openMRZDialog(${idx}); closeOrderMenu()" style="${passportDone ? doneStyle : ''}" title="粘贴护照 MRZ 给此单添加乘客">${passportDone ? checkmark : ''}📷 加护照</button>
       <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? doneStyle : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
+      <button class="btn ghost small" onclick="toggleNoSplit(${idx}); closeOrderMenu()" title="标记/解除禁止拆单（代理不允许拆开出票；-T 前的存量单可在此补旗）" style="${o.noSplit ? doneStyle : ''}">${o.noSplit ? '⛔ 已禁拆' : '⛔ 禁拆'}</button>
       <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
       <button class="btn ghost small" onclick="blacklistOrderPax(${idx}); closeOrderMenu()" title="把此单乘客加入在线开票黑名单（下次录入到同名会强提醒）">⛔ 加入黑名单</button>
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? doneStyle : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
@@ -19995,6 +19996,19 @@ function closeLinkOrderDialog() {
   document.getElementById('linkOrderOverlay')?.remove();
 }
 
+// 手动标记/解除「禁止拆单」——给 -T 之前入库的存量单补旗，或解除误判。
+function toggleNoSplit(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  o.noSplit = !o.noSplit;
+  persistOrders();
+  renderPendingList();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  renderAirlineUsdPanel(meaningful);
+  if (typeof BUY_SELECT !== 'undefined' && BUY_SELECT) _applyBuySelectMarks();
+  toast(o.noSplit ? '⛔ 已标记禁止拆单：收单按整单、变种禁用' : '✓ 已解除禁拆标记');
+}
+
 function toggleWaitingForRelease(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
@@ -20474,8 +20488,9 @@ function buildCardHTML(o, idx) {
 
   // ⛔ 禁止拆单横幅 — 代理标注此单不可拆开出票
   if (o.noSplit) {
-    html += `<div style="display:flex; align-items:center; background:linear-gradient(90deg,#fef2f2,#fee2e2); border-left:4px solid #b91c1c; padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(185,28,28,0.12);">
+    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:linear-gradient(90deg,#fef2f2,#fee2e2); border-left:4px solid #b91c1c; padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(185,28,28,0.12);">
       <span style="font-size:12px; font-weight:700; color:#991b1b;">⛔ 禁止拆单 — 代理标注此单不可拆开出票，收单需求按整单处理</span>
+      <button onclick="toggleNoSplit(${idx})" style="background:transparent; color:#991b1b; border:1px solid rgba(153,27,27,0.4); padding:3px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;">✕ 解除</button>
     </div>`;
   }
 
