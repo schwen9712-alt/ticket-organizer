@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-S\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.16-T\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-S</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-T</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9425,6 +9425,8 @@ function parseSingleBooking(raw) {
   };
   // Computed once — referenced by every short-circuit return.
   const _waitRelease = /要放位|等放位|需要放位|放位/u.test(raw);
+  // 代理标注「禁止拆单」→ 此单不可拆开出票（收单强制 no split、变种禁用）
+  const _noSplitMark = /禁止拆单|不可拆单|不能拆单|禁止拆分|不可拆分/.test(raw);
   // ── Single-line GDS rescue ──────────────────────────────────────────────────
   // Pastes from chat apps sometimes lose ALL newlines, flattening a GDS booking
   // ("1.  UA153 … DK1 …  2.  UA152 …  NAME/NAME 女 date … 成人25260 儿童22101")
@@ -9546,7 +9548,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -9642,7 +9644,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -9735,7 +9737,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -9789,7 +9791,7 @@ function parseSingleBooking(raw) {
             urgent: false, ticketSeqNote: undefined,
             basicFare: false, basicFareLabel: '',
             fareByType: null, unrecognizedLines: [],
-            waitingForRelease: _waitRelease
+            waitingForRelease: _waitRelease, noSplit: _noSplitMark
           };
         }
       }
@@ -9859,7 +9861,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -9934,7 +9936,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -10043,7 +10045,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark
       };
     }
   }
@@ -12196,7 +12198,7 @@ function parseSingleBooking(raw) {
     basicFareLabel: parsedBasicFareLabel,
     fareByType: parsedFareByType || null,
     unrecognizedLines: _unrec,
-    waitingForRelease: _waitRelease };
+    waitingForRelease: _waitRelease, noSplit: _noSplitMark };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12943,6 +12945,7 @@ async function parsePNR() {
       proposals,
       selectedProposalIdx: 0,
       waitingForRelease: primary.waitingForRelease || false,
+      noSplit: primary.noSplit || false,
       urgent: primary.urgent || false,
       urgentSetAt: primary.urgent ? Date.now() : null,
       ticketSeqNote: primary.ticketSeqNote || '',
@@ -13609,6 +13612,9 @@ function renderAirlineUsdPanel(orders) {
       const aiRowBadge = o.aiParsed
         ? `<span class="ui-badge" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:9px;" title="AI识别 · 出票前请核对">🤖AI</span>`
         : '';
+      const noSplitBadge = o.noSplit
+        ? `<span class="ui-badge" style="background:#b91c1c;color:#fff;border-color:#b91c1c;font-size:9px;" title="代理标注：禁止拆单，不可拆开出票">⛔ 禁拆</span>`
+        : '';
       const releaseBadge = o.waitingForRelease
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
         : '';
@@ -13693,7 +13699,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${noSplitBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -14520,7 +14526,7 @@ function _buyEligibleEntries() {
     // 有独立儿童价 → 成人配对拆（-F 逻辑）；含婴儿 → 永远强约束。
     const constrained = _orderHasInfant(o) || (hasChild && _hasDistinctChildFare(o));
     const childSplit = constrained ? _buySplitPlan(o, usdTotal) : null;
-    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit });
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit, noSplit: !!o.noSplit });
   });
   return entries;
 }
@@ -14536,8 +14542,11 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
       if (k <= 0) return null;
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
-      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && (!e.hasChild || !!e.childSplit);
-      if (e.pax >= 2 && e.hasChild && !useVariant) {
+      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && !e.noSplit && (!e.hasChild || !!e.childSplit);
+      if (e.pax >= 2 && e.noSplit) {
+        // 代理标注「禁止拆单」：无条件整单，压过成人组合与配对拆
+        split = ` (${e.pax} pax, no split)`;
+      } else if (e.pax >= 2 && e.hasChild && !useVariant) {
         // 含儿童：儿童不能单独出票。有成人可配对时给出拆法，否则整单不可拆。
         split = e.childSplit ? ` (${e.pax} pax, ${e.childSplit.text})` : ` (${e.pax} pax, no split)`;
       } else if (e.pax >= 2 && !e.hasChild && !useVariant) {
@@ -14570,7 +14579,7 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
   let out = blocks.join(blocks.some(b => b.includes('\n')) ? '\n\n' : '\n');
   // 批内含可自由拆分的多人单 → 追加英文脚注，向卖家说明可按任意人数供货；
   // 全单人/全受约束批次不加。"unless marked otherwise" 兜住 no split / splits as 单。
-  if (entries.some(e => e.pax >= 2 && !e.hasChild)) {
+  if (entries.some(e => e.pax >= 2 && !e.hasChild && !e.noSplit)) {
     out += '\n\nNote: multi-pax orders can be split freely — take 1, 2, or more pax (unless marked otherwise).';
   }
   return out;
@@ -14646,6 +14655,7 @@ function _toggleBuyVariant(id, row) {
   if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { _buyIneligibleToast(id); return; }
   const meta = BUY_META ? BUY_META.get(id) : null;
   if (!meta || meta.pax < 2) { toast('单人订单没有变种'); return; }
+  if (meta.noSplit) { toast('该单代理标注「禁止拆单」，不可拆开出票'); return; }
   if (meta.hasChild && !meta.childSplit) { toast('该单拆不了：儿童/婴儿需挂成人，当前人员结构无法成组'); return; }
   if (!BUY_VARIANT) BUY_VARIANT = new Set();
   if (BUY_VARIANT.has(id)) {
@@ -20459,6 +20469,13 @@ function buildCardHTML(o, idx) {
     html += `<div style="display:flex; align-items:center; justify-content:space-between; background:linear-gradient(90deg,#fffbf0,#fff8e8); border-left:4px solid var(--warning); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(240,165,0,0.15);">
       <span style="font-size:12px; font-weight:700; color:var(--warning-deep);">🔒 等待放位 — 代理公司尚未释放座位</span>
       <button onclick="toggleWaitingForRelease(${idx})" style="background:var(--warning); color:#fff; border:none; padding:4px 12px; border-radius:var(--r-sm); cursor:pointer; font-size:11px; font-weight:700; white-space:nowrap; box-shadow:0 1px 4px rgba(240,165,0,0.3);">✓ 已放位</button>
+    </div>`;
+  }
+
+  // ⛔ 禁止拆单横幅 — 代理标注此单不可拆开出票
+  if (o.noSplit) {
+    html += `<div style="display:flex; align-items:center; background:linear-gradient(90deg,#fef2f2,#fee2e2); border-left:4px solid #b91c1c; padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(185,28,28,0.12);">
+      <span style="font-size:12px; font-weight:700; color:#991b1b;">⛔ 禁止拆单 — 代理标注此单不可拆开出票，收单需求按整单处理</span>
     </div>`;
   }
 
