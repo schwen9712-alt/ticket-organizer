@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.16-U\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.21-V\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.16-U</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.21-V</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14525,7 +14525,7 @@ function _buyEligibleEntries() {
     // v26.07.16-G：儿童无独立运价（与成人同价/无分档）→ 视同成人可自由拆分；
     // 有独立儿童价 → 成人配对拆（-F 逻辑）；含婴儿 → 永远强约束。
     const constrained = _orderHasInfant(o) || (hasChild && _hasDistinctChildFare(o));
-    const childSplit = constrained ? _buySplitPlan(o, usdTotal) : null;
+    const childSplit = (constrained && !o.noSplit) ? _buySplitPlan(o, usdTotal) : null;
     entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit, noSplit: !!o.noSplit });
   });
   return entries;
@@ -25258,11 +25258,9 @@ function openTicketingModal(idx) {
   if (!o) return;
   pendingTicketingIdx = idx;
   const sel = document.getElementById('tm-cardholder');
-  sel.innerHTML = '<option value="">— 未指定 —</option>';
-  (settings.cardholders || []).forEach(ch => {
-    sel.innerHTML += `<option value="${ch.id}">${escapeHtml(ch.channel)} · ${escapeHtml(ch.name)}</option>`;
-  });
-  sel.innerHTML += `<option value="__new__">＋ 添加新卡主</option>`;
+  sel.innerHTML = '<option value="">— 未指定 —</option>'
+    + (settings.cardholders || []).map(ch => `<option value="${ch.id}">${escapeHtml(ch.channel)} · ${escapeHtml(ch.name)}</option>`).join('')
+    + `<option value="__new__">＋ 添加新卡主</option>`;
   sel.value = o.cardholderId || '';
   document.getElementById('tm-ch-channel').value = '';
   document.getElementById('tm-ch-name').value = '';
