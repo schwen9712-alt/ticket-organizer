@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.22-Y\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.22-AA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-Y</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-AA</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -12354,6 +12354,18 @@ function _isSamePersonStrict(a, b) {
 //   STRONG: same PNR (case-insensitive)
 //   STRONG: same first passenger name + same first segment route + same first segment date
 //   WEAK: same first passenger name + same airline + same first date
+// 标记同步器：把"文本即真相"的四字段从新解析结果同步到目标订单。
+// 三条线共用（弱重复更新 / 强重复跳过 / doReparse），杜绝挑拣清单再漏。
+// urgent 保留既有倒计时时间戳；无标记文本清旗归零；paxPrices 由各调用点按语义处理。
+function _syncOrderMarkers(target, src) {
+  target.fareByType = src.fareByType || null;
+  target.noSplit = !!src.noSplit;
+  target.waitingForRelease = !!src.waitingForRelease;
+  const _was = !!target.urgent;
+  target.urgent = !!src.urgent;
+  target.urgentSetAt = target.urgent ? ((_was && target.urgentSetAt) ? target.urgentSetAt : Date.now()) : null;
+}
+
 function detectDuplicates(newOrders) {
   const existingPending = STATE.orders.filter(o => isMeaningfulOrder(o));
   const existingTicketed = settings.ticketed || [];
@@ -13164,6 +13176,18 @@ async function parsePNR() {
     if (releasedCount > 0) {
       toast(`🔓 已人工放行 ${releasedCount} 单`);
     }
+
+    // 强重复被跳过（未放行）→ 轻量同步：重贴同一单往往就是为了带来新批注
+    // （禁拆/放位/加急）或分档更新；已出票记录不动。
+    let _markerSynced = 0;
+    for (const s of strong) {
+      if (decision.releasedStrong.has(s.newOrder)) continue;
+      if (s.where !== 'pending' || !s.existing) continue;
+      _syncOrderMarkers(s.existing, s.newOrder);
+      if (Array.isArray(s.newOrder.paxPrices) && s.newOrder.paxPrices.length) s.existing.paxPrices = s.newOrder.paxPrices.slice();
+      _markerSynced++;
+    }
+    if (_markerSynced > 0) toast(`♻ ${_markerSynced} 个完全重复单已跳过，其 标记/分档 已同步到既有订单`);
   }
 
   // Apply updates to existing orders
@@ -13180,6 +13204,10 @@ async function parsePNR() {
     if (newOrder.usd != null) existingOrder.usd = newOrder.usd;
     if (newOrder.discount != null) existingOrder.discount = newOrder.discount;
     if (newOrder.rawPnr) existingOrder.rawPnr = newOrder.rawPnr;
+    // 分档每人价与四面旗：与 parsePNR/doReparse 装配对齐（此前弱更新全部丢失）
+    if (Array.isArray(newOrder.paxPrices) && newOrder.paxPrices.length) existingOrder.paxPrices = newOrder.paxPrices.slice();
+    else existingOrder.paxPrices = null;
+    _syncOrderMarkers(existingOrder, newOrder);
     updatedCount++;
   });
   if (updatedCount > 0) {
@@ -17512,6 +17540,9 @@ function doReparse(idx) {
   }
   if (parsed.usd != null) o.usd = parsed.usd;
 
+  // 分档运价 + 三面旗：复用 _syncOrderMarkers（与弱更新/强重复同步同源）
+  _syncOrderMarkers(o, parsed);
+
   // Per-pax prices: if parser found multi-pax expression, use it; otherwise clear
   // any previous paxPrices (so re-parse of a single-price PNR won't carry old data).
   if (Array.isArray(parsed.paxPrices) && parsed.paxPrices.length > 0) {
@@ -17601,6 +17632,10 @@ function doReparse(idx) {
   if (productDiscount != null) updated.push(`🎁 ${productMarker || ''} ${productDiscount}%`);
   else if (parsed.discount != null) updated.push(`折扣 ${parsed.discount}%`);
   if (parsed.cabin) updated.push(parsed.cabin);
+  if (parsed.fareByType && parsed.fareByType.child != null) updated.push('分档运价');
+  if (parsed.noSplit) updated.push('⛔禁拆');
+  if (parsed.urgent) updated.push('🔥加急');
+  if (parsed.waitingForRelease) updated.push('🔒等放位');
   if (parsed.pax.length > 0) updated.push(`${parsed.pax.length}位乘客`);
   if (parsed.segs.length > 0) updated.push(`${parsed.segs.length}个航段`);
   if (parsedProposals.length > 1) updated.push(`${parsedProposals.length} 个方案`);
