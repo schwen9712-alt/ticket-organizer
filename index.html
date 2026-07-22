@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.21-W\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.22-Y\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.21-W</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-Y</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10666,12 +10666,13 @@ function parseSingleBooking(raw) {
         continue;
       }
       // SSR DOCS style: "P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
-      const ssrM = raw.match(/^P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
+      const ssrM = raw.match(/^P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{2}[A-Z]{3}\d{2,4})\/([A-Z]+)\/([A-Z]+)/i);
       if (ssrM) {
         const dob = extractDOB(ssrM[1]) || '';
         const gender = ssrM[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-        const name = ssrM[3].toUpperCase() + '/' + ssrM[4].toUpperCase();
-        if (!pax.find(p => p.name === name)) pax.push({ name, dob, gender, paxType: 'ADULT' });
+        const passportExpiry = extractDOB(ssrM[3]) || '';
+        const name = ssrM[4].toUpperCase() + '/' + ssrM[5].toUpperCase();
+        if (!pax.find(p => p.name === name)) pax.push({ name, dob, passportExpiry, gender, paxType: 'ADULT' });
         continue;
       }
       // Try to extract LAST/FIRST + DOB + gender from inline format
@@ -12981,6 +12982,9 @@ async function parsePNR() {
     }
     // Store raw PNR text for future re-parsing with updated logic
     o.rawPnr = bookingText;
+    // 生日重大异常 → 正常录入，但即时提醒并由卡片/行徽章持续标记（派生，不落库）
+    const _dobIssNew = _paxDobIssues(o);
+    if (_dobIssNew.length) toast('⚠ 乘客信息有误（已正常录入并标记）\n' + _dobIssNew.join('\n'));
     // Use PNR extracted by parser if not already set from form/context
     if (!o.pnr && primary.pnr) o.pnr = primary.pnr;
     if (o.rmb && !o.usd) {
@@ -13612,6 +13616,10 @@ function renderAirlineUsdPanel(orders) {
       const aiRowBadge = o.aiParsed
         ? `<span class="ui-badge" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:9px;" title="AI识别 · 出票前请核对">🤖AI</span>`
         : '';
+      const _dobIssR = _paxDobIssues(o);
+      const dobWarnBadge = _dobIssR.length
+        ? `<span class="ui-badge" style="background:var(--warning);color:#fff;border-color:var(--warning);font-size:9px;" title="${escapeAttr(_dobIssR.join('；'))}">⚠ 资料</span>`
+        : '';
       const noSplitBadge = o.noSplit
         ? `<span class="ui-badge" style="background:var(--red);color:#fff;border-color:var(--red);font-size:9px;" title="代理标注：禁止拆单，不可拆开出票">⛔ 禁拆</span>`
         : '';
@@ -13699,7 +13707,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${noSplitBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${dobWarnBadge}${noSplitBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -20494,6 +20502,14 @@ function buildCardHTML(o, idx) {
     </div>`;
   }
 
+  // ⚠ 乘客生日重大异常（派生标记，不落库）
+  const _dobIssues = _paxDobIssues(o);
+  if (_dobIssues.length) {
+    html += `<div style="display:flex; align-items:center; background:var(--warning-light); border-left:4px solid var(--warning); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm);">
+      <span style="font-size:12px; font-weight:700; color:var(--warning-deep);">⚠ 乘客信息有误 — ${escapeHtml(_dobIssues.join('；'))} <span style="font-weight:600; opacity:0.8;">（已正常录入，出票前请与代理核实修正）</span></span>
+    </div>`;
+  }
+
   if (o.pnr || o.tkt) {
     html += `<div style="display:flex; align-items:center; gap:16px; font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); margin-bottom:10px; padding:8px 12px; background:rgba(12,27,42,0.03); border-radius:var(--r-sm);">`;
     if (o.pnr) html += `<span>PNR <strong style="color:var(--ink); font-size:13px; letter-spacing:0.08em;">${escapeHtml(o.pnr)}</strong></span>`;
@@ -21174,6 +21190,56 @@ function matchKnownPassengers(o) {
 // Calculate age in years at the date of the flight
 // dob format: "01NOV88" or "03JUL21" etc. (DDMMMYY)
 // flightDate format: "09MAY" (DDMMM, current or next year inferred) or "09MAY26" with year
+// 生日重大异常派生校验（不落库、渲染与录入时实时计算，自动覆盖存量单）：
+// ① 解析为未来日期（如 2029-04-11 → 11APR29，轴心 <30 归 20xx）；② 乘机日尚未出生；③ >110 岁疑年份输错。
+function _paxDobIssues(o) {
+  const out = [];
+  const segs = ((o.proposals && o.proposals[o.selectedProposalIdx] && o.proposals[o.selectedProposalIdx].segments) || o.segments || []);
+  const d0 = segs[0] && segs[0].date ? segs[0].date : null;
+  const now = new Date();
+  const MN3 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const todayStr = String(now.getDate()).padStart(2, '0') + MN3[now.getMonth()] + String(now.getFullYear() % 100).padStart(2, '0');
+  // 自带解析（不走 calculateAgeAtFlight——其对异常年龄有防御性 null 拦截，
+  // 恰会吞掉我们要捕捉的错误）；轴心与其一致：两位年 <30 归 20xx。
+  const resolveDate = (s) => {
+    const m = String(s || '').toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
+    if (!m) return null;
+    const mi = MN3.indexOf(m[2]);
+    if (mi < 0) return null;
+    let y;
+    if (m[3] == null) y = now.getFullYear();
+    else if (m[3].length >= 4) y = parseInt(m[3], 10);
+    else { const yn = parseInt(m[3], 10); y = (yn >= 30 ? 1900 : 2000) + yn; }
+    return new Date(y, mi, parseInt(m[1], 10));
+  };
+  const flightHasYear = d0 ? /\d{2,4}$/.test(String(d0).replace(/^\d{1,2}[A-Z]{3}/i, '')) && /[A-Z]{3}\d{2,4}$/i.test(String(d0)) : false;
+  const flightDate = flightHasYear ? resolveDate(d0) : null;
+  (o.passengers || []).forEach(p => {
+    if (!p || !p.name || !p.dob) return;
+    const dobDate = resolveDate(p.dob);
+    if (!dobDate) return;
+    if (dobDate > now) {
+      // 三级定性：与护照有效期精确一致=实锤误填 > 落在今天+10年窗口=大概率误填有效期 > 其余通用
+      const yrsAhead = (dobDate - now) / (365.25 * 24 * 3600 * 1000);
+      let hint = '请向代理核实';
+      if (p.passportExpiry && String(p.passportExpiry).toUpperCase() === String(p.dob).toUpperCase()) {
+        hint = '与其护照有效期完全一致，确认为有效期误填，请向代理索取真实生日';
+      } else if (yrsAhead <= 10.5) {
+        hint = '大概率误填了护照有效期，请向代理索取真实生日';
+      }
+      out.push(`${p.name} 生日 ${p.dob}（解析为 ${dobDate.getFullYear()} 年，未来日期）— ${hint}`);
+      return;
+    }
+    if (flightDate && dobDate > flightDate) {
+      out.push(`${p.name} 生日 ${p.dob} 晚于乘机日期`);
+      return;
+    }
+    const age = (now - dobDate) / (365.25 * 24 * 3600 * 1000);
+    if (age > 110) out.push(`${p.name} 按生日 ${p.dob} 已约 ${Math.floor(age)} 岁，疑年份输错`);
+  });
+  return out;
+}
+
 function calculateAgeAtFlight(dob, flightDate) {
   if (!dob || !flightDate) return null;
   const monthMap = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
