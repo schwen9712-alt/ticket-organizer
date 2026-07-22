@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.21-V\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.21-W\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.21-V</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.21-W</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5525,13 +5525,13 @@ input[type="text"], input[type="number"], textarea {
 .buy-variant {
   position: relative;
   outline-style: dashed !important;
-  outline-color: #1d5fd0 !important;
+  outline-color: var(--blue) !important;
 }
 .buy-variant::after {
   content: '变种';
   position: absolute;
   top: -1px; right: -1px;
-  background: #1d5fd0; color: #fff;
+  background: var(--blue); color: #fff;
   font-size: 9px; font-weight: 700;
   padding: 1px 6px; border-radius: 0 0 0 6px;
   letter-spacing: 0.08em;
@@ -13613,7 +13613,7 @@ function renderAirlineUsdPanel(orders) {
         ? `<span class="ui-badge" style="background:#7c3aed;color:#fff;border-color:#7c3aed;font-size:9px;" title="AI识别 · 出票前请核对">🤖AI</span>`
         : '';
       const noSplitBadge = o.noSplit
-        ? `<span class="ui-badge" style="background:#b91c1c;color:#fff;border-color:#b91c1c;font-size:9px;" title="代理标注：禁止拆单，不可拆开出票">⛔ 禁拆</span>`
+        ? `<span class="ui-badge" style="background:var(--red);color:#fff;border-color:var(--red);font-size:9px;" title="代理标注：禁止拆单，不可拆开出票">⛔ 禁拆</span>`
         : '';
       const releaseBadge = o.waitingForRelease
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
@@ -20488,9 +20488,9 @@ function buildCardHTML(o, idx) {
 
   // ⛔ 禁止拆单横幅 — 代理标注此单不可拆开出票
   if (o.noSplit) {
-    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:linear-gradient(90deg,#fef2f2,#fee2e2); border-left:4px solid #b91c1c; padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm); box-shadow:0 1px 4px rgba(185,28,28,0.12);">
-      <span style="font-size:12px; font-weight:700; color:#991b1b;">⛔ 禁止拆单 — 代理标注此单不可拆开出票，收单需求按整单处理</span>
-      <button onclick="toggleNoSplit(${idx})" style="background:transparent; color:#991b1b; border:1px solid rgba(153,27,27,0.4); padding:3px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;">✕ 解除</button>
+    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:var(--red-light); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm);">
+      <span style="font-size:12px; font-weight:700; color:var(--red);">⛔ 禁止拆单 — 代理标注此单不可拆开出票，收单需求按整单处理</span>
+      <button onclick="toggleNoSplit(${idx})" style="background:transparent; color:var(--red); border:1px solid var(--red); padding:3px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;">✕ 解除</button>
     </div>`;
   }
 
