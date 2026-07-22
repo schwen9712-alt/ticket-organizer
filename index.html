@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.22-AA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.22-AB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-AA</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-AB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3535,11 +3535,12 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
       <span><span class="num">✓</span>TICKETED ORDERS <span class="zh">已出票记录</span></span>
       <div style="display:flex;align-items:center;gap:6px;">
-        <input type="text" id="ticketedSearchInput" placeholder="🔍 搜索姓名/航班/PNR…" data-i18n-placeholder="misc.searchPlaceholder" oninput="filterTicketedOrders(this.value)"
+        <input type="text" id="ticketedSearchInput" placeholder="🔍 搜索姓名/航班/PNR/票号/卡主…" data-i18n-placeholder="misc.searchPlaceholder" oninput="filterTicketedOrders(this.value)"
           style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;width:180px;outline:none;">
         <button onclick="document.getElementById('ticketedSearchInput').value='';filterTicketedOrders('')"
           style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;padding:0 4px;" title="清除搜索">✕</button>
         <button class="btn small" onclick="openManualTicketDialog()" style="font-size:11px;">＋ 手动补录</button>
+        <button class="btn small ghost" onclick="exportTicketedBackup()" style="font-size:11px;" title="一键导出全部出票记录（出票时间/卡主/积分/PNR/票号/收入成本）为 Excel 备份，不需选月">⬇ 备份出票记录</button>
         <button class="btn small ghost" onclick="clearTicketedScreenshots()" style="font-size:11px;" title="清除已出票订单上的所有截图，释放本地存储空间（订单数据不动）">🗑 清除历史截图</button>
       </div>
     </div>
@@ -22349,6 +22350,56 @@ async function submitManualTicket(btn) {
   toast(`✓ 已补录：${passengers.map(p=>p.name).join(', ')} · ¥${rmb.toLocaleString()}`);
 }
 
+// 出票记录全量备份：纯函数拼行（可测），导出壳负责 XLSX 落盘。
+// 与月度对账导出互补：这里不选月、不分表，一张「出票记录」大表按时间倒序，
+// 专为"定位某笔出票的卡主/时间/积分"与离线备份而设。
+function _ticketedBackupRows(list, cardholders) {
+  const chMap = new Map((cardholders || []).map(c => [c.id, c]));
+  const fmt = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+  const rows = [[
+    '出票时间', '表', '客户', '代理', '乘客', '人数', '航司', '行程', '航线', '首飞日期',
+    'PNR', '票号', '卡主渠道', '卡主', '卡尾号', '积分', '积分类型', 'CPM', '付卡主$',
+    '收入¥', '收入$', '成本$', '成本¥', '汇率', '舱位'
+  ]];
+  (list || []).forEach(t => {
+    const ch = t.cardholderId ? chMap.get(t.cardholderId) : null;
+    const segs = t.segments || [];
+    const route = segs.map(s => s.from).concat(segs.length ? [segs[segs.length - 1].to] : []).join('→');
+    rows.push([
+      fmt(t.ticketedAt), t.tableLabel || '', t.client || '', t.agent || '',
+      (t.passengers || []).map(p => p.name).filter(Boolean).join(', '), (t.passengers || []).length,
+      t.airline || '', t.trip || '', route, segs[0] ? (segs[0].date || '') : '',
+      t.pnr || '', t.tkt || '',
+      ch ? (ch.channel || '') : '', ch ? (ch.name || '') : '', t.swipeCardLast4 || '',
+      t.miles != null ? Number(t.miles) : '', t.pointsType || '', t.cpmRate != null ? t.cpmRate : '',
+      t.cardholderFee != null ? Number(t.cardholderFee) : '',
+      t.rmb != null ? Number(t.rmb) : '', t.usd != null ? Number(t.usd) : '',
+      t.costUsd != null ? Number(t.costUsd) : '', t.costRmb != null ? Number(t.costRmb) : '',
+      t.rate != null ? Number(Number(t.rate).toFixed(4)) : '', t.cabin || ''
+    ]);
+  });
+  return rows;
+}
+
+function exportTicketedBackup() {
+  const all = (settings.ticketed || []).slice().sort((a, b) => (b.ticketedAt || 0) - (a.ticketedAt || 0));
+  if (!all.length) { toast('还没有已出票记录'); return; }
+  if (typeof XLSX === 'undefined') { toast('✗ Excel 组件未加载（离线？），请联网后重试'); return; }
+  const rows = _ticketedBackupRows(all, settings.cardholders);
+  const wb = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, sheet, '出票记录');
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  XLSX.writeFile(wb, `出票记录备份_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.xlsx`);
+  toast(`⬇ 已导出 ${all.length} 条出票记录`);
+}
+
 function renderTicketed() {
   const list = document.getElementById('ticketedList');
   const allTicketed = settings.ticketed || [];
@@ -22370,7 +22421,9 @@ function renderTicketed() {
       ...(t.passengers||[]).map(p => p.name||''),
       ...(t.segments||[]).map(s => s.flight||''),
       ...(t.segments||[]).map(s => `${s.from||''}${s.to||''}`),
-      t.pnr||'', t.tkt||'', t.airline||'', t.client||''
+      t.pnr||'', t.tkt||'', t.airline||'', t.client||'',
+      t.agent||'', t.tableLabel||'', String(t.miles||''),
+      (() => { const c = t.cardholderId ? (settings.cardholders || []).find(x => x.id === t.cardholderId) : null; return c ? `${c.channel||''} ${c.name||''}` : ''; })()
     ].join(' ').toLowerCase();
     return q.split(/\s+/).every(token => hay.includes(token));
   }) : allTicketed;
@@ -22393,7 +22446,7 @@ function renderTicketed() {
     const route = t.segments.map(s => s.from).concat(t.segments.length ? [t.segments[t.segments.length-1].to] : []).join('→');
     const dates = t.segments.map(s => s.date).filter(Boolean).join(' / ');
     const dt = new Date(t.ticketedAt);
-    const dtStr = `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`;
+    const dtStr = `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
     const tagsArr = [];
     if (t.agent) tagsArr.push(`代理 ${t.agent}`);
     if (t.branch) tagsArr.push(t.branch);
@@ -25234,7 +25287,7 @@ function showCardholderDetail(id) {
       const route = t.segments.map(s => s.from).concat(t.segments.length ? [t.segments[t.segments.length-1].to] : []).join('→');
       const dates = t.segments.map(s => s.date).filter(Boolean).join('/');
       const dt = new Date(t.ticketedAt);
-      const dtStr = `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')}`;
+      const dtStr = `${dt.getFullYear()}.${String(dt.getMonth()+1).padStart(2,'0')}.${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
       const rev = orderRevenue(t);
       const prof = orderProfit(t);
       const isPaid = !!t.paidAt;
