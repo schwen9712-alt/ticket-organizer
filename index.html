@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.23-AC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.23-AD\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.23-AC</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.23-AD</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -20059,6 +20059,29 @@ function closeLinkOrderDialog() {
   document.getElementById('linkOrderOverlay')?.remove();
 }
 
+// 存量单标记回填（一次性迁移）：-T/-AC 之前入库的订单没有 noSplit/seatCount 字段，
+// 依据其 rawPnr 原文补判。正则与 parseSingleBooking 内 _noSplitMark/_seatCountN
+// 必须保持一致——改任一处须同步另一处。undefined=未迁移；迁移后写入 false/null 防重复扫描。
+// waitingForRelease/urgent 刻意不迁移（有手动状态与倒计时语义）。
+function _migrateMarkersFromRawPnr() {
+  let changed = 0;
+  (STATE.orders || []).forEach(o => {
+    if (!o) return;
+    const needNS = o.noSplit === undefined;
+    const needSC = o.seatCount === undefined;
+    if (!needNS && !needSC) return;
+    const raw = o.rawPnr || '';
+    if (needNS) o.noSplit = /禁止拆单|不可拆单|不能拆单|禁止拆分|不可拆分/.test(raw);
+    if (needSC) {
+      const m = raw.match(/(?:刚好|只有|仅剩|仅有|仅|正好|最后)\s*(\d{1,2})\s*(?:个)?\s*(?:位置|座位|席位|位)/);
+      o.seatCount = m ? parseInt(m[1], 10) : null;
+    }
+    changed++;
+  });
+  if (changed) persistOrders();
+  return changed;
+}
+
 // 解除满座判定：清空 seatCount（派生旗随之消失），用于代理后续放位/误判。
 function clearSeatTight(idx) {
   const o = STATE.orders[idx];
@@ -27675,6 +27698,10 @@ async function mergeImportData(event) {
     const pendingCount = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
     if (pendingCount > 0) toast(`已恢复 ${pendingCount} 单待处理订单`);
   }
+
+  // 存量单标记回填：为 -T/-AC 之前入库的订单依据 rawPnr 补 noSplit/seatCount
+  const _migN = _migrateMarkersFromRawPnr();
+  if (_migN) toast(`♻ 已为 ${_migN} 个历史订单回填 禁拆/满座 标记（依据原文）`);
 
   // (Cloud sync + Gist config removed in earlier cleanup — Firebase replaces both)
   loadDeviceName();        // load this device's friendly name from localStorage
