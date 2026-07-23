@@ -1,3 +1,13 @@
+## 2026-07-23 — 收分语义修正：等待放位照收，暂时无位不收 · v26.07.23-AE
+
+用户修正业务语义（推翻 -M 的等待放位排除）：**等待放位**=代理手里有位只是尚未释放，积分早晚要用 → 照常进收分池；**暂时无位**（noAvailability，⏸标记）=代理手中也没位 → 不收分。改动三处：_buyEligibleEntries 过滤对调（waitingForRelease 放行、noAvailability 排除）；_buyIneligibleToast 给「暂时无位」具体原因（恢复有位后自动回归）；空批说明同步。等待放位单在收分文本中无特殊标注（卖家侧无关）。恢复有位（再点⏸）即自动回归收分池。
+
+**测试**：buy_test7 按新语义重写 5 项（放位收/无位排/恢复回归/两类提示）+ 全历史回归全绿。
+
+**改动位置**：_buyEligibleEntries；_buyIneligibleToast；copyBuyingList 空批提示。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-23 — 存量单标记回填：启动时依据 rawPnr 一次性迁移 · v26.07.23-AD
 
 用户报满座单收分仍显示多人组合且无标记。全链实测（splitIntoBookings→splitChunkByProposals→parseSingleBooking）证明 AC 的新粘贴路径完整无缺（「第1单」头部行保留、seatCount=4/4人）——问题订单为 **AC 之前入库的存量状态**（无 seatCount 字段）。根治而非再叫用户重贴：新增 _migrateMarkersFromRawPnr，**启动时对 noSplit/seatCount 为 undefined 的订单，依据其 rawPnr 原文回填两字段**（正则与 parseSingleBooking 内保持一致，互为镜像必须同改）；迁移后写 false/null 防重复扫描；有变化即落库并 toast「♻ 已为 N 个历史订单回填 禁拆/满座 标记」。waitingForRelease/urgent 刻意不迁移（手动状态/倒计时语义）。手动改过的订单（字段已定义）不受影响；云端同步来的旧形态订单于下次刷新迁移。
