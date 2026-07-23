@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.22-AB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.23-AC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.22-AB</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.23-AC</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9428,6 +9428,10 @@ function parseSingleBooking(raw) {
   const _waitRelease = /要放位|等放位|需要放位|放位/u.test(raw);
   // 代理标注「禁止拆单」→ 此单不可拆开出票（收单强制 no split、变种禁用）
   const _noSplitMark = /禁止拆单|不可拆单|不能拆单|禁止拆分|不可拆分/.test(raw);
+  // 座位数语义提取："刚好/只有/仅/正好 N 个位置|座位|席位|位"。
+  // 满座判定（座位数=乘客数 → 按整单）是派生逻辑，见 _isSeatTight。
+  const _seatM = raw.match(/(?:刚好|只有|仅剩|仅有|仅|正好|最后)\s*(\d{1,2})\s*(?:个)?\s*(?:位置|座位|席位|位)/);
+  const _seatCountN = _seatM ? parseInt(_seatM[1], 10) : null;
   // ── Single-line GDS rescue ──────────────────────────────────────────────────
   // Pastes from chat apps sometimes lose ALL newlines, flattening a GDS booking
   // ("1.  UA153 … DK1 …  2.  UA152 …  NAME/NAME 女 date … 成人25260 儿童22101")
@@ -9549,7 +9553,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -9645,7 +9649,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -9738,7 +9742,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -9792,7 +9796,7 @@ function parseSingleBooking(raw) {
             urgent: false, ticketSeqNote: undefined,
             basicFare: false, basicFareLabel: '',
             fareByType: null, unrecognizedLines: [],
-            waitingForRelease: _waitRelease, noSplit: _noSplitMark
+            waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
           };
         }
       }
@@ -9862,7 +9866,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -9937,7 +9941,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -10046,7 +10050,7 @@ function parseSingleBooking(raw) {
         urgent: false, ticketSeqNote: undefined,
         basicFare: false, basicFareLabel: '',
         fareByType: null, unrecognizedLines: [],
-        waitingForRelease: _waitRelease, noSplit: _noSplitMark
+        waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN
       };
     }
   }
@@ -12200,7 +12204,7 @@ function parseSingleBooking(raw) {
     basicFareLabel: parsedBasicFareLabel,
     fareByType: parsedFareByType || null,
     unrecognizedLines: _unrec,
-    waitingForRelease: _waitRelease, noSplit: _noSplitMark };
+    waitingForRelease: _waitRelease, noSplit: _noSplitMark, seatCount: _seatCountN };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -12361,6 +12365,7 @@ function _isSamePersonStrict(a, b) {
 function _syncOrderMarkers(target, src) {
   target.fareByType = src.fareByType || null;
   target.noSplit = !!src.noSplit;
+  target.seatCount = (src.seatCount != null) ? src.seatCount : null;
   target.waitingForRelease = !!src.waitingForRelease;
   const _was = !!target.urgent;
   target.urgent = !!src.urgent;
@@ -12960,6 +12965,7 @@ async function parsePNR() {
       selectedProposalIdx: 0,
       waitingForRelease: primary.waitingForRelease || false,
       noSplit: primary.noSplit || false,
+      seatCount: primary.seatCount != null ? primary.seatCount : null,
       urgent: primary.urgent || false,
       urgentSetAt: primary.urgent ? Date.now() : null,
       ticketSeqNote: primary.ticketSeqNote || '',
@@ -12998,6 +13004,7 @@ async function parsePNR() {
     // 生日重大异常 → 正常录入，但即时提醒并由卡片/行徽章持续标记（派生，不落库）
     const _dobIssNew = _paxDobIssues(o);
     if (_dobIssNew.length) toast('⚠ 乘客信息有误（已正常录入并标记）\n' + _dobIssNew.join('\n'));
+    if (_isSeatTight(o)) toast(`🎯 满座判定：仅 ${o.seatCount} 席 = ${(o.passengers || []).length} 人，已按整单处理（收分不标多人）`);
     // Use PNR extracted by parser if not already set from form/context
     if (!o.pnr && primary.pnr) o.pnr = primary.pnr;
     if (o.rmb && !o.usd) {
@@ -13649,8 +13656,9 @@ function renderAirlineUsdPanel(orders) {
       const dobWarnBadge = _dobIssR.length
         ? `<span class="ui-badge" style="background:var(--warning);color:#fff;border-color:var(--warning);font-size:9px;" title="${escapeAttr(_dobIssR.join('；'))}">⚠ 资料</span>`
         : '';
-      const noSplitBadge = o.noSplit
-        ? `<span class="ui-badge" style="background:var(--red);color:#fff;border-color:var(--red);font-size:9px;" title="代理标注：禁止拆单，不可拆开出票">⛔ 禁拆</span>`
+      const _tightR = _isSeatTight(o);
+      const noSplitBadge = (_tightR || o.noSplit)
+        ? `<span class="ui-badge" style="background:var(--red);color:#fff;border-color:var(--red);font-size:9px;" title="${_tightR ? `满座：仅${o.seatCount}席=乘客数，按整单处理` : '代理标注：禁止拆单，不可拆开出票'}">⛔ ${_tightR ? '满座' : '禁拆'}</span>`
         : '';
       const releaseBadge = o.waitingForRelease
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
@@ -14453,6 +14461,13 @@ function _buyDominantAirline(o) {
   return best || fallback;
 }
 
+// 满座判定（派生，不落库额外旗）：文本给出的座位数 = 当前乘客数（且≥2）
+// → 代理抢到的正是最后 N 席，按 1 个订单处理：收分不标多人、不给拆分/变种。
+// 乘客数变化后自动失效，不会留下过期死旗。
+function _isSeatTight(o) {
+  return o && o.seatCount != null && o.seatCount >= 2 && (o.passengers || []).length === o.seatCount;
+}
+
 // 儿童是否有「独立儿童运价」：有 → 儿童必须挂成人出票；没有（与成人同价或
 // 根本没分档）→ 儿童视同成人，可自由拆分。fareByType.child 存在但找不到成人
 // 参照价时保守视为独立。
@@ -14563,7 +14578,7 @@ function _buyEligibleEntries() {
     // 有独立儿童价 → 成人配对拆（-F 逻辑）；含婴儿 → 永远强约束。
     const constrained = _orderHasInfant(o) || (hasChild && _hasDistinctChildFare(o));
     const childSplit = (constrained && !o.noSplit) ? _buySplitPlan(o, usdTotal) : null;
-    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit, noSplit: !!o.noSplit });
+    entries.push({ id: o.id, al, usd: usdTotal, posted: !!(o.buyPostedAt && (Date.now() - o.buyPostedAt) < 3600000), pax: (o.passengers || []).length || 1, hasChild: constrained, childSplit, noSplit: !!o.noSplit, seatTight: _isSeatTight(o) });
   });
   return entries;
 }
@@ -14579,8 +14594,11 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
       if (k <= 0) return null;
       // 多人订单可拆卡收：标注可拆份数与人均金额
       let split = '';
-      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && !e.noSplit && (!e.hasChild || !!e.childSplit);
-      if (e.pax >= 2 && e.noSplit) {
+      const useVariant = !!(variantIdSet && variantIdSet.has(e.id)) && e.pax >= 2 && !e.noSplit && !e.seatTight && (!e.hasChild || !!e.childSplit);
+      if (e.pax >= 2 && e.seatTight) {
+        // 满座（座位数=乘客数）：按 1 个订单处理——连 (N pax) 都不标，纯一行
+        split = '';
+      } else if (e.pax >= 2 && e.noSplit) {
         // 代理标注「禁止拆单」：无条件整单，压过成人组合与配对拆
         split = ` (${e.pax} pax, no split)`;
       } else if (e.pax >= 2 && e.hasChild && !useVariant) {
@@ -14616,7 +14634,7 @@ function _buildBuyingList(onlyIdSet, variantIdSet) {
   let out = blocks.join(blocks.some(b => b.includes('\n')) ? '\n\n' : '\n');
   // 批内含可自由拆分的多人单 → 追加英文脚注，向卖家说明可按任意人数供货；
   // 全单人/全受约束批次不加。"unless marked otherwise" 兜住 no split / splits as 单。
-  if (entries.some(e => e.pax >= 2 && !e.hasChild && !e.noSplit)) {
+  if (entries.some(e => e.pax >= 2 && !e.hasChild && !e.noSplit && !e.seatTight)) {
     out += '\n\nNote: multi-pax orders can be split freely — take 1, 2, or more pax (unless marked otherwise).';
   }
   return out;
@@ -14692,6 +14710,7 @@ function _toggleBuyVariant(id, row) {
   if (!BUY_ELIGIBLE || !BUY_ELIGIBLE.has(id)) { _buyIneligibleToast(id); return; }
   const meta = BUY_META ? BUY_META.get(id) : null;
   if (!meta || meta.pax < 2) { toast('单人订单没有变种'); return; }
+  if (meta.seatTight) { toast('该单满座（座位数=乘客数），按整单处理，无拆分/变种'); return; }
   if (meta.noSplit) { toast('该单代理标注「禁止拆单」，不可拆开出票'); return; }
   if (meta.hasChild && !meta.childSplit) { toast('该单拆不了：儿童/婴儿需挂成人，当前人员结构无法成组'); return; }
   if (!BUY_VARIANT) BUY_VARIANT = new Set();
@@ -20040,6 +20059,18 @@ function closeLinkOrderDialog() {
   document.getElementById('linkOrderOverlay')?.remove();
 }
 
+// 解除满座判定：清空 seatCount（派生旗随之消失），用于代理后续放位/误判。
+function clearSeatTight(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  o.seatCount = null;
+  persistOrders();
+  renderPendingList();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  renderAirlineUsdPanel(meaningful);
+  toast('✓ 已解除满座整单判定');
+}
+
 // 手动标记/解除「禁止拆单」——给 -T 之前入库的存量单补旗，或解除误判。
 function toggleNoSplit(idx) {
   const o = STATE.orders[idx];
@@ -20530,8 +20561,16 @@ function buildCardHTML(o, idx) {
     </div>`;
   }
 
-  // ⛔ 禁止拆单横幅 — 代理标注此单不可拆开出票
-  if (o.noSplit) {
+  // 🎯 满座整单横幅 — 座位数=乘客数（派生判定，改乘客数自动失效）
+  if (_isSeatTight(o)) {
+    html += `<div style="display:flex; align-items:center; justify-content:space-between; background:var(--red-light); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm);">
+      <span style="font-size:12px; font-weight:700; color:var(--red);">🎯 满座整单 — 仅 ${o.seatCount} 席 = ${(o.passengers || []).length} 人，按 1 个订单处理（收分不标多人，无拆分）</span>
+      <button onclick="clearSeatTight(${idx})" style="background:transparent; color:var(--red); border:1px solid var(--red); padding:3px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;">✕ 解除</button>
+    </div>`;
+  }
+
+  // ⛔ 禁止拆单横幅 — 代理标注此单不可拆开出票（满座横幅优先时不重复）
+  if (o.noSplit && !_isSeatTight(o)) {
     html += `<div style="display:flex; align-items:center; justify-content:space-between; background:var(--red-light); border-left:4px solid var(--red); padding:10px 14px; margin-bottom:12px; border-radius:var(--r-sm);">
       <span style="font-size:12px; font-weight:700; color:var(--red);">⛔ 禁止拆单 — 代理标注此单不可拆开出票，收单需求按整单处理</span>
       <button onclick="toggleNoSplit(${idx})" style="background:transparent; color:var(--red); border:1px solid var(--red); padding:3px 10px; border-radius:var(--r-sm); cursor:pointer; font-size:10px; font-weight:700; white-space:nowrap;">✕ 解除</button>
