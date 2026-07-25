@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.25-AG\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.25-AH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AG</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AH</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -27054,8 +27054,12 @@ async function fbApplyRemote(remote, isInitial) {
       // 平局判云端：remote 先入座，_lastEdit 相同/缺失时保留云端版本；
       // 本地真正较新的编辑因 _lastEdit 更大仍然获胜。
       const merged = _filterTombstoned(_mergeById(remote.orders, STATE.orders, 'id', '_lastEdit'));
+      // 旧版设备贴的单经同步进来时没有 noSplit/seatCount 字段——迁移不只在启动跑，
+      // 远端合并后同样补（纯内存、不落库不推送，见 07-24 回滚事故守则）。
+      STATE.orders = merged;
+      _migrateMarkersFromRawPnr();
       // Guard: never end up with an empty work area
-      STATE.orders = merged.length ? merged : (STATE.orders.length ? STATE.orders : [newOrder()]);
+      STATE.orders = STATE.orders.length ? STATE.orders : [newOrder()];
       STATE.currentIdx = Math.min(STATE.currentIdx || 0, STATE.orders.length - 1);
       if (STATE.currentIdx < 0) STATE.currentIdx = 0;
       await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
