@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.25-AI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.25-AK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AI</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AK</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -6950,9 +6950,37 @@ function formatETADuration(ms) {
 }
 
 
+// ── _lastEdit 全量自动落章（07-25 二次回滚事故修复）────────────────────────
+// AF 将拉取侧平局改判云端后，未落章的本地编辑会被任何远端快照冲掉（活跃设备
+// 的在编内容反而脆弱）。与其在上百条编辑路径逐一补章，这里在持久化咽喉做脏检测：
+// 任何字段变化的订单在落库瞬间自动盖 _lastEdit；远端应用期间不盖（防"最后接收
+// 者赢"的时间戳通胀），仅刷新影子基线。影子 = 排除 _lastEdit 后的 JSON 快照。
+let _persistShadow = new Map();
+function _orderShadowJson(o) {
+  const c = Object.assign({}, o);
+  delete c._lastEdit;
+  return JSON.stringify(c);
+}
+function _refreshPersistShadow() {
+  _persistShadow = new Map();
+  (STATE.orders || []).forEach(o => { if (o && o.id) _persistShadow.set(o.id, _orderShadowJson(o)); });
+}
+function _stampChangedOrders() {
+  const applying = (typeof _fbApplyingRemote !== 'undefined' && _fbApplyingRemote);
+  (STATE.orders || []).forEach(o => {
+    if (!o || !o.id) return;
+    const j = _orderShadowJson(o);
+    if (_persistShadow.get(o.id) !== j) {
+      if (!applying) o._lastEdit = Date.now();
+      _persistShadow.set(o.id, j);
+    }
+  });
+}
+
 // persistOrdersNow() — immediate write for critical paths (assignment, deletion, etc.)
 async function persistOrdersNow() {
   try {
+    _stampChangedOrders();
     await storageSet('ticket-organizer-pending', {
       orders: STATE.orders,
       currentIdx: STATE.currentIdx
@@ -26716,6 +26744,7 @@ function persistOrders() {
   // Debounce to avoid excessive writes on every keystroke
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(async () => {
+    _stampChangedOrders();
     const snapshot = {
       orders: STATE.orders,
       currentIdx: STATE.currentIdx
@@ -27074,6 +27103,7 @@ async function fbApplyRemote(remote, isInitial) {
       STATE.currentIdx = Math.min(STATE.currentIdx || 0, STATE.orders.length - 1);
       if (STATE.currentIdx < 0) STATE.currentIdx = 0;
       await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
+      _refreshPersistShadow();
     }
 
     localStorage.setItem('ticket-organizer-last-update', String(remote.updatedAt || Date.now()));
@@ -27546,7 +27576,13 @@ async function importAllData(event) {
       STATE.orders = data.orders.map(o => newOrder(o));
       STATE.currentIdx = 0;
       const changed = runPendingMigrations(STATE.orders);
-      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: 0 });
+      // 恢复备份 = 用户显式的全量本地编辑：逐单盖新章（跨设备仲裁中获胜），
+      // 刷新影子基线后经落章咽喉写入。禁止 raw storageSet 直写 pending——
+      // 唯一合法写手：persistOrdersNow / persistOrders 防抖体 / fbApplyRemote 豁免直写（07-25 专项审计立约）。
+      const _restoreTs = Date.now();
+      STATE.orders.forEach(o => { if (o) o._lastEdit = _restoreTs; });
+      _refreshPersistShadow();
+      await persistOrdersNow();
       if (changed.discount || changed.cabin) toastMigrationChanges(changed);
     } else {
       STATE.orders = [newOrder()];
@@ -27775,6 +27811,7 @@ async function mergeImportData(event) {
   // 存量单标记回填：为 -T/-AC 之前入库的订单依据 rawPnr 补 noSplit/seatCount
   const _migN = _migrateMarkersFromRawPnr();
   if (_migN) toast(`♻ 已为 ${_migN} 个历史订单回填 禁拆/满座 标记（依据原文）`);
+  _refreshPersistShadow();
 
   // (Cloud sync + Gist config removed in earlier cleanup — Firebase replaces both)
   loadDeviceName();        // load this device's friendly name from localStorage
