@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.23-AE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.24-AF\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.23-AE</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.24-AF</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -7593,6 +7593,7 @@ async function _doRemoveOrder(idx) {
     toast('已清空订单');
     return;
   }
+  _recordDeletedOrderId(STATE.orders[idx] && STATE.orders[idx].id);
   STATE.orders.splice(idx, 1);
   ensureDraft();
   loadCurrToDOM();
@@ -7851,7 +7852,10 @@ async function executeBulkCancel() {
   // Splice in reverse-index order. Each splice removes one row; remaining
   // larger indices in our list are still valid because we go high→low.
   idxList.forEach(i => {
-    if (i < STATE.orders.length) STATE.orders.splice(i, 1);
+    if (i < STATE.orders.length) {
+      _recordDeletedOrderId(STATE.orders[i] && STATE.orders[i].id);
+      STATE.orders.splice(i, 1);
+    }
   });
   ensureDraft();
   loadCurrToDOM();
@@ -12370,6 +12374,7 @@ function _syncOrderMarkers(target, src) {
   const _was = !!target.urgent;
   target.urgent = !!src.urgent;
   target.urgentSetAt = target.urgent ? ((_was && target.urgentSetAt) ? target.urgentSetAt : Date.now()) : null;
+  target._lastEdit = Date.now();   // 逐单仲裁章：让本次同步在跨设备合并中获胜
 }
 
 function detectDuplicates(newOrders) {
@@ -12966,6 +12971,7 @@ async function parsePNR() {
       waitingForRelease: primary.waitingForRelease || false,
       noSplit: primary.noSplit || false,
       seatCount: primary.seatCount != null ? primary.seatCount : null,
+      _lastEdit: Date.now(),
       urgent: primary.urgent || false,
       urgentSetAt: primary.urgent ? Date.now() : null,
       ticketSeqNote: primary.ticketSeqNote || '',
@@ -13383,6 +13389,7 @@ function fixOrderAirline(orderId) {
   const code = v.trim().toUpperCase();
   if (!/^[A-Z0-9]{2}$/.test(code)) { toast('✗ 航司代码须为两位字母/数字'); return false; }
   o.airline = code;
+  o._lastEdit = Date.now();
   persistOrders();
   renderPendingList();
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
@@ -19595,6 +19602,7 @@ function toggleNoAvailability(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.noAvailability = !o.noAvailability;
+  o._lastEdit = Date.now();
   persistOrders();
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
   renderAirlineUsdPanel(meaningful);
@@ -20078,7 +20086,8 @@ function _migrateMarkersFromRawPnr() {
     }
     changed++;
   });
-  if (changed) persistOrders();
+  // 刻意不 persist：07-23 数据回滚事故根因之一——启动期写库会触发 Firebase 推送，
+  // 让陈旧设备一开机就把旧数据推上云。回填是逐设备幂等派生，待下一次真实编辑随手落库。
   return changed;
 }
 
@@ -20087,6 +20096,7 @@ function clearSeatTight(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.seatCount = null;
+  o._lastEdit = Date.now();
   persistOrders();
   renderPendingList();
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
@@ -20099,6 +20109,7 @@ function toggleNoSplit(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.noSplit = !o.noSplit;
+  o._lastEdit = Date.now();
   persistOrders();
   renderPendingList();
   const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
@@ -20111,6 +20122,7 @@ function toggleWaitingForRelease(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
   o.waitingForRelease = !o.waitingForRelease;
+  o._lastEdit = Date.now();
   persistOrders();
   // Update actions bar in place
   const actionsEl = document.getElementById(`order-actions-${idx}`);
@@ -26796,6 +26808,7 @@ let _fbWriteTimer = null;    // debounce
 let _fbApplyingRemote = false; // guard against echo loops
 let _fbLastWriteAt = 0;      // timestamp of our last write (to ignore echo)
 let _fbLastWrittenTs = 0;    // exact updatedAt we last wrote (precise echo guard)
+let _fbInitialPullDone = false;  // 首拉闸门：完成首次云端拉取前禁止推送（防陈旧设备开机清洗云端）
 
 function loadFbConfig() {
   // Prefer user-overridden config in localStorage (for advanced users who
@@ -26888,12 +26901,15 @@ async function fbInit() {
     if (snap.exists()) {
       const remote = snap.data();
       await fbApplyRemote(remote, /* isInitial */ true);
+      _fbInitialPullDone = true;
     } else {
       // First time — push current local state
+      _fbInitialPullDone = true;
       await fbPushNow();
     }
   } catch(e) {
     console.warn('Firebase initial pull failed:', e);
+    _fbInitialPullDone = true;  // 离线也放行后续推送：fbPushNow 自带读-合并-写兜底
   }
 
   // Subscribe to live changes
@@ -26922,6 +26938,21 @@ async function fbInit() {
 // This is the core anti-data-loss primitive. Multiple devices each ticketing
 // concurrently will have their records combined rather than overwriting.
 // ─────────────────────────────────────────────────────────────────────────────
+// 删除墓碑：被删订单的 id 永久登记（封顶800），两侧合并后过滤，杜绝"删了又复活"。
+function _recordDeletedOrderId(id) {
+  if (!id) return;
+  if (!Array.isArray(settings.deletedOrderIds)) settings.deletedOrderIds = [];
+  if (settings.deletedOrderIds.includes(id)) return;
+  settings.deletedOrderIds.push(id);
+  if (settings.deletedOrderIds.length > 800) settings.deletedOrderIds = settings.deletedOrderIds.slice(-800);
+  storageSet('ticket-organizer-settings', settings);
+}
+function _filterTombstoned(list) {
+  const t = new Set(settings.deletedOrderIds || []);
+  if (!t.size) return Array.isArray(list) ? list : [];
+  return (Array.isArray(list) ? list : []).filter(o => !o || !o.id || !t.has(o.id));
+}
+
 function _mergeById(local, remote, keyField, tsField) {
   local  = Array.isArray(local)  ? local  : [];
   remote = Array.isArray(remote) ? remote : [];
@@ -26967,6 +26998,7 @@ async function fbApplyRemote(remote, isInitial) {
       if (r.cardholders)      settings.cardholders      = _mergeById(settings.cardholders,      r.cardholders,      'id', null);
       if (r.knownPax)         settings.knownPax         = _mergeUniqueStrings(settings.knownPax, r.knownPax);
       if (r.knownCards)       settings.knownCards       = _mergeUniqueStrings(settings.knownCards, r.knownCards);
+      if (r.deletedOrderIds)  settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, r.deletedOrderIds).slice(-800);
       if (r.actions)          settings.actions          = _mergeById(settings.actions,          r.actions,          'id', null);
       if (r.discountRules)    settings.discountRules    = _mergeById(settings.discountRules,    r.discountRules,    'id', null);
       if (r.productDiscounts) settings.productDiscounts = _mergeById(settings.productDiscounts, r.productDiscounts, 'id', null);
@@ -26997,7 +27029,9 @@ async function fbApplyRemote(remote, isInitial) {
     // ── pending (work-in-progress drafts): merge by id too, so a draft being
     //    edited on device A isn't wiped by device B's push. ──
     if (remote.orders && Array.isArray(remote.orders)) {
-      const merged = _mergeById(STATE.orders, remote.orders, 'id', '_lastEdit');
+      // 平局判云端：remote 先入座，_lastEdit 相同/缺失时保留云端版本；
+      // 本地真正较新的编辑因 _lastEdit 更大仍然获胜。
+      const merged = _filterTombstoned(_mergeById(remote.orders, STATE.orders, 'id', '_lastEdit'));
       // Guard: never end up with an empty work area
       STATE.orders = merged.length ? merged : (STATE.orders.length ? STATE.orders : [newOrder()]);
       STATE.currentIdx = Math.min(STATE.currentIdx || 0, STATE.orders.length - 1);
@@ -27035,6 +27069,7 @@ function _mergeUniqueStrings(local, remote) {
 
 function fbScheduleWrite() {
   if (!_fb || _fbApplyingRemote) return;
+  if (!_fbInitialPullDone) return;   // 首拉未完成 → 不推（闸门）
   if (_fbWriteTimer) clearTimeout(_fbWriteTimer);
   _fbWriteTimer = setTimeout(() => fbPushNow(), 800);  // 800ms debounce
 }
@@ -27069,12 +27104,13 @@ async function fbPushNow() {
     settings.operators        = _mergeById(settings.operators,        cloudSettings.operators,        'id', null);
     settings.knownPax         = _mergeUniqueStrings(settings.knownPax,    cloudSettings.knownPax);
     settings.knownCards       = _mergeUniqueStrings(settings.knownCards,  cloudSettings.knownCards);
+    settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, cloudSettings.deletedOrderIds).slice(-800);
     if (Array.isArray(cloudSettings.presetAgents)) {
       settings.presetAgents   = _mergeUniqueStrings(settings.presetAgents, cloudSettings.presetAgents);
     }
 
     // Pending drafts: merge by id as well
-    const mergedOrders = _mergeById(STATE.orders, cloudOrders, 'id', '_lastEdit');
+    const mergedOrders = _filterTombstoned(_mergeById(STATE.orders, cloudOrders, 'id', '_lastEdit'));
 
     // Persist the merged result locally too (keeps local == cloud)
     await storageSet('ticket-organizer-settings', settings);
