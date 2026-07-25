@@ -1234,7 +1234,7 @@ textarea.raw-input:focus {
   .header-top { gap: 4px; flex-direction: column; align-items: stretch; }
   .header-bottom { display: none !important; } /* hide world clocks + maintenance button on phones */
   #worldClocks { display: none !important; }   /* belt-and-braces */
-  .brand h1 { font-size: 19px; }
+  .brand h1 { font-size: 20px; }
   .brand .zh { font-size: 11px; }
 
   /* Header meta → single compact row on mobile */
@@ -1560,7 +1560,7 @@ textarea.raw-input:focus {
   /* USD row even tighter */
   .airline-usd-row { font-size: 10.5px; padding: 7px 8px; gap: 3px; }
   /* Tab count badge tiny */
-  .tab .count { font-size: 8.5px; padding: 1px 4px; }
+  .tab .count { font-size: 9px; padding: 1px 4px; }
 }
 
 
@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.25-AH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.25-AI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AH</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AI</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5500,7 +5500,7 @@ input[type="text"], input[type="number"], textarea {
   top: 2px; right: 2px; z-index: 6;
   display: inline-flex; align-items: center;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 8.5px; font-weight: 800; letter-spacing: .03em;
+  font-size: 9px; font-weight: 800; letter-spacing: .03em;
   line-height: 1.35; white-space: nowrap;
   color: #fff; padding: 1px 6px; border-radius: 3px 5px 3px 7px;
   background: linear-gradient(110deg, #7c3aed, #a855f7 45%, #7c3aed 90%);
@@ -13380,6 +13380,17 @@ function _renderPreviewNow() {
 // Full list of pending orders, for pending tab
 // Simple one-line-per-order USD list for pending orders.
 // Format: 订单 #N · 航司 · N人 · $金额
+// 行徽章封顶：最多展示 4 枚（按传入优先级），其余折叠为 +N（悬停列出全部）。
+// 解决二十余种徽章并存时挤爆姓名行的问题；优先级=身份(表Y)>安全旗>状态旗>资讯>历史。
+function _capRowBadges(badges, max = 4) {
+  const list = (badges || []).filter(b => typeof b === 'string' && b.trim());
+  if (list.length <= max) return list.join('');
+  const shown = list.slice(0, max).join('');
+  const hidden = list.slice(max);
+  const labels = hidden.map(h => { const m = h.match(/>([^<>]+)</); return m ? m[1].trim() : ''; }).filter(Boolean).join(' · ');
+  return shown + `<span class="ui-badge" style="font-size:9px;cursor:default;opacity:0.8;" title="其余标记：${escapeAttr(labels)}">+${hidden.length}</span>`;
+}
+
 // 快速修正未识别航司：弹窗输入两位代码，落库并全量刷新（分组/收分/卡片徽章同步）。
 function fixOrderAirline(orderId) {
   const o = (STATE.orders || []).find(x => x && x.id === orderId);
@@ -13752,7 +13763,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${tableYBadge}${historyBadge}${imminentBadge}${blacklistBadge}${mixedBadge}${aiRowBadge}${dobWarnBadge}${noSplitBadge}${releaseBadge}${noAvailBadge}${basicFareBadge}${seqNoteBadge}${linkedBadge}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${_capRowBadges([tableYBadge, noSplitBadge, releaseBadge, noAvailBadge, dobWarnBadge, blacklistBadge, imminentBadge, mixedBadge, aiRowBadge, basicFareBadge, seqNoteBadge, linkedBadge, historyBadge])}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
