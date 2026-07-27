@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.27-AL\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.27-AM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.27-AL</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.27-AM</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -18778,8 +18778,11 @@ function normalizePaxName(raw) {
 // every keystroke). Require ≥2 tokens AND ≥6 characters total.
 function isNameQueryable(normalized) {
   if (!normalized) return false;
-  const tokens = normalized.split(' ').filter(t => t.length >= 2);
-  return tokens.length >= 2 && normalized.replace(/\s/g, '').length >= 6;
+  // ≥2 个词、每词 ≥2 字母即可查询。旧规则另设总长 ≥6 地板，会系统性跳过
+  // 常见中文拼音名（ZHU YU / LI NA / HE YU 均为真实旅客名）→ 合规空洞，已移除。
+  // 每词 ≥2 + 双词的要求仍能挡住输入中的碎片（如 "ZHU Y"）。
+  const tokens = normalized.split(' ').filter(Boolean);
+  return tokens.length >= 2 && tokens.every(t => t.length >= 2);
 }
 
 // Trigger a sanctions check for one passenger name. Debounced.
@@ -19588,7 +19591,10 @@ function updateOrderOFACBanner(orderId) {
 function buildOFACInlineChip(rawName) {
   const status = getOFACStatus(rawName);
   if (!status.key) return '';
-  if (!isNameQueryable(status.key)) return '';   // single-token name: skip silently
+  if (!isNameQueryable(status.key)) {
+    // 不可查姓名（单词等）：灰色占位标而非留白——P 行始终有 OFAC 状态可见。
+    return `<span class="ofac-inline-chip" data-ofac-name="${escapeAttr(status.key)}" style="display:inline-flex; align-items:center; padding:1px 7px; margin-left:8px; border-radius:10px; font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:0.04em; vertical-align:middle; white-space:nowrap; background:rgba(12,27,42,0.04); color:var(--muted); border:1px dashed var(--line-strong);" title="姓名过短未查询 OFAC（补全姓名后自动比对）">– OFAC</span>`;
+  }
   const base = 'display:inline-flex; align-items:center; gap:3px; padding:1px 7px; margin-left:8px; border-radius:10px; font-family:"JetBrains Mono",monospace; font-size:9.5px; font-weight:700; letter-spacing:0.04em; vertical-align:middle; white-space:nowrap;';
   if (status.state === 'checking') {
     return `<span class="ofac-inline-chip" data-ofac-name="${escapeAttr(status.key)}" style="${base} background:rgba(43,76,126,0.10); color:var(--blue); border:1px solid rgba(43,76,126,0.25);" title="正在比对 OFAC 制裁名单…">
