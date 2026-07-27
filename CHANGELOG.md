@@ -1,3 +1,13 @@
+## 2026-07-27 — OFAC 人工放行完全体：跨设备同步 + 时间戳 + 撤销传播 · v26.07.27-AL
+
+用户要求增加 OFAC 人工 clear。现状勘察：确认/撤销/拦截豁免/绿条计数的骨架已存在，但**只存 localStorage（本机）、无时间戳**——多设备工作流下等于没有。本版补全：①存储迁至 `settings.ofacConfirmed = {key: 时间戳}`（正=放行时刻、负=撤销时刻），随 settings 走 Firebase 同步；②双侧合并新增 _mergeOfacConfirmed——**每键取绝对值更大者**，撤销也能跨设备传播、旧值不倒灌；③确认条显示「人工放行于 MM-DD HH:mm」（审计可视）；④撤销加 toast；⑤遗留 localStorage 记录启动一次性吸收进 settings 并删除旧键；⑥确认弹窗文案改为"将同步到所有设备并记录放行时间戳"。出票拦截豁免、绿条"N 名匹配后已人工确认"计数沿用既有逻辑自动受益。STATE.ofacConfirmed 全文清零断言。
+
+**测试**：ofac_test 7 项（遗留吸收/放行态含时刻/撤销负值/再放行/合并三律，夹具键经 normalizePaxName 规范化）+ 27 文件全量回归全绿。
+
+**改动位置**：getOFACStatus；confirmOFACClear/confirmOFACForOrder/unconfirmOFAC；loadOFACConfirmations 重写；_mergeOfacConfirmed 与双侧 settings 合并；确认条时刻。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-25 — 复检：同步完整性专项全绿，堵住备份恢复野路子写手 · v26.07.25-AK
 
 用户要求再检测。基础卫生全绿（语法基线一致/console.log·debugger·TODO·重复函数·真死函数全零/27,886 行 1.31MB）。**新增同步完整性专项**（AF/AJ 仲裁链逐环审计）：落章咽喉 2/2、影子刷新 2/2、首拉闸门置位 3+守卫 1、墓碑登记 2+过滤 2+settings 同步 2、合并方向拉取 remote 先/推送 local 先、_lastEdit 章 7 处、迁移纯度 0 persist、applying 旗配对正常（计数含声明行）。**唯一发现并已修**：`importAllData`（JSON 备份恢复）raw 直写 pending——无章无影子，恢复的数据一同步反而会被云端平局冲掉（恢复等于白恢复）。修复语义：恢复=用户显式全量本地编辑 → 逐单盖新章（仲裁获胜）→ 刷影子基线 → 经 persistOrdersNow 咽喉写入。**立约（可审计不变量）**：pending 键唯一合法写手 = persistOrdersNow / persistOrders 防抖体 / fbApplyRemote 豁免直写，共 3 处——本版起复检脚本以 `grep -c = 3` 把关。

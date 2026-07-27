@@ -2983,10 +2983,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.25-AK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.27-AL\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.25-AK</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.27-AL</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -18760,7 +18760,6 @@ function passesSharedTokenGate(queryNormalized, ofacName) {
 // In-memory cache: key = normalized name, value = { state, results, checkedAt, error }
 // state ∈ { 'idle' | 'checking' | 'clear' | 'match' | 'error' }
 if (!STATE.ofacCache) STATE.ofacCache = {};
-if (!STATE.ofacConfirmed) STATE.ofacConfirmed = {};   // { 'normalized name': true }
 const _ofacDebounce = new Map();   // name → timeout id
 
 // Normalize a PNR-format name "QIU/XIAOGANG" or "MADURO MOROS/NICOLAS" to
@@ -18898,16 +18897,18 @@ function getOFACStatus(rawName) {
   const key = normalizePaxName(rawName);
   if (!key) return { key: '', state: 'idle', results: [], confirmed: false };
   const cached = STATE.ofacCache[key] || { state: 'idle', results: [], checkedAt: 0 };
-  const confirmed = !!STATE.ofacConfirmed[key];
-  return { ...cached, key, confirmed };
+  const ts = ((settings.ofacConfirmed || {})[key]) || 0;   // 正=人工放行时刻，负=撤销时刻
+  const confirmed = ts > 0;
+  return { ...cached, key, confirmed, confirmedAt: confirmed ? ts : 0 };
 }
 
 // Persist user's confirmation that a flagged name is NOT the sanctioned person.
 function confirmOFACClear(rawName) {
   const key = normalizePaxName(rawName);
   if (!key) return;
-  STATE.ofacConfirmed[key] = true;
-  try { localStorage.setItem('to-ofac-confirmed', JSON.stringify(STATE.ofacConfirmed)); } catch(e) {}
+  settings.ofacConfirmed = settings.ofacConfirmed || {};
+  settings.ofacConfirmed[key] = Date.now();
+  storageSet('ticket-organizer-settings', settings);   // 随 settings 同步到所有设备
   renderPassengers();
   renderPreview();
 }
@@ -18931,15 +18932,17 @@ function confirmOFACForOrder(payloadEncoded, orderId) {
   const msg =
     `确认以下 ${normalizedNames.length} 名乘客均非制裁名单中的同名人员？\n\n` +
     `${namesList}\n\n` +
-    `此操作记录到本机器，下次进入此订单不再提示警告。\n` +
+    `此操作将同步到所有设备并记录放行时间戳。\n` +
     `误确认可能违反 OFAC 法规 — 请确实完成官网核验后再点击。`;
   if (!confirm(msg)) return;
 
   // Mark all as confirmed
+  settings.ofacConfirmed = settings.ofacConfirmed || {};
+  const _clearTs = Date.now();
   normalizedNames.forEach(key => {
-    if (key) STATE.ofacConfirmed[key] = true;
+    if (key) settings.ofacConfirmed[key] = _clearTs;
   });
-  try { localStorage.setItem('to-ofac-confirmed', JSON.stringify(STATE.ofacConfirmed)); } catch(e) {}
+  storageSet('ticket-organizer-settings', settings);
 
   // Update the affected order's banner + inline chips in-place (no full re-render
   // jitter). If we're on the new-order entry panel for this same order, also
@@ -18961,18 +18964,30 @@ function confirmOFACForOrder(payloadEncoded, orderId) {
 function unconfirmOFAC(rawName) {  // eslint-disable-line no-unused-vars
   const key = normalizePaxName(rawName);
   if (!key) return;
-  delete STATE.ofacConfirmed[key];
-  try { localStorage.setItem('to-ofac-confirmed', JSON.stringify(STATE.ofacConfirmed)); } catch(e) {}
+  settings.ofacConfirmed = settings.ofacConfirmed || {};
+  settings.ofacConfirmed[key] = -Date.now();   // 负值=撤销记录，跨设备传播且按绝对值新者胜
+  storageSet('ticket-organizer-settings', settings);
   renderPassengers();
   renderPreview();
+  toast('已撤销该姓名的人工放行');
 }
 
-// Load persisted confirmations once at startup
+// 遗留吸收：v-AL 前的人工放行存在 localStorage（仅本机）。启动时一次性并入
+// settings.ofacConfirmed（缺席才补，时间戳记为吸收时刻）并删除旧键，从此随云同步。
 function loadOFACConfirmations() {
+  settings.ofacConfirmed = (settings.ofacConfirmed && typeof settings.ofacConfirmed === 'object') ? settings.ofacConfirmed : {};
   try {
     const raw = localStorage.getItem('to-ofac-confirmed');
-    if (raw) STATE.ofacConfirmed = JSON.parse(raw) || {};
-  } catch(e) { STATE.ofacConfirmed = {}; }
+    if (raw) {
+      const legacy = JSON.parse(raw) || {};
+      let absorbed = 0;
+      Object.keys(legacy).forEach(k => {
+        if (legacy[k] && !settings.ofacConfirmed[k]) { settings.ofacConfirmed[k] = Date.now(); absorbed++; }
+      });
+      localStorage.removeItem('to-ofac-confirmed');
+      if (absorbed) storageSet('ticket-organizer-settings', settings);
+    }
+  } catch(e) {}
 }
 
 // Build the warning bar HTML shown beneath a passenger name input.
@@ -19331,7 +19346,7 @@ function buildOFACWarningHTML(rawName, paxIdx) {
 
   if (status.confirmed) {
     return `<div class="ofac-bar ofac-confirmed" style="margin-top:6px; padding:6px 10px; background:rgba(46,125,82,0.07); border:1px solid rgba(46,125,82,0.3); border-radius:var(--r-sm); font-size:11px; color:var(--ink); display:flex; align-items:center; justify-content:space-between; gap:8px;">
-      <span><span style="color:var(--green); font-weight:700;">✓ 已确认非制裁人员</span> · ${status.results.length} 条匹配已忽略</span>
+      <span><span style="color:var(--green); font-weight:700;">✓ 已确认非制裁人员</span> · ${status.results.length} 条匹配已忽略${status.confirmedAt ? ` · <span style="color:var(--muted);">人工放行于 ${new Date(status.confirmedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>` : ''}</span>
       <button class="btn ghost small" style="padding:2px 8px; font-size:10px;" onclick="unconfirmOFAC(curr().passengers[${paxIdx}].name)">撤销</button>
     </div>`;
   }
@@ -27061,6 +27076,7 @@ async function fbApplyRemote(remote, isInitial) {
       if (r.knownPax)         settings.knownPax         = _mergeUniqueStrings(settings.knownPax, r.knownPax);
       if (r.knownCards)       settings.knownCards       = _mergeUniqueStrings(settings.knownCards, r.knownCards);
       if (r.deletedOrderIds)  settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, r.deletedOrderIds).slice(-800);
+      if (r.ofacConfirmed)    settings.ofacConfirmed    = _mergeOfacConfirmed(settings.ofacConfirmed, r.ofacConfirmed);
       if (r.actions)          settings.actions          = _mergeById(settings.actions,          r.actions,          'id', null);
       if (r.discountRules)    settings.discountRules    = _mergeById(settings.discountRules,    r.discountRules,    'id', null);
       if (r.productDiscounts) settings.productDiscounts = _mergeById(settings.productDiscounts, r.productDiscounts, 'id', null);
@@ -27122,6 +27138,16 @@ async function fbApplyRemote(remote, isInitial) {
 }
 
 // Merge two string arrays, dedup, preserve order (local first).
+// OFAC 人工放行合并：每键取 |时间戳| 更大者（正=放行、负=撤销，撤销也能跨设备传播）。
+function _mergeOfacConfirmed(a, b) {
+  const out = Object.assign({}, a || {});
+  Object.keys(b || {}).forEach(k => {
+    const av = out[k] || 0, bv = b[k] || 0;
+    if (Math.abs(bv) > Math.abs(av)) out[k] = bv;
+  });
+  return out;
+}
+
 function _mergeUniqueStrings(local, remote) {
   local  = Array.isArray(local)  ? local  : [];
   remote = Array.isArray(remote) ? remote : [];
@@ -27172,6 +27198,7 @@ async function fbPushNow() {
     settings.knownPax         = _mergeUniqueStrings(settings.knownPax,    cloudSettings.knownPax);
     settings.knownCards       = _mergeUniqueStrings(settings.knownCards,  cloudSettings.knownCards);
     settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, cloudSettings.deletedOrderIds).slice(-800);
+    settings.ofacConfirmed    = _mergeOfacConfirmed(settings.ofacConfirmed, cloudSettings.ofacConfirmed);
     if (Array.isArray(cloudSettings.presetAgents)) {
       settings.presetAgents   = _mergeUniqueStrings(settings.presetAgents, cloudSettings.presetAgents);
     }
