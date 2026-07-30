@@ -254,6 +254,17 @@ button:disabled, .btn:disabled, button[disabled], .btn[disabled] {
 }
 
 /* Toast entrance — slide down + fade */
+/* ── 环境放松层：航班天气 / 出票彩带 / 清零白鸽（尊重 prefers-reduced-motion）── */
+@keyframes fxDrift {
+  from { transform: translateX(-8vw) translateY(0) rotate(4deg); }
+  50%  { transform: translateX(46vw) translateY(-14px) rotate(-3deg); }
+  to   { transform: translateX(108vw) translateY(0) rotate(4deg); }
+}
+@keyframes fxFall {
+  0%   { transform: translateY(-4vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(62vh) rotate(340deg); opacity: 0; }
+}
+
 @keyframes toastIn {
   from { opacity: 0; transform: translate(-50%, -16px); }
   to   { opacity: 1; transform: translate(-50%, 0); }
@@ -2983,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.27-AM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.30-AN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.27-AM</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AN</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15053,7 +15064,96 @@ async function aiTicketingAdvice() {
   if (btn) { btn.disabled = false; btn.textContent = '🤖 AI深度分析'; }
 }
 
+// ══ 环境放松层 ═══════════════════════════════════════════════════════════
+// 「航班天气」：待出订单越多，底部漂过的小纸飞机越多（封顶4架，pointer-events
+// 穿透不挡操作）；清零时化作一只白鸽。出票瞬间彩带迸发，全部清空大庆。
+// 尊重 prefers-reduced-motion；🎐 角标可关，偏好存 settings 随云同步。
+function _fxBucket(n) {
+  if (n <= 0) return 0;        // zen：白鸽
+  if (n <= 3) return 1;
+  if (n <= 7) return 2;
+  if (n <= 12) return 3;
+  return 4;
+}
+function _fxEnabled() {
+  if (settings.ambientFx === false) return false;
+  const rm = (typeof matchMedia === 'function') && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return !rm;
+}
+function _ensureFxLayer() {
+  let el = document.getElementById('ambientFxLayer');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ambientFxLayer';
+    el.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:5; overflow:hidden;';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function renderAmbientFx() {
+  if (typeof document === 'undefined') return;
+  const layer = _ensureFxLayer();
+  if (!_fxEnabled()) { if (layer.dataset.bucket !== 'off') { layer.innerHTML = _fxToggleChip(false); layer.dataset.bucket = 'off'; } return; }
+  const n = STATE.orders.filter(o => isMeaningfulOrder(o)).length;
+  const bucket = _fxBucket(n);
+  if (layer.dataset.bucket === String(bucket)) return;   // 桶未变不重建（防动画重启抖动）
+  layer.dataset.bucket = String(bucket);
+  const dur = [40, 26, 22, 18, 15][bucket];
+  let html = '';
+  if (bucket === 0) {
+    html += `<span style="position:absolute; bottom:36px; left:0; font-size:20px; opacity:0.5; animation:fxDrift ${dur}s linear infinite;">🕊️</span>`;
+  } else {
+    const bottoms = [10, 30, 50, 70];
+    for (let i = 0; i < bucket; i++) {
+      html += `<span style="position:absolute; bottom:${bottoms[i]}px; left:0; font-size:18px; opacity:0.42; animation:fxDrift ${dur}s linear infinite; animation-delay:-${(dur / bucket) * i}s;">✈️</span>`;
+    }
+  }
+  layer.innerHTML = html + _fxToggleChip(true);
+}
+function _fxToggleChip(on) {
+  return `<button onclick="toggleAmbientFx()" title="${on ? '关闭' : '开启'}放松动画（航班天气/出票彩带）" style="position:absolute; bottom:8px; right:10px; pointer-events:auto; background:transparent; border:none; cursor:pointer; font-size:14px; opacity:${on ? 0.4 : 0.25}; padding:2px;">🎐</button>`;
+}
+function toggleAmbientFx() {
+  settings.ambientFx = settings.ambientFx === false ? true : false;
+  storageSet('ticket-organizer-settings', settings);
+  const layer = document.getElementById('ambientFxLayer');
+  if (layer) layer.dataset.bucket = '__reset__';
+  renderAmbientFx();
+  toast(settings.ambientFx === false ? '🎐 放松动画已关闭' : '🎐 放松动画已开启');
+}
+function _fxBurst(emojis, count) {
+  if (!_fxEnabled() || typeof document === 'undefined') return;
+  const layer = _ensureFxLayer();
+  const frag = document.createElement('div');
+  frag.style.cssText = 'position:absolute; inset:0; pointer-events:none;';
+  let html = '';
+  for (let i = 0; i < count; i++) {
+    const e = emojis[i % emojis.length];
+    const left = 6 + Math.random() * 88;
+    const dur = 1.1 + Math.random() * 0.7;
+    const delay = Math.random() * 0.25;
+    const size = 14 + Math.random() * 12;
+    html += `<span style="position:absolute; top:0; left:${left}vw; font-size:${size}px; animation:fxFall ${dur}s ease-in ${delay}s forwards; opacity:0;">${e}</span>`;
+  }
+  frag.innerHTML = html;
+  layer.appendChild(frag);
+  setTimeout(() => { frag.remove(); }, 2400);
+}
+function celebrateTicketed() {
+  _fxBurst(['🎉', '✨', '🎫', '✈️'], 14);
+}
+function celebrateAllClear() {
+  _fxBurst(['🕊️', '✨', '🎉'], 22);
+  toast('🕊️ 待出清零 — 辛苦了，歇一会儿');
+}
+function _fxAfterTicketing() {
+  celebrateTicketed();
+  if (!STATE.orders.some(o => isMeaningfulOrder(o))) celebrateAllClear();
+  renderAmbientFx();
+}
+
 function renderPendingList() {
+  renderAmbientFx();
   const area = document.getElementById('pendingArea');
   if (!area) return;
 
@@ -22049,6 +22149,7 @@ async function markAllTicketed() {
     settings.ticketed.unshift(entry);
   });
   await storageSet('ticket-organizer-settings', settings);
+  _fxAfterTicketing();
 
   // SAFETY: cloud push handles persistence. Local rolling backups disabled
   // to conserve localStorage quota (was ~4 MB for 5 snapshots).
@@ -22499,6 +22600,7 @@ async function submitManualTicket(btn) {
   settings.ticketed = settings.ticketed || [];
   settings.ticketed.unshift(entry);
   await storageSet('ticket-organizer-settings', settings);
+  _fxAfterTicketing();
 
   btn.closest('.verify-modal-overlay').remove();
   renderTicketed();
@@ -25965,6 +26067,7 @@ async function doMarkTicketed(idx) {
     settings.ticketed = settings.ticketed || [];
     settings.ticketed.unshift(entry);
     await storageSet('ticket-organizer-settings', settings);
+    _fxAfterTicketing();
 
     // Refresh billing badge (new ticketed order = new unsettled item)
     if (typeof renderBillingPanel === 'function') {
