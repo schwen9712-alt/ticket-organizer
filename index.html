@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.30-AO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.30-AP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AO</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AP</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3446,6 +3446,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         </div>
         <button class="btn small" id="buyingListBtn" onclick="copyBuyingList()" title="第一次点：高亮全部待收订单进入选择模式；点订单行可取消/恢复；再点按钮确认复制">📋 收单需求</button>
         <button class="btn small ghost" id="buyMaxBtn" onclick="toggleBuyMax()" title="MAX 拆单模式：默认整单收分；紧急收不到分时一键开启——多人单标注全部可拆档位/组合/脚注">⚡MAX</button>
+        <button class="btn small ghost" onclick="openPackingDialog()" title="配账结算：未分配订单 × 卡主积分额度 → 计算最贴近的订单组合，一键分配">🧮 配账</button>
         <button id="bulkModeToggle" onclick="toggleBulkMode()"
           title="进入批量操作模式：勾选多个订单后一次性撤单"
           style="padding:5px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font-size:11.5px;background:#fff;color:var(--ink);cursor:pointer;font-family:inherit;font-weight:600;">📋 批量</button>
@@ -15063,6 +15064,189 @@ async function aiTicketingAdvice() {
   // above: a render hiccup must not overwrite a successful analysis with an error.
   try { if (typeof renderPendingList === 'function') renderPendingList(); } catch (e) {}
   if (btn) { btn.disabled = false; btn.textContent = '🤖 AI深度分析'; }
+}
+
+// ══ 🧮 配账结算（订单⇄账户装箱）══════════════════════════════════════════
+// A 段=未分配订单 USD；B 段=卡主积分额度（settings.pointsPerUsd 分=$1，默认100）。
+// 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
+// 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
+// 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
+function _packEnumerate(items, capUsd, allowOver) {
+  // items: [{i, usd}] ≤20；返回可行组合列表（未排序）
+  const n = items.length;
+  const out = [];
+  for (let mask = 1; mask < (1 << n); mask++) {
+    let sum = 0;
+    for (let b = 0; b < n; b++) if (mask & (1 << b)) sum += items[b].usd;
+    if (sum <= capUsd + allowOver) {
+      out.push({ mask, sum, count: mask.toString(2).replace(/0/g, '').length, over: Math.max(0, sum - capUsd) });
+    }
+  }
+  return out;
+}
+function _packRank(combos, capUsd, sortMode) {
+  const arr = combos.slice();
+  if (sortMode === 'fewest') {
+    arr.sort((a, b) => a.count - b.count || Math.abs(capUsd - a.sum) - Math.abs(capUsd - b.sum));
+  } else {
+    arr.sort((a, b) => Math.abs(capUsd - a.sum) - Math.abs(capUsd - b.sum) || a.count - b.count);
+  }
+  return arr;
+}
+function _packMulti(items, accounts, allowOver) {
+  // FFD：订单降序，逐一放入「剩余额度最大且放得下(含允许超额)」的账户
+  const accs = accounts.map(a => ({ ...a, used: 0, picks: [] }));
+  const rest = [];
+  items.slice().sort((a, b) => b.usd - a.usd).forEach(it => {
+    let best = null;
+    accs.forEach(a => {
+      const remain = a.capUsd - a.used;
+      if (it.usd <= remain + allowOver && (!best || remain > (best.capUsd - best.used))) best = a;
+    });
+    if (best) { best.picks.push(it); best.used += it.usd; }
+    else rest.push(it);
+  });
+  return { accs, rest };
+}
+let _PACK_CTX = null;
+function openPackingDialog() {
+  const unassigned = STATE.orders
+    .map((o, idx) => ({ o, idx }))
+    .filter(x => isMeaningfulOrder(x.o) && !x.o.cardholderId && x.o.tableLabel !== 'G');
+  if (!unassigned.length) { toast('没有未分配卡主的待出订单'); return; }
+  if (typeof settings.pointsPerUsd !== 'number' || !(settings.pointsPerUsd > 0)) settings.pointsPerUsd = 100;
+  const items = unassigned.map(x => ({
+    idx: x.idx, id: x.o.id,
+    label: `#${x.idx + 1} ${((x.o.passengers || [])[0] || {}).name || '—'} ${x.o.airline || ''}`,
+    usd: Math.round((_orderUsd(x.o) || 0)),
+    on: true
+  })).filter(it => it.usd > 0);
+  const accounts = (settings.cardholders || []).map(c => ({
+    id: c.id, name: `${c.channel || ''} ${c.name || ''}`.trim(),
+    points: Number(c.pointsBalance) || 0
+  }));
+  _PACK_CTX = { items, accounts, mode: 'single', sort: 'closest', allowOver: 100, warnPct: 1, targetId: (accounts.find(a => a.points > 0) || accounts[0] || {}).id || null };
+  _renderPackingDialog();
+}
+function _renderPackingDialog(results) {
+  const C = _PACK_CTX;
+  const ppu = settings.pointsPerUsd;
+  const fmt = (n) => Math.round(n).toLocaleString('zh-CN');
+  const itemsHtml = C.items.map((it, i) => `
+    <div style="display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px;">
+      <input type="checkbox" ${it.on ? 'checked' : ''} onchange="_PACK_CTX.items[${i}].on=this.checked">
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(it.label)}</span>
+      <strong style="font-family:'JetBrains Mono',monospace;">$${fmt(it.usd)}</strong>
+    </div>`).join('');
+  const accOptions = C.accounts.map(a => `<option value="${escapeAttr(a.id)}" ${a.id === C.targetId ? 'selected' : ''}>${escapeHtml(a.name || '未命名')} · ${fmt(a.points)} 分 ≈ $${fmt(a.points / ppu)}</option>`).join('');
+  const accEdit = C.accounts.map((a, i) => `
+    <div style="display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px;">
+      <span style="flex:1;">${escapeHtml(a.name || '未命名')}</span>
+      <input type="number" value="${a.points}" style="width:110px; text-align:right;" oninput="_PACK_CTX.accounts[${i}].points=Number(this.value)||0"> 分
+      <span style="color:var(--muted); width:70px; text-align:right;">≈$${fmt(a.points / ppu)}</span>
+    </div>`).join('');
+  let resHtml = '';
+  if (results && C.mode === 'single') {
+    const cap = results.capUsd;
+    resHtml = results.list.length ? results.list.slice(0, 10).map((r, ri) => {
+      const names = C.enabled.filter((_, b) => r.mask & (1 << b)).map(it => escapeHtml(it.label)).join('、');
+      const warn = r.over >= cap * C.warnPct / 100;
+      return `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px; ${warn ? 'border-color:var(--warning);' : ''}">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <strong style="font-family:'JetBrains Mono',monospace;">$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单</strong>
+          <button class="btn small" onclick="applyPackingCombo(${ri})">应用此组合 →</button>
+        </div>
+        <div style="color:var(--muted); margin-top:3px;">${names}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--muted); font-size:12px; margin-top:8px;">没有可行组合（额度太小或订单太大）</div>';
+  }
+  if (results && C.mode === 'multi') {
+    resHtml = results.accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
+      <strong>${escapeHtml(a.name || '未命名')}</strong> · $${fmt(a.used)} / $${fmt(a.capUsd)}
+      <div style="color:var(--muted); margin-top:3px;">${a.picks.map(p => escapeHtml(p.label)).join('、') || '—'}</div>
+    </div>`).join('') + (results.rest.length ? `<div style="color:var(--warning-deep); font-size:12px; margin-top:6px;">放不下：${results.rest.map(p => escapeHtml(p.label)).join('、')}</div>` : '') +
+    `<div style="text-align:right; margin-top:8px;"><button class="btn small" onclick="applyPackingMulti()">全部应用 →</button></div>`;
+  }
+  const old = document.getElementById('packingOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'packingOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:640px; max-height:86vh; overflow:auto;">
+    <div class="verify-modal-header"><h3>🧮 配账结算</h3><button onclick="document.getElementById('packingOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">A 段=未分配订单 · B 段=卡主积分额度（<input type="number" value="${ppu}" style="width:56px; text-align:right;" oninput="settings.pointsPerUsd=Number(this.value)||100"> 分 = $1）· 组合应用后自动分配卡主</div>
+      <div style="font-weight:800; font-size:12px; margin:8px 0 4px;">A 段 · 订单（${C.items.length}）</div>${itemsHtml}
+      <div style="font-weight:800; font-size:12px; margin:12px 0 4px;">B 段 · 账户额度</div>${accEdit}
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; font-size:12px;">
+        模式 <select onchange="_PACK_CTX.mode=this.value; _renderPackingDialog();"><option value="single" ${C.mode === 'single' ? 'selected' : ''}>单账户凑满</option><option value="multi" ${C.mode === 'multi' ? 'selected' : ''}>多账户自动分配</option></select>
+        ${C.mode === 'single' ? `目标 <select onchange="_PACK_CTX.targetId=this.value">${accOptions}</select>
+        排序 <select onchange="_PACK_CTX.sort=this.value"><option value="closest" ${C.sort === 'closest' ? 'selected' : ''}>最贴近</option><option value="fewest" ${C.sort === 'fewest' ? 'selected' : ''}>订单最少</option></select>` : ''}
+        允许超额 ≤ $<input type="number" value="${C.allowOver}" style="width:64px;" oninput="_PACK_CTX.allowOver=Number(this.value)||0">
+        警戒 ≥ <input type="number" value="${C.warnPct}" style="width:44px;" oninput="_PACK_CTX.warnPct=Number(this.value)||1">%
+      </div>
+      <div style="margin-top:12px;"><button class="btn" style="width:100%;" onclick="runPacking()">计 算 组 合</button></div>
+      <div id="packingResults">${resHtml}</div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+function runPacking() {
+  const C = _PACK_CTX;
+  // 账户余额落库（编辑过的持久化）
+  (settings.cardholders || []).forEach(c => {
+    const a = C.accounts.find(x => x.id === c.id);
+    if (a) c.pointsBalance = a.points;
+  });
+  storageSet('ticket-organizer-settings', settings);
+  C.enabled = C.items.filter(it => it.on);
+  if (!C.enabled.length) { toast('至少启用一单'); return; }
+  if (C.mode === 'single') {
+    if (C.enabled.length > 20) { toast(`参与订单 ${C.enabled.length} > 20，请关掉一些（穷举保护）`); return; }
+    const acc = C.accounts.find(a => a.id === C.targetId);
+    if (!acc || !(acc.points > 0)) { toast('目标账户没有积分额度，先在 B 段填入'); return; }
+    const capUsd = acc.points / settings.pointsPerUsd;
+    const combos = _packEnumerate(C.enabled, capUsd, C.allowOver);
+    const list = _packRank(combos, capUsd, C.sort);
+    C.lastSingle = { list, capUsd, accId: acc.id, accName: acc.name };
+    _renderPackingDialog({ list, capUsd });
+    toast(`可行组合 ${list.length}`);
+  } else {
+    const accs = C.accounts.filter(a => a.points > 0).map(a => ({ id: a.id, name: a.name, capUsd: a.points / settings.pointsPerUsd }));
+    if (!accs.length) { toast('没有带积分额度的账户'); return; }
+    const r = _packMulti(C.enabled, accs, C.allowOver);
+    C.lastMulti = r;
+    _renderPackingDialog(r);
+  }
+}
+function _assignPackPicks(pairs) {
+  // pairs: [{orderIdx, cardholderId}]
+  pairs.forEach(p => {
+    const o = STATE.orders[p.orderIdx];
+    if (o) { o.cardholderId = p.cardholderId; o._lastEdit = Date.now(); }
+  });
+  persistOrdersNow();
+  renderPendingList();
+  const meaningful = STATE.orders.filter(ord => isMeaningfulOrder(ord) && ord.tableLabel !== 'G');
+  renderAirlineUsdPanel(meaningful);
+}
+function applyPackingCombo(ri) {
+  const C = _PACK_CTX;
+  const r = C.lastSingle.list[ri];
+  const picks = C.enabled.filter((_, b) => r.mask & (1 << b));
+  _assignPackPicks(picks.map(p => ({ orderIdx: p.idx, cardholderId: C.lastSingle.accId })));
+  document.getElementById('packingOverlay').remove();
+  toast(`✓ ${picks.length} 单已分配给 ${C.lastSingle.accName}（$${Math.round(r.sum).toLocaleString()}）`);
+}
+function applyPackingMulti() {
+  const C = _PACK_CTX;
+  const pairs = [];
+  C.lastMulti.accs.forEach(a => a.picks.forEach(p => pairs.push({ orderIdx: p.idx, cardholderId: a.id })));
+  if (!pairs.length) { toast('方案为空'); return; }
+  _assignPackPicks(pairs);
+  document.getElementById('packingOverlay').remove();
+  toast(`✓ 已按方案分配 ${pairs.length} 单到 ${C.lastMulti.accs.filter(a => a.picks.length).length} 个账户`);
 }
 
 // ══ 环境放松层 ═══════════════════════════════════════════════════════════
