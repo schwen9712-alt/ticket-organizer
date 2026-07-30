@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.30-AU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.30-AV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AU</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AV</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13723,6 +13723,9 @@ function renderAirlineUsdPanel(orders) {
       const releaseBadge = o.waitingForRelease
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
         : '';
+      const packBadge = o.packTag
+        ? `<span class="ui-badge" style="background:rgba(59,110,180,0.12); border-color:#3b6eb4; color:#3b6eb4; font-size:9px; cursor:pointer;" onclick="event.stopPropagation(); clearPackTag('${escapeAttr(o.id)}')" title="已选定配账方案 【${escapeAttr(o.packTag.al || '—')}】≈$${Math.round(o.packTag.cap || 0).toLocaleString()}${o.packTag.name ? ' · ' + escapeAttr(o.packTag.name) : ''} · ${new Date(o.packTag.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · 点击解除">💠 配账</span>`
+        : '';
       const noAvailBadge = o.noAvailability
         ? `<span class="ui-badge ui-badge--none">⏸ 无位</span>`
         : '';
@@ -13804,7 +13807,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${_capRowBadges([tableYBadge, noSplitBadge, releaseBadge, noAvailBadge, dobWarnBadge, blacklistBadge, imminentBadge, mixedBadge, aiRowBadge, basicFareBadge, seqNoteBadge, linkedBadge, historyBadge])}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${_capRowBadges([tableYBadge, noSplitBadge, releaseBadge, packBadge, noAvailBadge, dobWarnBadge, blacklistBadge, imminentBadge, mixedBadge, aiRowBadge, basicFareBadge, seqNoteBadge, linkedBadge, historyBadge])}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -15349,7 +15352,8 @@ function openPackingDialog() {
     label: `#${x.idx + 1} ${((x.o.passengers || [])[0] || {}).name || '—'} ${x.o.airline || ''}`,
     usd: Math.round((_orderUsd(x.o) || 0)),
     al: x.o.airline || '—',
-    on: true
+    tagged: !!x.o.packTag,
+    on: !x.o.packTag
   })).filter(it => it.usd > 0);
   if (!_PACK_ACCOUNTS.length) _PACK_ACCOUNTS = [{ name: '', points: 0, on: true }, { name: '', points: 0, on: true }, { name: '', points: 0, on: true }];
   const prev = _PACK_CTX || {};
@@ -15395,6 +15399,7 @@ function _packComboRowsHtml(res, copyFn, showAll) {
     return `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px; ${warn ? 'border-color:var(--warning);' : ''}">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
         <strong style="font-family:'JetBrains Mono',monospace;"><span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px; margin-right:5px;">${escapeHtml(r.al || '—')}</span>$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单</strong>
+        <button class="btn small" onclick="markPackChosen('${copyFn === 'copyPackingQuick' ? 'quick' : 'single'}', ${ri})">✓ 选定</button>
         <button class="btn ghost small" onclick="${copyFn}(${ri})">复制</button>
       </div>
       <div style="color:var(--muted); margin-top:3px;">${names}</div>
@@ -15430,6 +15435,61 @@ function copyPackingQuick(ri) {
   const tail = r.over > 0 ? `超 $${f(r.over)}` : `差 $${f(C.lastQuick.capUsd - r.sum)}`;
   navigator.clipboard.writeText(`≈$${f(C.lastQuick.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}`).then(() => toast('✓ 组合已复制'));
 }
+// ── 💠 选定方案 → 待出票行自动标识（解除同链路，全走 persistOrdersNow 咽喉）──
+function markPackChosen(src, ri) {
+  const C = _PACK_CTX;
+  const res = src === 'quick' ? C.lastQuick : C.lastSingle;
+  if (!res || !res.list[ri]) return;
+  const r = res.list[ri];
+  const set = new Set(r.idxs);
+  const picks = C.enabled.filter((_, b) => set.has(b));
+  const tag = { al: r.al || '—', cap: res.capUsd, sum: r.sum, name: src === 'single' ? (res.accName || '') : '', at: Date.now() };
+  picks.forEach(it => {
+    const o = STATE.orders[it.idx];
+    if (!o) return;
+    o.packTag = tag;
+    o._lastEdit = Date.now();
+    const ci = C.items.findIndex(x => x.idx === it.idx);
+    if (ci >= 0) { C.items[ci].tagged = true; C.items[ci].on = false; }
+  });
+  persistOrdersNow();
+  renderPendingList();
+  _renderPackingDialog();
+  _packQuickCalc();
+  toast(`✓ 已标记 ${picks.length} 单 💠 配账（${tag.al} ≈$${Math.round(tag.cap).toLocaleString()}）`);
+}
+function markPackMultiChosen() {
+  const C = _PACK_CTX;
+  if (!C || !C.lastMulti) return;
+  let n = 0;
+  C.lastMulti.accs.forEach(a => {
+    if (!a.picks.length) return;
+    const tag = { al: a.picks[0].al || '—', cap: a.capUsd, sum: a.used, name: a.name || '', at: Date.now() };
+    a.picks.forEach(p => {
+      const o = STATE.orders[p.idx];
+      if (!o) return;
+      o.packTag = tag; o._lastEdit = Date.now(); n++;
+      const ci = C.items.findIndex(x => x.idx === p.idx);
+      if (ci >= 0) { C.items[ci].tagged = true; C.items[ci].on = false; }
+    });
+  });
+  if (!n) { toast('方案为空'); return; }
+  persistOrdersNow();
+  renderPendingList();
+  _renderPackingDialog();
+  _packQuickCalc();
+  toast(`✓ 已按方案标记 ${n} 单 💠 配账`);
+}
+function clearPackTag(orderId) {
+  const o = (STATE.orders || []).find(x => x && x.id === orderId);
+  if (!o || !o.packTag) return;
+  if (!confirm(`解除该单的 💠 配账标记（【${o.packTag.al || '—'}】≈$${Math.round(o.packTag.cap || 0).toLocaleString()}）？`)) return;
+  delete o.packTag;
+  o._lastEdit = Date.now();
+  persistOrdersNow();
+  renderPendingList();
+  toast('✓ 已解除配账标记');
+}
 function _packAdvSingleRerender() {
   const C = _PACK_CTX;
   const el = document.getElementById('packAdvRes');
@@ -15444,7 +15504,7 @@ function _renderPackingDialog() {
   const itemsHtml = C.items.map((it, i) => `
     <div style="display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px;">
       <input type="checkbox" ${it.on ? 'checked' : ''} onchange="_PACK_CTX.items[${i}].on=this.checked; _packQueueCalc();">
-      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(it.label)}</span>
+      <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(it.label)}${it.tagged ? ' <span style="opacity:0.55;" title="已选定配账方案，默认不参与计算">💠</span>' : ''}</span>
       <strong style="font-family:'JetBrains Mono',monospace;">$${fmt(it.usd)}</strong>
     </div>`).join('');
   const accOn = C.accounts.map((a, i) => ({ a, i })).filter(x => x.a.on !== false && x.a.points > 0);
@@ -15548,7 +15608,7 @@ function runPacking() {
     });
     C.lastMulti = { accs, rest: best.pool.map(p => ({ label: p.label })), totCost: best.totCost / 100 };
     const _warnN = accs.filter(a => (a.used - a.capUsd) > 0 && (a.used - a.capUsd) >= a.capUsd * C.warnPct / 100).length;
-    el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(C.lastMulti.totCost)}</strong>${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>`
+    el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(C.lastMulti.totCost)}</strong>${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn small" onclick="markPackMultiChosen()">✓ 全部选定</button> <button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>`
       + accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
       <strong>${escapeHtml(a.name || '未命名')}</strong>${a.picks.length ? ` <span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px;">${escapeHtml(a.picks[0].al || '—')}</span>` : ''} · $${fmt(a.used)} / $${fmt(a.capUsd)}
       <div style="color:var(--muted); margin-top:3px;">${a.picks.map(p => escapeHtml(p.label)).join('、') || '—'}</div>
