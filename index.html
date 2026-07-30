@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.30-AR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.30-AT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AR</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AT</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15075,7 +15075,7 @@ async function aiTicketingAdvice() {
 // 整数分（cents）记账防浮点；lowbit DP 子集表；top-K=100；平手取不超、单数少；
 // 多账户 = 六种子（额度降/升/原序 × bestFill种子开关）+ 12 轮局部搜索
 // （单户重解 / 双户双序重排 / 三户六序重排，cand 上限 20/20/14）。
-const _PACK_ENUM_CAP = 20;
+const _PACK_ENUM_CAP = 40;   // 折半枚举上限：2×2^20 代价覆盖 2^40 空间
 function _packParseNum(str) {
   if (str == null) return NaN;
   let s = String(str).trim().replace(/[,，\s$＄]/g, '');
@@ -15135,14 +15135,140 @@ function _packKnapBestFill(capC, amtC) { // 不超额填最满（多账户种子
   }
   return { m: bm, sum: bs };
 }
+// ── 折半枚举（meet-in-the-middle）：>20 单时的精确冠军引擎 ──────────────
+// 劈两半各枚举，B 半按 sum 升序、同 sum 去重保最小单数；对拼时二分定位。
+// bestDist/bestFill 结果精确；top-K 前排精确、深尾近似（每个 A 半只探 ±12 邻位）。
+function _packMitmHalf(amtC, offset, len) {
+  const size = 1 << len;
+  const sums = new Float64Array(size), cnts = new Uint8Array(size);
+  for (let m = 1; m < size; m++) {
+    const low = m & -m, i = 31 - Math.clz32(low);
+    sums[m] = sums[m ^ low] + amtC[offset + i]; cnts[m] = cnts[m ^ low] + 1;
+  }
+  const idx = Array.from({ length: size }, (_, i) => i).sort((a, b) => sums[a] - sums[b] || cnts[a] - cnts[b]);
+  const oS = new Float64Array(size), oC = new Uint8Array(size), oM = new Uint32Array(size);
+  let k = 0;
+  for (const m of idx) {
+    if (k > 0 && sums[m] === oS[k - 1]) continue;
+    oS[k] = sums[m]; oC[k] = cnts[m]; oM[k] = m; k++;
+  }
+  return { sums: oS, cnts: oC, masks: oM, n: k };
+}
+function _packLB(sums, n, v) { let lo = 0, hi = n; while (lo < hi) { const mid = (lo + hi) >> 1; if (sums[mid] < v) lo = mid + 1; else hi = mid; } return lo; }
+function _packMaskIdxs(mask, offset) { const out = []; for (let b = 0; mask; b++, mask >>>= 1) if (mask & 1) out.push(offset + b); return out; }
+function _packMitmBestDist(capC, amtC, allowC) {
+  const n = amtC.length, la = n >> 1, lb = n - la;
+  const A = _packMitmHalf(amtC, 0, la), B = _packMitmHalf(amtC, la, lb);
+  let bs = -1, bd = Infinity, bo = false, bc = 0, bia = 0, bib = 0;
+  const bound = capC + allowC;
+  for (let ia = 0; ia < A.n; ia++) {
+    const sA = A.sums[ia];
+    if (sA > bound) break;
+    const pos = _packLB(B.sums, B.n, capC - sA);
+    for (let j = Math.max(0, pos - 1); j <= Math.min(B.n - 1, pos); j++) {
+      const s = sA + B.sums[j];
+      if (s > bound) continue;
+      if (A.masks[ia] === 0 && B.masks[j] === 0) continue;
+      const d = Math.abs(capC - s), o = s > capC, c = A.cnts[ia] + B.cnts[j];
+      if (d < bd || (d === bd && ((bo && !o) || (o === bo && c < bc)))) { bd = d; bs = s; bo = o; bc = c; bia = ia; bib = j; }
+    }
+  }
+  if (bs < 0) return { sum: 0, dist: capC, idxs: [] };
+  return { sum: bs, dist: bd, idxs: _packMaskIdxs(A.masks[bia], 0).concat(_packMaskIdxs(B.masks[bib], la)) };
+}
+function _packMitmBestFill(capC, amtC) {
+  const n = amtC.length, la = n >> 1, lb = n - la;
+  const A = _packMitmHalf(amtC, 0, la), B = _packMitmHalf(amtC, la, lb);
+  let bs = -1, bc = 0, bia = 0, bib = 0;
+  for (let ia = 0; ia < A.n; ia++) {
+    const sA = A.sums[ia];
+    if (sA > capC) break;
+    const j = _packLB(B.sums, B.n, capC - sA + 0.5) - 1;
+    if (j < 0) continue;
+    const s = sA + B.sums[j], c = A.cnts[ia] + B.cnts[j];
+    if (s > bs || (s === bs && c < bc)) { bs = s; bc = c; bia = ia; bib = j; }
+  }
+  if (bs < 0) return { sum: 0, idxs: [] };
+  return { sum: bs, idxs: _packMaskIdxs(A.masks[bia], 0).concat(_packMaskIdxs(B.masks[bib], la)) };
+}
+function _packMitmTop(capC, amtC, K, allowC, sortMode) {
+  const n = amtC.length, la = n >> 1, lb = n - la, NB = 12;
+  const A = _packMitmHalf(amtC, 0, la), B = _packMitmHalf(amtC, la, lb);
+  const bound = capC + allowC;
+  const top = [];
+  const cmp = sortMode === 'count'
+    ? ((a, b) => (a.cnt - b.cnt) || (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)))
+    : ((a, b) => (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)) || (a.cnt - b.cnt));
+  for (let ia = 0; ia < A.n; ia++) {
+    const sA = A.sums[ia];
+    if (sA > bound) break;
+    const pos = _packLB(B.sums, B.n, capC - sA);
+    for (let j = Math.max(0, pos - NB); j <= Math.min(B.n - 1, pos + NB); j++) {
+      const s = sA + B.sums[j];
+      if (s > bound) continue;
+      if (A.masks[ia] === 0 && B.masks[j] === 0) continue;
+      const it = { sum: s, dist: Math.abs(capC - s), over: s > capC, cnt: A.cnts[ia] + B.cnts[j], ia, j };
+      if (top.length === K && cmp(it, top[K - 1]) >= 0) continue;
+      let lo = 0, hi = top.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (cmp(it, top[mid]) < 0) hi = mid; else lo = mid + 1; }
+      top.splice(lo, 0, it); if (top.length > K) top.pop();
+    }
+  }
+  return top.map(t => ({ sum: t.sum, dist: t.dist, over: t.over, cnt: t.cnt, idxs: _packMaskIdxs(A.masks[t.ia], 0).concat(_packMaskIdxs(B.masks[t.j], la)) }));
+}
+// ── 自动路由：≤20 单走全枚举精确，>20 走折半 ──────────────────────────
+function _packAutoBestDist(capC, amtC, allowC) {
+  if (amtC.length > 20) return _packMitmBestDist(capC, amtC, allowC);
+  const b = _packKnapBestDist(capC, amtC, allowC);
+  return { sum: b.sum, dist: b.dist, idxs: _packMaskIdxs(b.m, 0) };
+}
+function _packAutoBestFill(capC, amtC) {
+  if (amtC.length > 20) return _packMitmBestFill(capC, amtC);
+  const b = _packKnapBestFill(capC, amtC);
+  return { sum: b.sum, idxs: _packMaskIdxs(b.m, 0) };
+}
+function _packAutoTop(capC, amtC, K, allowC, sortMode) {
+  if (amtC.length > 20) return _packMitmTop(capC, amtC, K, allowC, sortMode);
+  return _packKnapTop(capC, amtC, K, allowC, sortMode).map(t => ({ sum: t.sum, dist: t.dist, over: t.over, cnt: t.cnt, idxs: _packMaskIdxs(t.m, 0) }));
+}
+function _packPickIdx(pool, idxs) { const set = new Set(idxs); const t = [], k = []; pool.forEach((p, i) => set.has(i) ? t.push(p) : k.push(p)); return [t, k]; }
+// ── 航司隔离：一个账户只吃一个航司，组合内禁止混航司 ──────────────────
+function _packGroupByAl(items) {
+  const g = {};
+  items.forEach((p, i) => { const k = p.al || '—'; (g[k] = g[k] || { al: k, gi: [], cents: [] }); g[k].gi.push(i); g[k].cents.push(p.c); });
+  return Object.values(g);
+}
+function _packBestDistAl(capC, items, allowC) {
+  let best = null;
+  _packGroupByAl(items).forEach(gr => {
+    const b = _packAutoBestDist(capC, gr.cents, allowC);
+    if (!b.idxs.length) return;
+    const c = { sum: b.sum, dist: b.dist, idxs: b.idxs.map(i => gr.gi[i]), al: gr.al, cnt: b.idxs.length };
+    const better = !best || c.dist < best.dist
+      || (c.dist === best.dist && ((best.sum > capC && c.sum <= capC)
+      || ((c.sum > capC) === (best.sum > capC) && c.cnt < best.cnt)));
+    if (better) best = c;
+  });
+  return best || { sum: 0, dist: capC, idxs: [], al: '' };
+}
+function _packBestFillAl(capC, items) {
+  let best = null;
+  _packGroupByAl(items).forEach(gr => {
+    const b = _packAutoBestFill(capC, gr.cents);
+    if (!b.idxs.length) return;
+    const c = { sum: b.sum, idxs: b.idxs.map(i => gr.gi[i]), al: gr.al, cnt: b.idxs.length };
+    if (!best || c.sum > best.sum || (c.sum === best.sum && c.cnt < best.cnt)) best = c;
+  });
+  return best || { sum: 0, idxs: [], al: '' };
+}
 const _packSumC = arr => arr.reduce((s, p) => s + p.c, 0);
 function _packPick(pool, mask) { const t = [], k = []; pool.forEach((p, i) => (mask & (1 << i)) ? t.push(p) : k.push(p)); return [t, k]; }
 const _packAccCost = (acc, arr) => Math.abs(acc.capC - _packSumC(arr));
 function _packSeqSolve(accIdxs, cand, accOrder, allowC) {
   let rest = cand; const takes = []; let tot = 0;
   for (let i = 0; i < accIdxs.length; i++) {
-    const b = _packKnapBestDist(accOrder[accIdxs[i]].capC, rest.map(p => p.c), allowC);
-    const r = _packPick(rest, b.m); takes.push(r[0]); rest = r[1]; tot += b.dist;
+    const b = _packBestDistAl(accOrder[accIdxs[i]].capC, rest, allowC);
+    const r = _packPickIdx(rest, b.idxs); takes.push(r[0]); rest = r[1]; tot += b.dist;
   }
   return { tot, takes, rest };
 }
@@ -15151,9 +15277,9 @@ function _packMultiSolve(items, accOrder, allowC, seedFill) {
   let pool = items.slice();
   const asg = accOrder.map(() => []);
   accOrder.forEach((a, ai) => {
-    const b = seedFill ? _packKnapBestFill(a.capC, pool.map(p => p.c)) : _packKnapBestDist(a.capC, pool.map(p => p.c), allowC);
-    if (!b.m) return;
-    const [t, k] = _packPick(pool, b.m); asg[ai] = t; pool = k;
+    const b = seedFill ? _packBestFillAl(a.capC, pool) : _packBestDistAl(a.capC, pool, allowC);
+    if (!b.idxs.length) return;
+    const [t, k] = _packPickIdx(pool, b.idxs); asg[ai] = t; pool = k;
   });
   const A = accOrder.length;
   for (let pass = 0; pass < 12; pass++) {
@@ -15162,12 +15288,12 @@ function _packMultiSolve(items, accOrder, allowC, seedFill) {
       const cand = asg[ai].concat(pool);
       if (!cand.length) continue;
       const cur = _packAccCost(accOrder[ai], asg[ai]);
-      const b = _packKnapBestDist(accOrder[ai].capC, cand.map(p => p.c), allowC);
-      if (b.dist < cur) { const [t, k] = _packPick(cand, b.m); asg[ai] = t; pool = k; improved = true; }
+      const b = _packBestDistAl(accOrder[ai].capC, cand, allowC);
+      if (b.dist < cur) { const [t, k] = _packPickIdx(cand, b.idxs); asg[ai] = t; pool = k; improved = true; }
     }
     for (let x = 0; x < A; x++) for (let y = x + 1; y < A; y++) {
       const cand = asg[x].concat(asg[y], pool);
-      if (!cand.length || cand.length > _PACK_ENUM_CAP) continue;
+      if (!cand.length || cand.length > 24) continue;
       const cur = _packAccCost(accOrder[x], asg[x]) + _packAccCost(accOrder[y], asg[y]);
       let best = null;
       [[x, y], [y, x]].forEach(pr => {
@@ -15180,7 +15306,7 @@ function _packMultiSolve(items, accOrder, allowC, seedFill) {
     }
     for (let x = 0; x < A; x++) for (let y = x + 1; y < A; y++) for (let z = y + 1; z < A; z++) {
       const cand = asg[x].concat(asg[y], asg[z], pool);
-      if (!cand.length || cand.length > 14) continue;
+      if (!cand.length || cand.length > 18) continue;
       const cur = _packAccCost(accOrder[x], asg[x]) + _packAccCost(accOrder[y], asg[y]) + _packAccCost(accOrder[z], asg[z]);
       let best = null;
       _packPerms3(x, y, z).forEach(pr => {
@@ -15222,6 +15348,7 @@ function openPackingDialog() {
     idx: x.idx, id: x.o.id,
     label: `#${x.idx + 1} ${((x.o.passengers || [])[0] || {}).name || '—'} ${x.o.airline || ''}`,
     usd: Math.round((_orderUsd(x.o) || 0)),
+    al: x.o.airline || '—',
     on: true
   })).filter(it => it.usd > 0);
   if (!_PACK_ACCOUNTS.length) _PACK_ACCOUNTS = [{ name: '', points: 0, on: true }, { name: '', points: 0, on: true }, { name: '', points: 0, on: true }];
@@ -15263,11 +15390,12 @@ function _renderPackingDialog(results) {
     const cap = results.capUsd;
     const SHOW = C.showAll ? results.list.length : 10;
     resHtml = results.list.length ? results.list.slice(0, SHOW).map((r, ri) => {
-      const names = C.enabled.filter((_, b) => r.mask & (1 << b)).map(it => escapeHtml(it.label)).join('、');
+      const _set = new Set(r.idxs);
+      const names = C.enabled.filter((_, b) => _set.has(b)).map(it => escapeHtml(it.label)).join('、');
       const warn = r.over >= cap * C.warnPct / 100;
       return `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px; ${warn ? 'border-color:var(--warning);' : ''}">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-          <strong style="font-family:'JetBrains Mono',monospace;">$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单</strong>
+          <strong style="font-family:'JetBrains Mono',monospace;"><span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px; margin-right:5px;">${escapeHtml(r.al || '—')}</span>$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单</strong>
           <button class="btn ghost small" onclick="copyPackingCombo(${ri})">复制</button>
         </div>
         <div style="color:var(--muted); margin-top:3px;">${names}</div>
@@ -15278,7 +15406,7 @@ function _renderPackingDialog(results) {
   if (results && C.mode === 'multi') {
     const _warnN = results.accs.filter(a => (a.used - a.capUsd) > 0 && (a.used - a.capUsd) >= a.capUsd * C.warnPct / 100).length;
     resHtml = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(results.totCost || 0)}</strong>${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>` + results.accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
-      <strong>${escapeHtml(a.name || '未命名')}</strong> · $${fmt(a.used)} / $${fmt(a.capUsd)}
+      <strong>${escapeHtml(a.name || '未命名')}</strong>${a.picks.length ? ` <span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px;">${escapeHtml(a.picks[0].al || '—')}</span>` : ''} · $${fmt(a.used)} / $${fmt(a.capUsd)}
       <div style="color:var(--muted); margin-top:3px;">${a.picks.map(p => escapeHtml(p.label)).join('、') || '—'}</div>
     </div>`).join('') + (results.rest.length ? `<div style="color:var(--warning-deep); font-size:12px; margin-top:6px;">放不下：${results.rest.map(p => escapeHtml(p.label)).join('、')}</div>` : '') +
     '';
@@ -15292,7 +15420,7 @@ function _renderPackingDialog(results) {
   ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:640px; max-height:86vh; overflow:auto;">
     <div class="verify-modal-header"><h3>🧮 配账结算</h3><button onclick="document.getElementById('packingOverlay').remove()" class="close-btn">×</button></div>
     <div class="verify-modal-body" style="padding:14px 16px;">
-      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">A 段=未分配订单 · B 段=临时积分额度（谁来分都行，当场输入，不落库；<input type="number" value="${ppu}" style="width:56px; text-align:right;" oninput="settings.pointsPerUsd=Number(this.value)||100"> 分 = $1）· 只做金额速算</div>
+      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">A 段=未分配订单 · B 段=临时积分额度（谁来分都行，当场输入，不落库；<input type="number" value="${ppu}" style="width:56px; text-align:right;" oninput="settings.pointsPerUsd=Number(this.value)||100"> 分 = $1）· 只做金额速算 · 一个账户只吃一个航司，组合与分配按航司隔离</div>
       <div style="font-weight:800; font-size:12px; margin:8px 0 4px; display:flex; justify-content:space-between; align-items:center;">A 段 · 订单（${C.items.length}）<button class="btn ghost small" onclick="sendToComboCalc()" title="按 #data= 协议把 A/B 段与参数送进独立计算器（需 points_combo_calculator_v4.html 同站点部署）">↗ 送独立计算器</button></div>${itemsHtml}
       <div style="font-weight:800; font-size:12px; margin:12px 0 4px;">B 段 · 账户额度</div>${accEdit}
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; font-size:12px;">
@@ -15319,8 +15447,20 @@ function runPacking() {
     const capC = Math.round(acc.points / settings.pointsPerUsd * 100);
     const allowC = Math.round(C.allowOver * 100);
     const amtC = C.enabled.map(it => Math.round(it.usd * 100));
-    const top = _packKnapTop(capC, amtC, 100, allowC, C.sort === 'fewest' ? 'count' : 'closest');
-    const list = top.map(t => ({ mask: t.m, sum: t.sum / 100, over: t.over ? (t.sum - capC) / 100 : 0, count: t.cnt }));
+    const sortM = C.sort === 'fewest' ? 'count' : 'closest';
+    const groups = {};
+    C.enabled.forEach((it, b) => { const k = it.al || '—'; (groups[k] = groups[k] || []).push(b); });
+    const merged = [];
+    Object.keys(groups).forEach(k => {
+      const gi = groups[k];
+      _packAutoTop(capC, gi.map(b => Math.round(C.enabled[b].usd * 100)), 100, allowC, sortM)
+        .forEach(t => merged.push({ idxs: t.idxs.map(i => gi[i]), sum: t.sum, dist: t.dist, over: t.over, cnt: t.cnt, al: k }));
+    });
+    const cmpM = sortM === 'count'
+      ? ((a, b) => (a.cnt - b.cnt) || (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)))
+      : ((a, b) => (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)) || (a.cnt - b.cnt));
+    merged.sort(cmpM);
+    const list = merged.slice(0, 100).map(t => ({ idxs: t.idxs, al: t.al, sum: t.sum / 100, over: t.over ? (t.sum - capC) / 100 : 0, count: t.cnt }));
     C.lastSingle = { list, capUsd: capC / 100, accName: acc.name || ('账户' + (Number(C.targetId) + 1)) };
     C.showAll = false;
     _renderPackingDialog({ list, capUsd: capC / 100, minUsd: amtC.length ? Math.min.apply(null, amtC) / 100 : 0, allowUsd: allowC / 100 });
@@ -15329,7 +15469,7 @@ function runPacking() {
     const accsOn = C.accounts.filter(a => a.on !== false && a.points > 0);
     if (!accsOn.length) { toast('没有带积分额度的账户'); return; }
     const allowC = Math.round(C.allowOver * 100);
-    const items = C.enabled.map(it => ({ c: Math.round(it.usd * 100), label: it.label, idx: it.idx }));
+    const items = C.enabled.map(it => ({ c: Math.round(it.usd * 100), label: it.label, idx: it.idx, al: it.al }));
     const accOrderBase = accsOn.map((a, k) => ({ name: a.name || ('账户' + (k + 1)), capC: Math.round(a.points / settings.pointsPerUsd * 100) }));
     // v4 六种子：额度降序/升序/原序 × 种子器(bestDist/bestFill)，取贴近偏差合计最小者
     const seeds = [];
@@ -15359,9 +15499,10 @@ function copyPackingPlan() {
   C.lastMulti.accs.forEach(a => {
     if (!a.picks.length) { lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：未使用`); return; }
     const parts = a.picks.map(p => `${p.label} $${f(p.c / 100)}`);
+    const alTag = `【${a.picks[0].al || '—'}】`;
     const over = a.used - a.capUsd;
     const tail = over > 0 ? `超 $${f(over)}${over >= a.capUsd * C.warnPct / 100 ? ' ⚠' : ''}` : `差 $${f(-over)}`;
-    lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：${parts.join(' + ')} = $${f(a.used)}｜${tail}`);
+    lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：${alTag}${parts.join(' + ')} = $${f(a.used)}｜${tail}`);
   });
   if (C.lastMulti.rest.length) lines.push(`未分配：${C.lastMulti.rest.map(p => p.label).join('、')}`);
   navigator.clipboard.writeText(lines.join('\n')).then(() => toast('✓ 方案已复制'));
@@ -15385,9 +15526,10 @@ function copyPackingCombo(ri) {
   const C = _PACK_CTX;
   const r = C.lastSingle.list[ri];
   const f = (n) => Math.round(n).toLocaleString('en-US');
-  const parts = C.enabled.filter((_, b) => r.mask & (1 << b)).map(it => `${it.label} $${f(it.usd)}`);
+  const _set = new Set(r.idxs);
+  const parts = C.enabled.filter((_, b) => _set.has(b)).map(it => `${it.label} $${f(it.usd)}`);
   const tail = r.over > 0 ? `超 $${f(r.over)}` : `差 $${f(C.lastSingle.capUsd - r.sum)}`;
-  navigator.clipboard.writeText(`${C.lastSingle.accName} ≈$${f(C.lastSingle.capUsd)}｜${parts.join(' + ')} = $${f(r.sum)}｜${tail}`).then(() => toast('✓ 组合已复制'));
+  navigator.clipboard.writeText(`${C.lastSingle.accName} ≈$${f(C.lastSingle.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}`).then(() => toast('✓ 组合已复制'));
 }
 
 // ══ 环境放松层 ═══════════════════════════════════════════════════════════
