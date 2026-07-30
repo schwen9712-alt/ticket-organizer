@@ -1,3 +1,13 @@
+## 2026-07-30 — 配账改速算器：B 段临时账户池（收分来源随机，不绑卡主名册） · v26.07.30-AR
+
+用户反馈：提供积分的卡主是随机的，只需要快速匹配金额。**撤销卡主名册绑定与分配闭环**：①B 段改为会话级临时账户池 _PACK_ACCOUNTS——名字可选＋积分＋启用开关＋删行，「+ 添加账户 / 批量粘贴 / 清空账户」，批量粘贴按 v4 规则取每行最后一个数字（支持 万/w/k/千 后缀，名字自动剥离行尾冒号），会话内保留、关弹窗不丢、不写 settings；②删除 cardholder.pointsBalance 落库与 applyPackingCombo/applyPackingMulti/_assignPackPicks 分配闭环（清零断言），组合动作改「复制」——单组合复制 v4 行格式，多账户保留「复制全部方案」；③**修 bug**：ENUM_CAP=20 守卫提到双模式公共段（原多账户模式无守卫，23 单会分配 2×8M Float64Array 内存爆炸）；④目标账户改索引寻址（仅列启用且积分>0 的行）；⑤桥 payload 带行开关状态。
+
+**测试**：pack_test 增至 10 项（新增 K8 批量行解析：名字剥离/万k 后缀/无数字行跳过）+ fx/wrap 回归 + 语法基线一致 + 三个闭环函数清零断言。
+
+**改动位置**：_PACK_ACCOUNTS/_packParseBulkLines；openPackingDialog B 段；渲染 accEdit/accOptions/批量粘贴区；runPacking 守卫与寻址；copyPackingCombo。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-30 — 配账引擎对表 v4 原件：整数分/平手律/六种子局部搜索/互通桥 · v26.07.30-AQ
 
 用户上传独立计算器 points_combo_calculator_v4.html（权威规格）。AP 系照截图逆向，本版逐条对表采纳 v4 语义：①**整数分（cents）记账**防浮点（Float64 lowbit DP 子集表）；②knapTop **K=100**，比较器双模式——最贴近: 距离→**不超优先**→单数；订单最少: 单数→距离→不超（AP 缺不超平手律）；首屏 10 个 +「展开全部 100+ 个方案」；③单模式空可行 v4 文案（最小单已超额度＋允许超额）；④**多账户弃 FFD 改 multiSolve**：六种子（额度降/升/原序 × bestFill/bestDist 种子）各跑 12 轮局部搜索（单户重解/双户双序重排 cand≤20/三户六序重排 cand≤14）取贴近偏差合计最小，结果映射回 B 段原顺序，补 ⚠超警戒户计数与「复制全部方案」（v4 行格式）；⑤_packParseNum 支持 万/w/k/千 后缀备用；⑥**互通桥**「↗ 送独立计算器」——按 v4 的 #data=Base64(JSON) 协议（orders 含 id 回传位/accounts/rate/allow/pct/mode/autorun:1）打开同站点 points_combo_calculator_v4.html，把 v4 文件放进仓库即完成双向互通。旧 _packEnumerate/_packRank/_packMulti 全文清零断言。
