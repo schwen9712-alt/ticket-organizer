@@ -1,3 +1,13 @@
+## 2026-07-30 — 配账引擎对表 v4 原件：整数分/平手律/六种子局部搜索/互通桥 · v26.07.30-AQ
+
+用户上传独立计算器 points_combo_calculator_v4.html（权威规格）。AP 系照截图逆向，本版逐条对表采纳 v4 语义：①**整数分（cents）记账**防浮点（Float64 lowbit DP 子集表）；②knapTop **K=100**，比较器双模式——最贴近: 距离→**不超优先**→单数；订单最少: 单数→距离→不超（AP 缺不超平手律）；首屏 10 个 +「展开全部 100+ 个方案」；③单模式空可行 v4 文案（最小单已超额度＋允许超额）；④**多账户弃 FFD 改 multiSolve**：六种子（额度降/升/原序 × bestFill/bestDist 种子）各跑 12 轮局部搜索（单户重解/双户双序重排 cand≤20/三户六序重排 cand≤14）取贴近偏差合计最小，结果映射回 B 段原顺序，补 ⚠超警戒户计数与「复制全部方案」（v4 行格式）；⑤_packParseNum 支持 万/w/k/千 后缀备用；⑥**互通桥**「↗ 送独立计算器」——按 v4 的 #data=Base64(JSON) 协议（orders 含 id 回传位/accounts/rate/allow/pct/mode/autorun:1）打开同站点 points_combo_calculator_v4.html，把 v4 文件放进仓库即完成双向互通。旧 _packEnumerate/_packRank/_packMulti 全文清零断言。
+
+**测试**：pack_test 重写 9 项（真实 13 单 cents 冠军复核/双排序律/over 平手/bestFill/双种子完美装箱构造例/后缀/分级精度）+ fx/wrap 回归 + 语法基线一致。
+
+**改动位置**：引擎区整段置换（_packParseNum…_packMultiSolve）；runPacking 双模式；渲染展开/空态/multi summary；copyPackingPlan/sendToComboCalc。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-07-30 — 🧮 配账结算：未分配订单 × 卡主积分额度装箱，一键分配 · v26.07.30-AP
 
 按用户独立「订单配账计算器」窗口的规格移植进本体并接通闭环。**A 段**自动灌入未分配卡主的待出订单（USD，勾选参与）；**B 段**为卡主积分额度（新增 cardholder.pointsBalance 字段，对话框内可编辑并落库；全局换算 settings.pointsPerUsd 分=$1，默认 100）。**单账户凑满**：≤20 单穷举子集（>20 提示关单保护），可行=组合 ≤ 额度+允许超额（默认 $100），排序 最贴近/订单最少，超额 ≥警戒%（默认 1%）标 ⚠，结果前 10 组各带「应用此组合 →」——**一键把该组订单全部分配给目标卡主**（cardholderId + _lastEdit 落章 + persistOrdersNow）。**多账户自动分配**：FFD 贪心（大单先入余量最大账户），放不下的明示，「全部应用 →」按方案批量分配。入口：面板 🧮 配账（⚡MAX 旁）。

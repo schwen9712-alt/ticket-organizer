@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.30-AP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.07.30-AQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AP</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AQ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15071,43 +15071,132 @@ async function aiTicketingAdvice() {
 // 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
-function _packEnumerate(items, capUsd, allowOver) {
-  // items: [{i, usd}] ≤20；返回可行组合列表（未排序）
-  const n = items.length;
-  const out = [];
-  for (let mask = 1; mask < (1 << n); mask++) {
-    let sum = 0;
-    for (let b = 0; b < n; b++) if (mask & (1 << b)) sum += items[b].usd;
-    if (sum <= capUsd + allowOver) {
-      out.push({ mask, sum, count: mask.toString(2).replace(/0/g, '').length, over: Math.max(0, sum - capUsd) });
-    }
-  }
-  return out;
+// ═══ 配账引擎 · v4 原样移植（用户独立计算器 points_combo_calculator_v4）═══
+// 整数分（cents）记账防浮点；lowbit DP 子集表；top-K=100；平手取不超、单数少；
+// 多账户 = 六种子（额度降/升/原序 × bestFill种子开关）+ 12 轮局部搜索
+// （单户重解 / 双户双序重排 / 三户六序重排，cand 上限 20/20/14）。
+const _PACK_ENUM_CAP = 20;
+function _packParseNum(str) {
+  if (str == null) return NaN;
+  let s = String(str).trim().replace(/[,，\s$＄]/g, '');
+  if (!s) return NaN;
+  const m = s.match(/^(\d+(?:\.\d+)?)(万|w|W|k|K|千)?$/);
+  if (!m) return NaN;
+  let v = parseFloat(m[1]);
+  const suf = m[2];
+  if (suf === '万' || suf === 'w' || suf === 'W') v *= 10000;
+  else if (suf === 'k' || suf === 'K' || suf === '千') v *= 1000;
+  return v;
 }
-function _packRank(combos, capUsd, sortMode) {
-  const arr = combos.slice();
-  if (sortMode === 'fewest') {
-    arr.sort((a, b) => a.count - b.count || Math.abs(capUsd - a.sum) - Math.abs(capUsd - b.sum));
-  } else {
-    arr.sort((a, b) => Math.abs(capUsd - a.sum) - Math.abs(capUsd - b.sum) || a.count - b.count);
+function _packSubsetTables(amtC) {
+  const n = amtC.length, size = 1 << n;
+  const sums = new Float64Array(size), cnts = new Uint8Array(size);
+  for (let m = 1; m < size; m++) {
+    const low = m & -m, i = 31 - Math.clz32(low);
+    sums[m] = sums[m ^ low] + amtC[i]; cnts[m] = cnts[m ^ low] + 1;
   }
-  return arr;
+  return { sums, cnts, size };
 }
-function _packMulti(items, accounts, allowOver) {
-  // FFD：订单降序，逐一放入「剩余额度最大且放得下(含允许超额)」的账户
-  const accs = accounts.map(a => ({ ...a, used: 0, picks: [] }));
-  const rest = [];
-  items.slice().sort((a, b) => b.usd - a.usd).forEach(it => {
-    let best = null;
-    accs.forEach(a => {
-      const remain = a.capUsd - a.used;
-      if (it.usd <= remain + allowOver && (!best || remain > (best.capUsd - best.used))) best = a;
-    });
-    if (best) { best.picks.push(it); best.used += it.usd; }
-    else rest.push(it);
+function _packKnapTop(capC, amtC, K, allowC, sortMode) { // sum ≤ cap+allow，按贴近排序
+  if (amtC.length === 0) return [];
+  const { sums, cnts, size } = _packSubsetTables(amtC);
+  const top = [];
+  const cmp = sortMode === 'count'
+    ? ((a, b) => (a.cnt - b.cnt) || (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)))
+    : ((a, b) => (a.dist - b.dist) || ((a.over ? 1 : 0) - (b.over ? 1 : 0)) || (a.cnt - b.cnt));
+  for (let m = 1; m < size; m++) {
+    const s = sums[m]; if (s > capC + allowC) continue;
+    const it = { m, sum: s, dist: Math.abs(capC - s), over: s > capC, cnt: cnts[m] };
+    if (top.length === K && cmp(it, top[K - 1]) >= 0) continue;
+    let lo = 0, hi = top.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (cmp(it, top[mid]) < 0) hi = mid; else lo = mid + 1; }
+    top.splice(lo, 0, it); if (top.length > K) top.pop();
+  }
+  return top;
+}
+function _packKnapBestDist(capC, amtC, allowC) { // 最贴近（±），平手取不超、单数少
+  if (amtC.length === 0) return { m: 0, sum: 0, dist: capC };
+  const { sums, cnts, size } = _packSubsetTables(amtC);
+  let bm = 0, bs = 0, bd = capC, bo = false, bc = 0;
+  for (let m = 1; m < size; m++) {
+    const s = sums[m]; if (s > capC + allowC) continue;
+    const d = Math.abs(capC - s), o = s > capC;
+    if (d < bd || (d === bd && ((bo && !o) || (o === bo && cnts[m] < bc)))) { bm = m; bs = s; bd = d; bo = o; bc = cnts[m]; }
+  }
+  return { m: bm, sum: bs, dist: bd };
+}
+function _packKnapBestFill(capC, amtC) { // 不超额填最满（多账户种子）
+  if (amtC.length === 0) return { m: 0, sum: 0 };
+  const { sums, cnts, size } = _packSubsetTables(amtC);
+  let bm = 0, bs = 0, bc = 0;
+  for (let m = 1; m < size; m++) {
+    const s = sums[m];
+    if (s <= capC && (s > bs || (s === bs && cnts[m] < bc))) { bm = m; bs = s; bc = cnts[m]; }
+  }
+  return { m: bm, sum: bs };
+}
+const _packSumC = arr => arr.reduce((s, p) => s + p.c, 0);
+function _packPick(pool, mask) { const t = [], k = []; pool.forEach((p, i) => (mask & (1 << i)) ? t.push(p) : k.push(p)); return [t, k]; }
+const _packAccCost = (acc, arr) => Math.abs(acc.capC - _packSumC(arr));
+function _packSeqSolve(accIdxs, cand, accOrder, allowC) {
+  let rest = cand; const takes = []; let tot = 0;
+  for (let i = 0; i < accIdxs.length; i++) {
+    const b = _packKnapBestDist(accOrder[accIdxs[i]].capC, rest.map(p => p.c), allowC);
+    const r = _packPick(rest, b.m); takes.push(r[0]); rest = r[1]; tot += b.dist;
+  }
+  return { tot, takes, rest };
+}
+function _packPerms3(a, b, c) { return [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]]; }
+function _packMultiSolve(items, accOrder, allowC, seedFill) {
+  let pool = items.slice();
+  const asg = accOrder.map(() => []);
+  accOrder.forEach((a, ai) => {
+    const b = seedFill ? _packKnapBestFill(a.capC, pool.map(p => p.c)) : _packKnapBestDist(a.capC, pool.map(p => p.c), allowC);
+    if (!b.m) return;
+    const [t, k] = _packPick(pool, b.m); asg[ai] = t; pool = k;
   });
-  return { accs, rest };
+  const A = accOrder.length;
+  for (let pass = 0; pass < 12; pass++) {
+    let improved = false;
+    for (let ai = 0; ai < A; ai++) {
+      const cand = asg[ai].concat(pool);
+      if (!cand.length) continue;
+      const cur = _packAccCost(accOrder[ai], asg[ai]);
+      const b = _packKnapBestDist(accOrder[ai].capC, cand.map(p => p.c), allowC);
+      if (b.dist < cur) { const [t, k] = _packPick(cand, b.m); asg[ai] = t; pool = k; improved = true; }
+    }
+    for (let x = 0; x < A; x++) for (let y = x + 1; y < A; y++) {
+      const cand = asg[x].concat(asg[y], pool);
+      if (!cand.length || cand.length > _PACK_ENUM_CAP) continue;
+      const cur = _packAccCost(accOrder[x], asg[x]) + _packAccCost(accOrder[y], asg[y]);
+      let best = null;
+      [[x, y], [y, x]].forEach(pr => {
+        const r = _packSeqSolve(pr, cand, accOrder, allowC);
+        if (!best || r.tot < best.tot) { best = r; best.pr = pr; }
+      });
+      if (best && best.tot < cur) {
+        asg[best.pr[0]] = best.takes[0]; asg[best.pr[1]] = best.takes[1]; pool = best.rest; improved = true;
+      }
+    }
+    for (let x = 0; x < A; x++) for (let y = x + 1; y < A; y++) for (let z = y + 1; z < A; z++) {
+      const cand = asg[x].concat(asg[y], asg[z], pool);
+      if (!cand.length || cand.length > 14) continue;
+      const cur = _packAccCost(accOrder[x], asg[x]) + _packAccCost(accOrder[y], asg[y]) + _packAccCost(accOrder[z], asg[z]);
+      let best = null;
+      _packPerms3(x, y, z).forEach(pr => {
+        const r = _packSeqSolve(pr, cand, accOrder, allowC);
+        if (!best || r.tot < best.tot) { best = r; best.pr = pr; }
+      });
+      if (best && best.tot < cur) {
+        best.pr.forEach((ai, i) => { asg[ai] = best.takes[i]; }); pool = best.rest; improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+  const totCost = accOrder.reduce((s, a, ai) => s + _packAccCost(a, asg[ai]), 0);
+  return { asg, pool, totCost };
 }
+
 let _PACK_CTX = null;
 function openPackingDialog() {
   const unassigned = STATE.orders
@@ -15148,7 +15237,8 @@ function _renderPackingDialog(results) {
   let resHtml = '';
   if (results && C.mode === 'single') {
     const cap = results.capUsd;
-    resHtml = results.list.length ? results.list.slice(0, 10).map((r, ri) => {
+    const SHOW = C.showAll ? results.list.length : 10;
+    resHtml = results.list.length ? results.list.slice(0, SHOW).map((r, ri) => {
       const names = C.enabled.filter((_, b) => r.mask & (1 << b)).map(it => escapeHtml(it.label)).join('、');
       const warn = r.over >= cap * C.warnPct / 100;
       return `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px; ${warn ? 'border-color:var(--warning);' : ''}">
@@ -15158,10 +15248,12 @@ function _renderPackingDialog(results) {
         </div>
         <div style="color:var(--muted); margin-top:3px;">${names}</div>
       </div>`;
-    }).join('') : '<div style="color:var(--muted); font-size:12px; margin-top:8px;">没有可行组合（额度太小或订单太大）</div>';
+    }).join('') + (results.list.length > SHOW ? `<div style="text-align:center; margin-top:8px;"><button class="btn ghost small" onclick="_PACK_CTX.showAll=true; _renderPackingDialog({ list: _PACK_CTX.lastSingle.list, capUsd: _PACK_CTX.lastSingle.capUsd })">展开全部 ${results.list.length >= 100 ? '100+' : results.list.length} 个方案</button></div>` : '')
+    : `<div style="color:var(--muted); font-size:12px; margin-top:8px;">${results.minUsd > 0 ? `没有任何订单组合能放进该账户：最小单 $${fmt(results.minUsd)} 已超过 额度＋允许超额 $${fmt(results.capUsd + (results.allowUsd || 0))}` : '没有可行组合（额度太小或订单太大）'}</div>`;
   }
   if (results && C.mode === 'multi') {
-    resHtml = results.accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
+    const _warnN = results.accs.filter(a => (a.used - a.capUsd) > 0 && (a.used - a.capUsd) >= a.capUsd * C.warnPct / 100).length;
+    resHtml = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(results.totCost || 0)}</strong>${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>` + results.accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
       <strong>${escapeHtml(a.name || '未命名')}</strong> · $${fmt(a.used)} / $${fmt(a.capUsd)}
       <div style="color:var(--muted); margin-top:3px;">${a.picks.map(p => escapeHtml(p.label)).join('、') || '—'}</div>
     </div>`).join('') + (results.rest.length ? `<div style="color:var(--warning-deep); font-size:12px; margin-top:6px;">放不下：${results.rest.map(p => escapeHtml(p.label)).join('、')}</div>` : '') +
@@ -15177,7 +15269,7 @@ function _renderPackingDialog(results) {
     <div class="verify-modal-header"><h3>🧮 配账结算</h3><button onclick="document.getElementById('packingOverlay').remove()" class="close-btn">×</button></div>
     <div class="verify-modal-body" style="padding:14px 16px;">
       <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">A 段=未分配订单 · B 段=卡主积分额度（<input type="number" value="${ppu}" style="width:56px; text-align:right;" oninput="settings.pointsPerUsd=Number(this.value)||100"> 分 = $1）· 组合应用后自动分配卡主</div>
-      <div style="font-weight:800; font-size:12px; margin:8px 0 4px;">A 段 · 订单（${C.items.length}）</div>${itemsHtml}
+      <div style="font-weight:800; font-size:12px; margin:8px 0 4px; display:flex; justify-content:space-between; align-items:center;">A 段 · 订单（${C.items.length}）<button class="btn ghost small" onclick="sendToComboCalc()" title="按 #data= 协议把 A/B 段与参数送进独立计算器（需 points_combo_calculator_v4.html 同站点部署）">↗ 送独立计算器</button></div>${itemsHtml}
       <div style="font-weight:800; font-size:12px; margin:12px 0 4px;">B 段 · 账户额度</div>${accEdit}
       <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; font-size:12px;">
         模式 <select onchange="_PACK_CTX.mode=this.value; _renderPackingDialog();"><option value="single" ${C.mode === 'single' ? 'selected' : ''}>单账户凑满</option><option value="multi" ${C.mode === 'multi' ? 'selected' : ''}>多账户自动分配</option></select>
@@ -15203,22 +15295,73 @@ function runPacking() {
   C.enabled = C.items.filter(it => it.on);
   if (!C.enabled.length) { toast('至少启用一单'); return; }
   if (C.mode === 'single') {
-    if (C.enabled.length > 20) { toast(`参与订单 ${C.enabled.length} > 20，请关掉一些（穷举保护）`); return; }
+    if (C.enabled.length > _PACK_ENUM_CAP) { toast(`参与计算的启用订单最多 ${_PACK_ENUM_CAP} 单（当前 ${C.enabled.length} 单），请先停用部分订单`); return; }
     const acc = C.accounts.find(a => a.id === C.targetId);
     if (!acc || !(acc.points > 0)) { toast('目标账户没有积分额度，先在 B 段填入'); return; }
-    const capUsd = acc.points / settings.pointsPerUsd;
-    const combos = _packEnumerate(C.enabled, capUsd, C.allowOver);
-    const list = _packRank(combos, capUsd, C.sort);
-    C.lastSingle = { list, capUsd, accId: acc.id, accName: acc.name };
-    _renderPackingDialog({ list, capUsd });
-    toast(`可行组合 ${list.length}`);
+    const capC = Math.round(acc.points / settings.pointsPerUsd * 100);
+    const allowC = Math.round(C.allowOver * 100);
+    const amtC = C.enabled.map(it => Math.round(it.usd * 100));
+    const top = _packKnapTop(capC, amtC, 100, allowC, C.sort === 'fewest' ? 'count' : 'closest');
+    const list = top.map(t => ({ mask: t.m, sum: t.sum / 100, over: t.over ? (t.sum - capC) / 100 : 0, count: t.cnt }));
+    C.lastSingle = { list, capUsd: capC / 100, accId: acc.id, accName: acc.name };
+    C.showAll = false;
+    _renderPackingDialog({ list, capUsd: capC / 100, minUsd: amtC.length ? Math.min.apply(null, amtC) / 100 : 0, allowUsd: allowC / 100 });
+    toast(`可行组合 ${list.length >= 100 ? '100+' : list.length}`);
   } else {
-    const accs = C.accounts.filter(a => a.points > 0).map(a => ({ id: a.id, name: a.name, capUsd: a.points / settings.pointsPerUsd }));
-    if (!accs.length) { toast('没有带积分额度的账户'); return; }
-    const r = _packMulti(C.enabled, accs, C.allowOver);
-    C.lastMulti = r;
-    _renderPackingDialog(r);
+    const accsOn = C.accounts.filter(a => a.points > 0);
+    if (!accsOn.length) { toast('没有带积分额度的账户'); return; }
+    const allowC = Math.round(C.allowOver * 100);
+    const items = C.enabled.map(it => ({ c: Math.round(it.usd * 100), label: it.label, idx: it.idx }));
+    const accOrderBase = accsOn.map(a => ({ id: a.id, name: a.name, capC: Math.round(a.points / settings.pointsPerUsd * 100) }));
+    // v4 六种子：额度降序/升序/原序 × 种子器(bestDist/bestFill)，取贴近偏差合计最小者
+    const seeds = [];
+    [accOrderBase.slice().sort((x, y) => y.capC - x.capC),
+     accOrderBase.slice().sort((x, y) => x.capC - y.capC),
+     accOrderBase.slice()].forEach(ord => { seeds.push([ord, false]); seeds.push([ord, true]); });
+    let best = null;
+    seeds.forEach(s => {
+      const r = _packMultiSolve(items, s[0], allowC, s[1]);
+      if (!best || r.totCost < best.totCost) { best = r; best.order = s[0]; }
+    });
+    const accs = accOrderBase.map(a => {
+      const picks = best.asg[best.order.indexOf(a)] || [];
+      return { id: a.id, name: a.name, capUsd: a.capC / 100, used: picks.reduce((s, p) => s + p.c, 0) / 100, picks };
+    });
+    C.lastMulti = { accs, rest: best.pool.map(p => ({ label: p.label })), totCost: best.totCost / 100 };
+    _renderPackingDialog(C.lastMulti);
   }
+}
+
+// 「复制全部方案」：多账户结果按独立计算器 v4 的行格式输出
+function copyPackingPlan() {
+  const C = _PACK_CTX;
+  if (!C || !C.lastMulti) return;
+  const f = (n) => Math.round(n).toLocaleString('en-US');
+  const lines = [`多账户分配方案（贴近偏差合计 $${f(C.lastMulti.totCost)}）`];
+  C.lastMulti.accs.forEach(a => {
+    if (!a.picks.length) { lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：未使用`); return; }
+    const parts = a.picks.map(p => `${p.label} $${f(p.c / 100)}`);
+    const over = a.used - a.capUsd;
+    const tail = over > 0 ? `超 $${f(over)}${over >= a.capUsd * C.warnPct / 100 ? ' ⚠' : ''}` : `差 $${f(-over)}`;
+    lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：${parts.join(' + ')} = $${f(a.used)}｜${tail}`);
+  });
+  if (C.lastMulti.rest.length) lines.push(`未分配：${C.lastMulti.rest.map(p => p.label).join('、')}`);
+  navigator.clipboard.writeText(lines.join('\n')).then(() => toast('✓ 方案已复制'));
+}
+
+// 互通桥：按 v4 协议（#data=Base64 JSON）把当前 A/B 段送进独立计算器。
+// 前提：points_combo_calculator_v4.html 与本页同站点部署（放进同一仓库即可）。
+function sendToComboCalc() {
+  const C = _PACK_CTX;
+  if (!C) return;
+  const payload = {
+    orders: C.items.map(it => ({ id: String(it.idx), label: it.label, amt: Math.round(it.usd * 100) / 100, on: !!it.on })),
+    accounts: C.accounts.filter(a => a.points > 0).map(a => ({ name: a.name || '未命名', pts: a.points, on: true })),
+    rate: settings.pointsPerUsd, allow: C.allowOver, pct: C.warnPct,
+    mode: C.mode === 'multi' ? 'multi' : 'single', autorun: 1
+  };
+  const hash = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  window.open('points_combo_calculator_v4.html#data=' + hash, '_blank');
 }
 function _assignPackPicks(pairs) {
   // pairs: [{orderIdx, cardholderId}]
