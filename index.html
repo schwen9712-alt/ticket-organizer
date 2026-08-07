@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.07.30-AV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.07-AX\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.07.30-AV</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.07-AX</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13724,7 +13724,7 @@ function renderAirlineUsdPanel(orders) {
         ? `<span class="ui-badge ui-badge--hold" title="等待代理公司放位">🔒 放位</span>`
         : '';
       const packBadge = o.packTag
-        ? `<span class="ui-badge" style="background:rgba(59,110,180,0.12); border-color:#3b6eb4; color:#3b6eb4; font-size:9px; cursor:pointer;" onclick="event.stopPropagation(); clearPackTag('${escapeAttr(o.id)}')" title="已选定配账方案 【${escapeAttr(o.packTag.al || '—')}】≈$${Math.round(o.packTag.cap || 0).toLocaleString()}${o.packTag.name ? ' · ' + escapeAttr(o.packTag.name) : ''} · ${new Date(o.packTag.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · 点击解除">💠 配账</span>`
+        ? `<span class="ui-badge" style="background:rgba(59,110,180,0.12); border-color:#3b6eb4; color:#3b6eb4; font-size:9px; cursor:pointer;" onclick="event.stopPropagation(); clearPackTag('${escapeAttr(o.id)}')" title="已选定配账方案 【${escapeAttr(o.packTag.al || '—')}】≈$${Math.round(o.packTag.cap || 0).toLocaleString()}${o.packTag.name ? ' · ' + escapeAttr(o.packTag.name) : ''}${o.packTag.pay ? ' · 付 $' + Math.round(o.packTag.pay).toLocaleString() + '（' + (o.packTag.bp || 0) + '%）' : ''} · ${new Date(o.packTag.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })} · 点击解除">💠 配账</span>`
         : '';
       const noAvailBadge = o.noAvailability
         ? `<span class="ui-badge ui-badge--none">⏸ 无位</span>`
@@ -15357,11 +15357,12 @@ function openPackingDialog() {
   })).filter(it => it.usd > 0);
   if (!_PACK_ACCOUNTS.length) _PACK_ACCOUNTS = [{ name: '', points: 0, on: true }, { name: '', points: 0, on: true }, { name: '', points: 0, on: true }];
   const prev = _PACK_CTX || {};
-  _PACK_CTX = { items, accounts: _PACK_ACCOUNTS, mode: prev.mode || 'single', sort: prev.sort || 'closest', allowOver: prev.allowOver != null ? prev.allowOver : 100, warnPct: prev.warnPct != null ? prev.warnPct : 1, targetId: prev.targetId != null ? prev.targetId : 0, bulkOpen: false, quick: prev.quick || { raw: '', unit: null }, quickAll: false, showA: false, showAdv: false };
+  _PACK_CTX = { items, accounts: _PACK_ACCOUNTS, mode: prev.mode || 'single', sort: prev.sort || 'closest', allowOver: prev.allowOver != null ? prev.allowOver : 100, warnPct: prev.warnPct != null ? prev.warnPct : 1, targetId: prev.targetId != null ? prev.targetId : 0, bulkOpen: false, quick: prev.quick || { raw: '', unit: null }, quickAll: false, showA: false, showAdv: false, bpPct: prev.bpPct != null ? prev.bpPct : 35 };
   _renderPackingDialog();
   setTimeout(() => { const el = document.getElementById('packQuickIn'); if (el) { el.focus(); el.select(); } if (_PACK_CTX.quick.raw) _packQuickCalc(); }, 60);
 }
 // ── ⚡ 快配层：一个数进去，答案出来 ─────────────────────────────────────
+function _packPayUsd(sumUsd, pct) { return Math.round(sumUsd * pct) / 100; }
 function _packCapC() {
   const C = _PACK_CTX;
   const v = _packParseNum(C.quick.raw);
@@ -15398,7 +15399,7 @@ function _packComboRowsHtml(res, copyFn, showAll) {
     const warn = r.over >= cap * C.warnPct / 100;
     return `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px; ${warn ? 'border-color:var(--warning);' : ''}">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-        <strong style="font-family:'JetBrains Mono',monospace;"><span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px; margin-right:5px;">${escapeHtml(r.al || '—')}</span>$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单</strong>
+        <strong style="font-family:'JetBrains Mono',monospace;"><span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px; margin-right:5px;">${escapeHtml(r.al || '—')}</span>$${fmt(r.sum)} / $${fmt(cap)} ${r.over > 0 ? `<span style="color:var(--warning-deep);">超 $${fmt(r.over)}${warn ? ' ⚠' : ''}</span>` : `<span style="color:var(--muted);">差 $${fmt(cap - r.sum)}</span>`} · ${r.count} 单 · <span style="color:var(--muted); font-weight:600;">付 $${fmt(_packPayUsd(r.sum, C.bpPct))}</span></strong>
         <button class="btn small" onclick="markPackChosen('${copyFn === 'copyPackingQuick' ? 'quick' : 'single'}', ${ri})">✓ 选定</button>
         <button class="btn ghost small" onclick="${copyFn}(${ri})">复制</button>
       </div>
@@ -15433,7 +15434,7 @@ function copyPackingQuick(ri) {
   const _set = new Set(r.idxs);
   const parts = C.enabled.filter((_, b) => _set.has(b)).map(it => `${it.label} $${f(it.usd)}`);
   const tail = r.over > 0 ? `超 $${f(r.over)}` : `差 $${f(C.lastQuick.capUsd - r.sum)}`;
-  navigator.clipboard.writeText(`≈$${f(C.lastQuick.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}`).then(() => toast('✓ 组合已复制'));
+  navigator.clipboard.writeText(`≈$${f(C.lastQuick.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}｜付 $${_packPayUsd(r.sum, C.bpPct).toLocaleString('en-US')}（${C.bpPct}%）`).then(() => toast('✓ 组合已复制'));
 }
 // ── 💠 选定方案 → 待出票行自动标识（解除同链路，全走 persistOrdersNow 咽喉）──
 function markPackChosen(src, ri) {
@@ -15443,7 +15444,7 @@ function markPackChosen(src, ri) {
   const r = res.list[ri];
   const set = new Set(r.idxs);
   const picks = C.enabled.filter((_, b) => set.has(b));
-  const tag = { al: r.al || '—', cap: res.capUsd, sum: r.sum, name: src === 'single' ? (res.accName || '') : '', at: Date.now() };
+  const tag = { al: r.al || '—', cap: res.capUsd, sum: r.sum, name: src === 'single' ? (res.accName || '') : '', bp: C.bpPct, pay: _packPayUsd(r.sum, C.bpPct), at: Date.now() };
   picks.forEach(it => {
     const o = STATE.orders[it.idx];
     if (!o) return;
@@ -15464,7 +15465,7 @@ function markPackMultiChosen() {
   let n = 0;
   C.lastMulti.accs.forEach(a => {
     if (!a.picks.length) return;
-    const tag = { al: a.picks[0].al || '—', cap: a.capUsd, sum: a.used, name: a.name || '', at: Date.now() };
+    const tag = { al: a.picks[0].al || '—', cap: a.capUsd, sum: a.used, name: a.name || '', bp: C.bpPct, pay: _packPayUsd(a.used, C.bpPct), at: Date.now() };
     a.picks.forEach(p => {
       const o = STATE.orders[p.idx];
       if (!o) return;
@@ -15545,6 +15546,7 @@ function _renderPackingDialog() {
         排序 <select onchange="_PACK_CTX.sort=this.value; _packQueueCalc();"><option value="closest" ${C.sort === 'closest' ? 'selected' : ''}>最贴近</option><option value="fewest" ${C.sort === 'fewest' ? 'selected' : ''}>订单最少</option></select>
         超额 ≤ $<input type="number" value="${C.allowOver}" style="width:58px;" oninput="_PACK_CTX.allowOver=Number(this.value)||0; _packQueueCalc();">
         警戒 ≥ <input type="number" value="${C.warnPct}" style="width:42px;" oninput="_PACK_CTX.warnPct=Number(this.value)||1; _packQueueCalc();">%
+        收价 <input type="number" value="${C.bpPct}" style="width:46px;" title="付给卖分卡主的比例（新卡主默认 35%）·付款=组合合计×比例" oninput="_PACK_CTX.bpPct=Number(this.value)||0; _packQueueCalc();"> %
       </div>
       <div id="packQuickRes"><div style="color:var(--muted); font-size:12px; margin-top:8px;">输入积分或美元额度，边输边出结果（支持 55万 / 8160 / 100k）</div></div>
       <div style="margin-top:14px; padding-top:10px; border-top:1px solid var(--line); font-size:12px; display:flex; justify-content:space-between; align-items:center;">
@@ -15608,9 +15610,9 @@ function runPacking() {
     });
     C.lastMulti = { accs, rest: best.pool.map(p => ({ label: p.label })), totCost: best.totCost / 100 };
     const _warnN = accs.filter(a => (a.used - a.capUsd) > 0 && (a.used - a.capUsd) >= a.capUsd * C.warnPct / 100).length;
-    el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(C.lastMulti.totCost)}</strong>${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn small" onclick="markPackMultiChosen()">✓ 全部选定</button> <button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>`
+    el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px;"><span>贴近偏差合计 <strong>$${fmt(C.lastMulti.totCost)}</strong> · 付合计 <strong>$${fmt(_packPayUsd(accs.reduce((s, a) => s + a.used, 0), C.bpPct))}</strong>（${C.bpPct}%）${_warnN ? ` · <span style="color:var(--warning-deep);">⚠ ${_warnN} 户超警戒</span>` : ''}</span><button class="btn small" onclick="markPackMultiChosen()">✓ 全部选定</button> <button class="btn ghost small" onclick="copyPackingPlan()">复制全部方案</button></div>`
       + accs.map(a => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 10px; margin-top:6px; font-size:12px;">
-      <strong>${escapeHtml(a.name || '未命名')}</strong>${a.picks.length ? ` <span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px;">${escapeHtml(a.picks[0].al || '—')}</span>` : ''} · $${fmt(a.used)} / $${fmt(a.capUsd)}
+      <strong>${escapeHtml(a.name || '未命名')}</strong>${a.picks.length ? ` <span style="display:inline-block; padding:0 5px; border:1px solid var(--line); border-radius:var(--r-sm); font-size:10px;">${escapeHtml(a.picks[0].al || '—')}</span>` : ''} · $${fmt(a.used)} / $${fmt(a.capUsd)}${a.picks.length ? ` · <span style="color:var(--muted);">付 $${fmt(_packPayUsd(a.used, C.bpPct))}</span>` : ''}
       <div style="color:var(--muted); margin-top:3px;">${a.picks.map(p => escapeHtml(p.label)).join('、') || '—'}</div>
     </div>`).join('')
       + (C.lastMulti.rest.length ? `<div style="color:var(--warning-deep); font-size:12px; margin-top:6px;">放不下：${C.lastMulti.rest.map(p => escapeHtml(p.label)).join('、')}</div>` : '');
@@ -15629,7 +15631,7 @@ function copyPackingPlan() {
     const alTag = `【${a.picks[0].al || '—'}】`;
     const over = a.used - a.capUsd;
     const tail = over > 0 ? `超 $${f(over)}${over >= a.capUsd * C.warnPct / 100 ? ' ⚠' : ''}` : `差 $${f(-over)}`;
-    lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：${alTag}${parts.join(' + ')} = $${f(a.used)}｜${tail}`);
+    lines.push(`${a.name || '未命名'} $${f(a.capUsd)}：${alTag}${parts.join(' + ')} = $${f(a.used)}｜${tail}｜付 $${_packPayUsd(a.used, C.bpPct).toLocaleString('en-US')}（${C.bpPct}%）`);
   });
   if (C.lastMulti.rest.length) lines.push(`未分配：${C.lastMulti.rest.map(p => p.label).join('、')}`);
   navigator.clipboard.writeText(lines.join('\n')).then(() => toast('✓ 方案已复制'));
@@ -15656,7 +15658,7 @@ function copyPackingCombo(ri) {
   const _set = new Set(r.idxs);
   const parts = C.enabled.filter((_, b) => _set.has(b)).map(it => `${it.label} $${f(it.usd)}`);
   const tail = r.over > 0 ? `超 $${f(r.over)}` : `差 $${f(C.lastSingle.capUsd - r.sum)}`;
-  navigator.clipboard.writeText(`${C.lastSingle.accName} ≈$${f(C.lastSingle.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}`).then(() => toast('✓ 组合已复制'));
+  navigator.clipboard.writeText(`${C.lastSingle.accName} ≈$${f(C.lastSingle.capUsd)}｜【${r.al || '—'}】${parts.join(' + ')} = $${f(r.sum)}｜${tail}｜付 $${_packPayUsd(r.sum, C.bpPct).toLocaleString('en-US')}（${C.bpPct}%）`).then(() => toast('✓ 组合已复制'));
 }
 
 // ══ 环境放松层 ═══════════════════════════════════════════════════════════
@@ -22673,30 +22675,11 @@ async function markOrderTicketed(idx) {
       if (!o.orderUsdAmount || Number(o.orderUsdAmount) <= 0) missing.push('💲 直接结算金额');
     }
   }
+  // 2026-07 用户指令：价格在对账环节最终核实，出票前不再做重复的价格/结算确认。
+  // missing 仍照常收集，但从「alert 阻断」降级为「轻提示放行」——缺就缺，照常出票。
   if (missing.length > 0) {
-    alert(`⚠️ 此单缺少以下信息，无法标记为已出票：\n\n${missing.map(m => '  ' + m).join('\n')}\n\n请先在订单卡片下方的"完成出票"区填写后再点击。`);
-    // Scroll to the finalize section of this order card
-    setTimeout(() => {
-      const meaningful = STATE.orders.filter(isMeaningfulOrder);
-      const dispIdx = meaningful.indexOf(o);
-      if (dispIdx >= 0) {
-        const groups = document.querySelectorAll('#pendingArea .preview-order-group');
-        const card = groups[dispIdx];
-        if (card) {
-          // Expand if collapsed
-          if (card.classList.contains('collapsed')) card.querySelector('.collapse-toggle')?.click();
-          // Find the finalize section inside the card
-          const finalizeSection = card.querySelector('.finalize-section, .settlement-section, [class*="finalize"]');
-          const target = finalizeSection || card;
-          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Flash highlight
-          target.style.transition = 'box-shadow 0.3s';
-          target.style.boxShadow = '0 0 0 3px var(--red)';
-          setTimeout(() => { target.style.boxShadow = ''; }, 1800);
-        }
-      }
-    }, 100);
-    return;
+    const brief = missing.slice(0, 2).map(m => m.replace(/^[^\s]+\s/, '')).join('、');
+    toast(`ℹ️ 结算信息待补 ${missing.length} 项（${brief}${missing.length > 2 ? ' 等' : ''}）· 对账前核实即可`);
   }
 
   // Multi-proposal confirmation: if the booking has alternate itineraries, make
