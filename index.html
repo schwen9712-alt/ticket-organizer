@@ -2960,23 +2960,7 @@ html[data-lang="en"] .zh {
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<!-- Firebase SDK v10 (modular) — Firestore for real-time multi-device sync -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot,
-    enableIndexedDbPersistence
-  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  // Expose to window for use by main app script (which is non-module)
-  window.firebaseAPI = {
-    initializeApp,
-    getFirestore, doc, getDoc, setDoc, onSnapshot,
-    enableIndexedDbPersistence
-  };
-  // Signal readiness
-  window.dispatchEvent(new Event('firebase-sdk-ready'));
-</script>
 </head>
 <body>
 <script>
@@ -2994,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.08-AZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.08-BA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-AZ</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-BA</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3727,41 +3711,6 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       </div>
     </div>
   </div>
-
-  <div class="section" style="border-left: 3px solid #ff9800;">
-    <div class="section-title"><span class="num" style="background:#ff9800;">🔥</span>FIREBASE 实时同步 <span class="zh">手机/电脑/平板 实时同步同一份数据</span></div>
-    <div class="hint" style="margin-bottom:12px;">
-      <strong>✓ 自动连接</strong> — 打开网址即可同步，无需手动配置。任何设备改动 1 秒内同步到其他设备。<br>
-      <span style="color:var(--muted); font-size:11px;">高级用户可在下方输入框粘贴自己的 Firebase config 来使用独立项目。留空则使用默认配置。</span>
-    </div>
-    <div id="fbSyncStatus" style="padding:8px 12px; background:var(--cream); border-radius:var(--r-sm); font-family:'JetBrains Mono',monospace; font-size:12px; margin-bottom:12px;">
-      <span id="fbStatusText">未配置</span>
-    </div>
-    <details style="margin-top:8px;">
-      <summary style="cursor:pointer; font-size:12px; color:var(--muted);">⚙ 自定义 Firebase 项目（高级）</summary>
-      <div class="setting-row" style="align-items:flex-start; margin-top:8px;">
-        <div style="flex:1;">
-          <div class="label">Firebase Config</div>
-          <div class="desc">粘贴整段 <code>const firebaseConfig = { ... }</code>，或仅 <code>{ apiKey:..., projectId:... }</code> 对象</div>
-        </div>
-        <div style="display:flex; gap:4px; flex-direction:column;">
-          <textarea id="s-fbConfig" placeholder='{
-  apiKey: "AIza...",
-  authDomain: "xxx.firebaseapp.com",
-  projectId: "xxx",
-  ...
-}' style="width:340px; height:120px; font-size:10px; font-family:'JetBrains Mono',monospace; padding:8px; border:1.5px solid var(--line); border-radius:var(--r-sm); resize:vertical;"></textarea>
-          <div style="display:flex; gap:4px;">
-            <button class="btn small" onclick="saveFbConfig()" style="background:#ff9800; border-color:#ff9800; color:#fff; flex:1;">保存覆盖</button>
-            <button class="btn small ghost" onclick="clearFbConfig()" style="color:var(--red);">恢复默认</button>
-          </div>
-        </div>
-      </div>
-    </details>
-  </div>
-
-
-
 
   <div class="section">
     <div class="section-title"><span class="num">⚙</span>EXCHANGE RATE <span class="zh">汇率设置</span></div>
@@ -6049,9 +5998,6 @@ async function storageSet(key, value) {
       toast('⚠️ 本地存储已满，数据仅保存在内存中');
     }
   }
-  if (key === 'ticket-organizer-settings' || key === 'ticket-organizer-pending') {
-    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
-  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -6980,7 +6926,7 @@ function _refreshPersistShadow() {
   (STATE.orders || []).forEach(o => { if (o && o.id) _persistShadow.set(o.id, _orderShadowJson(o)); });
 }
 function _stampChangedOrders() {
-  const applying = (typeof _fbApplyingRemote !== 'undefined' && _fbApplyingRemote);
+  const applying = false;   // Firebase 摘除（v-BA）后恒 false，仲裁结构保留
   (STATE.orders || []).forEach(o => {
     if (!o || !o.id) return;
     const j = _orderShadowJson(o);
@@ -14873,7 +14819,7 @@ async function usdQuickFix(orderId) {
   if (!(usd > 0 && usd < 1000000)) { toast('金额无效'); return; }
   o.basePrice = +((usd * rate) / pax).toFixed(2);   // 每人票面（人民币）
   o.paxPrices = null;                                // 清除旧的每人价，改走 basePrice
-  try { await persistOrdersNow(); if (typeof fbScheduleWrite === 'function') fbScheduleWrite(); } catch (e) {}
+  try { await persistOrdersNow(); } catch (e) {}
   toast(`✓ 已改为 $${usd.toLocaleString()}（每人 ¥${o.basePrice.toLocaleString()}）`);
   try { renderPendingList(); } catch (e) {}
 }
@@ -14918,11 +14864,10 @@ async function copyBuyingList() {
   _applyBuySelectMarks();
   if (btn) { btn.textContent = '📋 收单需求'; btn.classList.remove('accent'); }
   if (!text) { toast('已取消（未选择任何订单）'); return; }
-  // 给本次复制的单打"已发"时间戳（随订单持久化+云同步，下次默认不再选中）
+  // 给本次复制的单打"已发"时间戳（随订单持久化，下次默认不再选中）
   try {
     STATE.orders.forEach(o => { if (copiedSet.has(o.id)) o.buyPostedAt = Date.now(); });
     await persistOrdersNow();
-    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   } catch (e) {}
   await copyText(text);
   toast(`✓ 已复制 ${n} 条收单需求：\n` + text.split('\n').slice(0, 4).join('\n') + (n > 4 ? '\n…' : ''));
@@ -15125,9 +15070,9 @@ async function aiTicketingAdvice() {
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
 // ══ 存储健康：白屏防护 / 用量仪表 / 一键释放 ═══════════════════════════
-// 本地 localStorage 约 5MB 配额；Firestore 单文档 1MiB 硬限。
-// 三层防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条）；②云端推送剥离
-// 截图（见 fbPushNow）；③🧹 一键释放（截图保最新2张/出票记录裁400/隔离键清除）。
+// 本地 localStorage 约 5MB 配额（Firebase 已摘除，本地为唯一数据源）。
+// 防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条：先导出备份再清理）；
+// ②🧹 一键释放（截图保最新2张/出票记录裁400/隔离键清除）；③每日备份提醒。
 function storageUsage() {
   let b = 0;
   try {
@@ -15146,7 +15091,7 @@ function storageHealthCheck() {
 function storageCleanup() {
   const before = storageUsage();
   let ssTrim = 0;
-  const msg = `🧹 释放本地空间将执行：\n\n· 每单截图只保留最新 2 张（更早的剥离）\n· 出票记录保留最近 400 条（更早的以 Excel 备份为准）\n· 清除损坏数据隔离键\n\n云端同步数据不受影响。继续？`;
+  const msg = `🧹 释放本地空间将执行：\n\n· 每单截图只保留最新 2 张（更早的剥离）\n· 出票记录保留最近 400 条（更早的以 Excel 备份为准）\n· 清除损坏数据隔离键\n\n建议先在设置页导出一份 JSON 备份。继续？`;
   if (!confirm(msg)) return;
   (STATE.orders || []).forEach(o => {
     if (o && Array.isArray(o.screenshots) && o.screenshots.length > 2) {
@@ -15171,10 +15116,13 @@ function storageCleanup() {
   }, 600);
 }
 function storageRescue() {
-  if (!confirm('启动异常急救：将清除本机的订单与设置缓存并刷新页面。\n云端（Firebase）保存的数据会在刷新后自动恢复。\n\n继续？')) return;
-  try { localStorage.removeItem('ticket-organizer-pending'); } catch (e) {}
-  try { localStorage.removeItem('ticket-organizer-settings'); } catch (e) {}
-  location.reload();
+  if (!confirm('启动异常急救：\n① 先自动下载一份全量备份（JSON）\n② 然后清除本机缓存并刷新\n\n刷新后用「导入备份」即可找回数据。继续？')) return;
+  try { if (typeof exportAllData === 'function') exportAllData(); } catch (e) {}
+  setTimeout(() => {
+    try { localStorage.removeItem('ticket-organizer-pending'); } catch (e) {}
+    try { localStorage.removeItem('ticket-organizer-settings'); } catch (e) {}
+    location.reload();
+  }, 900);
 }
 window.addEventListener('error', (e) => {
   if (window._bootOk) return;
@@ -26627,7 +26575,6 @@ async function clearTicketedScreenshots() {
     }
   });
   await storageSet('ticket-organizer-settings', settings);
-  if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   if (typeof renderTicketed === 'function') renderTicketed();
   toast(`✓ 已清除 ${cleared} 张截图，释放约 ${_formatBytes(est.bytes)} 空间`);
 }
@@ -27642,7 +27589,6 @@ function persistOrders() {
       currentIdx: STATE.currentIdx
     };
     await storageSet('ticket-organizer-pending', snapshot);
-    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   }, 400);
 }
 
@@ -27730,477 +27676,11 @@ async function loadPersistedOrders() {
   return false;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// FIREBASE FIRESTORE SYNC
-// Real-time multi-device sync. All devices using the same Firebase config
-// share one document. onSnapshot pushes changes to all devices instantly.
-//
-// Setup: User creates a Firebase project, copies the config object,
-// pastes into settings → Firebase Sync section.
-// ═══════════════════════════════════════════════════════════════════════════
-
-const FB_CONFIG_KEY = 'ticket-organizer-firebase-config';
-
-// ── Hardcoded Firebase config (deployed) ─────────────────────────────────
-// This config is intentionally embedded in the source so all devices opening
-// the GitHub Pages URL get instant sync without needing manual setup.
-// SECURITY NOTE: The apiKey here is a Firebase project identifier, not a
-// password. The actual access control happens via Firestore Security Rules
-// (configure in Firebase Console → Firestore → Rules).
-const FB_DEFAULT_CONFIG = {
-  apiKey: "AIzaSyB8i6_JRA1C5K_tRJgCMxN38ceg4WqY-Mk",
-  authDomain: "ticker-orangizer.firebaseapp.com",
-  projectId: "ticker-orangizer",
-  storageBucket: "ticker-orangizer.firebasestorage.app",
-  messagingSenderId: "358841344991",
-  appId: "1:358841344991:web:c73fd8f1a4736e3fec5a6a"
-};
-
-let _fb = null;              // { app, db } once initialized
-let _fbUnsubscribe = null;   // onSnapshot listener cleanup
-let _fbWriteTimer = null;    // debounce
-let _fbApplyingRemote = false; // guard against echo loops
-let _fbLastWriteAt = 0;      // timestamp of our last write (to ignore echo)
-let _fbLastWrittenTs = 0;    // exact updatedAt we last wrote (precise echo guard)
-let _fbInitialPullDone = false;  // 首拉闸门：完成首次云端拉取前禁止推送（防陈旧设备开机清洗云端）
-
-function loadFbConfig() {
-  // Prefer user-overridden config in localStorage (for advanced users who
-  // want to point at their own Firebase project), else use hardcoded default.
-  try {
-    const raw = localStorage.getItem(FB_CONFIG_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch(e) {}
-  return FB_DEFAULT_CONFIG;
-}
-
-function saveFbConfig() {
-  const inp = document.getElementById('s-fbConfig');
-  const txt = (inp?.value || '').trim();
-  if (!txt) { toast('请粘贴 Firebase config 对象'); return; }
-  // Parse — accept both `const firebaseConfig = {...}` and just `{...}`
-  let cfg;
-  try {
-    let cleaned = txt.replace(/^.*?=\s*/s, '').replace(/;?\s*$/, '');
-    // Use Function constructor to evaluate the object literal safely
-    cfg = (new Function('return ' + cleaned))();
-  } catch(e) {
-    toast('解析失败：' + e.message);
-    return;
-  }
-  if (!cfg.projectId || !cfg.apiKey) {
-    toast('config 缺少 projectId 或 apiKey');
-    return;
-  }
-  localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
-  if (inp) inp.value = '';
-  toast('✓ Firebase 配置已保存，正在连接…');
-  updateFbStatus();
-  // Init immediately
-  fbInit().then(() => {
-    toast('✓ Firebase 连接成功，开始实时同步');
-  }).catch(e => {
-    toast('❌ Firebase 初始化失败：' + e.message);
-  });
-}
-
-function clearFbConfig() {
-  if (!confirm('恢复默认 Firebase 配置？将使用内置的共享项目。')) return;
-  localStorage.removeItem(FB_CONFIG_KEY);
-  if (_fbUnsubscribe) { _fbUnsubscribe(); _fbUnsubscribe = null; }
-  _fb = null;
-  updateFbStatus();
-  // Reconnect with default config
-  fbInit().then(() => toast('✓ 已恢复默认 Firebase 配置')).catch(e => toast('❌ 连接失败：' + e.message));
-}
-
-function updateFbStatus() {
-  const el = document.getElementById('fbStatusText');
-  if (!el) return;
-  const cfg = loadFbConfig();
-  if (!cfg) {
-    el.innerHTML = '<span style="color:var(--muted);">未配置</span>';
-  } else if (_fb) {
-    el.innerHTML = `<span style="color:#ff9800; font-weight:700;">● 实时同步中</span>  <span style="color:var(--muted);">项目: ${cfg.projectId}</span>`;
-  } else {
-    el.innerHTML = `<span style="color:var(--muted);">已配置 · 项目 ${cfg.projectId}（未连接）</span>`;
-  }
-}
-
-async function fbInit() {
-  const cfg = loadFbConfig();
-  if (!cfg) return null;
-  if (_fb) return _fb;  // already initialized
-
-  // Wait for SDK if not ready
-  if (!window.firebaseAPI) {
-    await new Promise(r => window.addEventListener('firebase-sdk-ready', r, { once: true }));
-  }
-  const { initializeApp, getFirestore, doc, getDoc, setDoc, onSnapshot, enableIndexedDbPersistence } = window.firebaseAPI;
-
-  const app = initializeApp(cfg);
-  const db  = getFirestore(app);
-
-  // Offline persistence (so the app works without network too)
-  try { await enableIndexedDbPersistence(db); }
-  catch(e) { /* may fail in multi-tab scenarios — ok to ignore */ }
-
-  _fb = { app, db, doc, getDoc, setDoc, onSnapshot };
-  updateFbStatus();
-
-  // Initial pull
-  const docRef = doc(db, 'ticket-organizer', 'main');
-  try {
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const remote = snap.data();
-      await fbApplyRemote(remote, /* isInitial */ true);
-      _fbInitialPullDone = true;
-    } else {
-      // First time — push current local state
-      _fbInitialPullDone = true;
-      await fbPushNow();
-    }
-  } catch(e) {
-    console.warn('Firebase initial pull failed:', e);
-    _fbInitialPullDone = true;  // 离线也放行后续推送：fbPushNow 自带读-合并-写兜底
-  }
-
-  // Subscribe to live changes
-  _fbUnsubscribe = onSnapshot(docRef, (snap) => {
-    if (!snap.exists()) return;
-    const remote = snap.data();
-    // Echo guard: only skip the exact snapshot we just wrote (same updatedAt).
-    // Merge is loss-safe, so even if an echo slips through it just merges our
-    // own data into itself (harmless). We must NOT blanket-ignore a time window,
-    // or a second device's update arriving right after ours would be dropped.
-    if (remote.updatedAt && remote.updatedAt === _fbLastWrittenTs) return;
-    fbApplyRemote(remote);
-  }, (err) => {
-    console.warn('Firebase listener error:', err);
-  });
-
-  return _fb;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Merge two arrays of records by a stable key, keeping the UNION (never drops).
-//   - records only in `local`  → kept
-//   - records only in `remote` → added
-//   - records in both (same key) → keep the one with the larger `tsField`
-//     (falls back to: keep local, since local may have just been edited)
-// This is the core anti-data-loss primitive. Multiple devices each ticketing
-// concurrently will have their records combined rather than overwriting.
-// ─────────────────────────────────────────────────────────────────────────────
-// 删除墓碑：被删订单的 id 永久登记（封顶800），两侧合并后过滤，杜绝"删了又复活"。
-function _recordDeletedOrderId(id) {
-  if (!id) return;
-  if (!Array.isArray(settings.deletedOrderIds)) settings.deletedOrderIds = [];
-  if (settings.deletedOrderIds.includes(id)) return;
-  settings.deletedOrderIds.push(id);
-  if (settings.deletedOrderIds.length > 800) settings.deletedOrderIds = settings.deletedOrderIds.slice(-800);
-  storageSet('ticket-organizer-settings', settings);
-}
-function _filterTombstoned(list) {
-  const t = new Set(settings.deletedOrderIds || []);
-  if (!t.size) return Array.isArray(list) ? list : [];
-  return (Array.isArray(list) ? list : []).filter(o => !o || !o.id || !t.has(o.id));
-}
-
-function _mergeById(local, remote, keyField, tsField) {
-  local  = Array.isArray(local)  ? local  : [];
-  remote = Array.isArray(remote) ? remote : [];
-  const byKey = new Map();
-  // Seed with local first
-  for (const rec of local) {
-    const k = rec && rec[keyField];
-    if (k == null) { byKey.set('__nokey_' + Math.random(), rec); continue; }
-    byKey.set(k, rec);
-  }
-  // Merge remote in
-  for (const rec of remote) {
-    const k = rec && rec[keyField];
-    if (k == null) { byKey.set('__nokey_' + Math.random(), rec); continue; }
-    if (!byKey.has(k)) {
-      byKey.set(k, rec);   // remote-only → add
-    } else if (tsField) {
-      // both have it → keep newer by timestamp; tie → keep existing (local)
-      const existing = byKey.get(k);
-      const lt = Number(existing[tsField]) || 0;
-      const rt = Number(rec[tsField]) || 0;
-      if (rt > lt) byKey.set(k, rec);
-    }
-    // if no tsField, local wins (already in map)
-  }
-  return Array.from(byKey.values());
-}
-
-async function fbApplyRemote(remote, isInitial) {
-  if (!remote) return;
-
-  _fbApplyingRemote = true;
-  try {
-    // ── ticketed: MERGE (never overwrite) — this is the historical record ──
-    if (remote.settings) {
-      const r = remote.settings;
-
-      // Accumulative arrays: merge by id, keep the union.
-      settings.ticketed = _mergeById(settings.ticketed, r.ticketed, 'id', 'ticketedAt');
-
-      // cardholders / knownPax / others: merge by id (no ts → local wins on conflict,
-      // which preserves any rename the user just did locally).
-      if (r.cardholders)      settings.cardholders      = _mergeById(settings.cardholders,      r.cardholders,      'id', null);
-      if (r.knownPax)         settings.knownPax         = _mergeUniqueStrings(settings.knownPax, r.knownPax);
-      if (r.knownCards)       settings.knownCards       = _mergeUniqueStrings(settings.knownCards, r.knownCards);
-      if (r.deletedOrderIds)  settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, r.deletedOrderIds).slice(-800);
-      if (r.ofacConfirmed)    settings.ofacConfirmed    = _mergeOfacConfirmed(settings.ofacConfirmed, r.ofacConfirmed);
-      if (r.actions)          settings.actions          = _mergeById(settings.actions,          r.actions,          'id', null);
-      if (r.discountRules)    settings.discountRules    = _mergeById(settings.discountRules,    r.discountRules,    'id', null);
-      if (r.productDiscounts) settings.productDiscounts = _mergeById(settings.productDiscounts, r.productDiscounts, 'id', null);
-      if (r.operators)        settings.operators        = _mergeById(settings.operators,        r.operators,        'id', null);
-      if (r.presetAgents && Array.isArray(r.presetAgents)) {
-        settings.presetAgents = _mergeUniqueStrings(settings.presetAgents, r.presetAgents);
-      }
-
-      // Scalar / config settings: take remote's value (last-write-wins is fine for these).
-      const scalarKeys = ['exchangeRate', 'defaultTableLabel', 'theme'];
-      scalarKeys.forEach(k => { if (r[k] !== undefined) settings[k] = r[k]; });
-
-      // Encrypted Anthropic key: follow remote (add or remove).
-      const remoteHasEncKey = !!r.anthropicKeyEncrypted;
-      if (remoteHasEncKey) {
-        settings.anthropicKeyEncrypted = r.anthropicKeyEncrypted;
-      } else if ('anthropicKeyEncrypted' in settings) {
-        delete settings.anthropicKeyEncrypted;
-      }
-
-      await storageSet('ticket-organizer-settings', settings);
-
-      if (remoteHasEncKey) {
-        try { await tryAutoDecryptCloudKey(); } catch(e) { /* needs password */ }
-      }
-    }
-
-    // ── pending (work-in-progress drafts): merge by id too, so a draft being
-    //    edited on device A isn't wiped by device B's push. ──
-    if (remote.orders && Array.isArray(remote.orders)) {
-      // 平局判云端：remote 先入座，_lastEdit 相同/缺失时保留云端版本；
-      // 本地真正较新的编辑因 _lastEdit 更大仍然获胜。
-      const merged = _filterTombstoned(_mergeById(remote.orders, STATE.orders, 'id', '_lastEdit'));
-      // 云端不携带截图（_ssCount 占位）：remote 胜出的单从本地旧值回填截图
-      merged.forEach(m => {
-        if (m && (!Array.isArray(m.screenshots) || !m.screenshots.length)) {
-          const loc = (STATE.orders || []).find(x => x && x.id === m.id);
-          if (loc && Array.isArray(loc.screenshots) && loc.screenshots.length) m.screenshots = loc.screenshots;
-        }
-        if (m && m._ssCount != null) delete m._ssCount;
-      });
-      // 旧版设备贴的单经同步进来时没有 noSplit/seatCount 字段——迁移不只在启动跑，
-      // 远端合并后同样补（纯内存、不落库不推送，见 07-24 回滚事故守则）。
-      STATE.orders = merged;
-      _migrateMarkersFromRawPnr();
-      // Guard: never end up with an empty work area
-      STATE.orders = STATE.orders.length ? STATE.orders : [newOrder()];
-      STATE.currentIdx = Math.min(STATE.currentIdx || 0, STATE.orders.length - 1);
-      if (STATE.currentIdx < 0) STATE.currentIdx = 0;
-      await storageSet('ticket-organizer-pending', { orders: STATE.orders, currentIdx: STATE.currentIdx });
-      _refreshPersistShadow();
-    }
-
-    localStorage.setItem('ticket-organizer-last-update', String(remote.updatedAt || Date.now()));
-
-    // Re-render
-    if (typeof renderPendingList === 'function') renderPendingList();
-    if (typeof syncOrderToDOM === 'function') syncOrderToDOM();
-    if (typeof renderPreview === 'function') renderPreview();
-    if (typeof updateCounts === 'function') updateCounts();
-    if (typeof renderTicketed === 'function') renderTicketed();
-    if (typeof updateAiKeyStatus === 'function') updateAiKeyStatus();
-    if (!isInitial) toast('↓ 已合并远程更新');
-  } finally {
-    _fbApplyingRemote = false;
-  }
-}
-
-// Merge two string arrays, dedup, preserve order (local first).
-// OFAC 人工放行合并：每键取 |时间戳| 更大者（正=放行、负=撤销，撤销也能跨设备传播）。
-function _mergeOfacConfirmed(a, b) {
-  const out = Object.assign({}, a || {});
-  Object.keys(b || {}).forEach(k => {
-    const av = out[k] || 0, bv = b[k] || 0;
-    if (Math.abs(bv) > Math.abs(av)) out[k] = bv;
-  });
-  return out;
-}
-
-function _mergeUniqueStrings(local, remote) {
-  local  = Array.isArray(local)  ? local  : [];
-  remote = Array.isArray(remote) ? remote : [];
-  const seen = new Set();
-  const out = [];
-  for (const s of [...local, ...remote]) {
-    const key = typeof s === 'string' ? s : JSON.stringify(s);
-    if (!seen.has(key)) { seen.add(key); out.push(s); }
-  }
-  return out;
-}
-
-function fbScheduleWrite() {
-  if (!_fb || _fbApplyingRemote) return;
-  if (!_fbInitialPullDone) return;   // 首拉未完成 → 不推（闸门）
-  if (_fbWriteTimer) clearTimeout(_fbWriteTimer);
-  _fbWriteTimer = setTimeout(() => fbPushNow(), 800);  // 800ms debounce
-}
-
-async function fbPushNow() {
-  if (!_fb) return;
-  const { db, doc, setDoc, getDoc } = _fb;
-  const now = Date.now();
-
-  try {
-    // READ-MERGE-WRITE: pull the latest cloud state first and merge our local
-    // data INTO it, so we never overwrite records another device just added.
-    let cloudOrders = [], cloudSettings = {};
-    try {
-      const snap = await getDoc(doc(db, 'ticket-organizer', 'main'));
-      if (snap.exists()) {
-        const r = snap.data();
-        cloudOrders   = Array.isArray(r.orders) ? r.orders : [];
-        cloudSettings = r.settings || {};
-      }
-    } catch(e) { /* offline / first write — proceed with local only */ }
-
-    // Merge ticketed (union by id) so concurrent ticketing from any device survives
-    const mergedTicketed = _mergeById(settings.ticketed, cloudSettings.ticketed, 'id', 'ticketedAt');
-    settings.ticketed = mergedTicketed;
-
-    // Merge other accumulative arrays the same way
-    settings.cardholders      = _mergeById(settings.cardholders,      cloudSettings.cardholders,      'id', null);
-    settings.actions          = _mergeById(settings.actions,          cloudSettings.actions,          'id', null);
-    settings.discountRules    = _mergeById(settings.discountRules,    cloudSettings.discountRules,    'id', null);
-    settings.productDiscounts = _mergeById(settings.productDiscounts, cloudSettings.productDiscounts, 'id', null);
-    settings.operators        = _mergeById(settings.operators,        cloudSettings.operators,        'id', null);
-    settings.knownPax         = _mergeUniqueStrings(settings.knownPax,    cloudSettings.knownPax);
-    settings.knownCards       = _mergeUniqueStrings(settings.knownCards,  cloudSettings.knownCards);
-    settings.deletedOrderIds  = _mergeUniqueStrings(settings.deletedOrderIds, cloudSettings.deletedOrderIds).slice(-800);
-    settings.ofacConfirmed    = _mergeOfacConfirmed(settings.ofacConfirmed, cloudSettings.ofacConfirmed);
-    if (Array.isArray(cloudSettings.presetAgents)) {
-      settings.presetAgents   = _mergeUniqueStrings(settings.presetAgents, cloudSettings.presetAgents);
-    }
-
-    // Pending drafts: merge by id as well
-    const mergedOrders = _filterTombstoned(_mergeById(STATE.orders, cloudOrders, 'id', '_lastEdit'));
-
-    // Persist the merged result locally too (keeps local == cloud)
-    await storageSet('ticket-organizer-settings', settings);
-
-    _fbLastWriteAt = Date.now();
-    _fbLastWrittenTs = now;
-    localStorage.setItem('ticket-organizer-last-update', String(now));
-
-    await setDoc(doc(db, 'ticket-organizer', 'main'), {
-      orders     : (mergedOrders.length ? mergedOrders : (STATE.orders || [])).map(o => {
-        if (!o || !Array.isArray(o.screenshots) || !o.screenshots.length) return o;
-        const { screenshots, ...rest } = o;
-        return { ...rest, _ssCount: screenshots.length };   // 截图为设备本地资料，不上云（Firestore 1MiB/doc）
-      }),
-      currentIdx : STATE.currentIdx || 0,
-      settings   : settings || {},
-      updatedAt  : now,
-      device     : (navigator.userAgent.match(/iPhone|iPad|Android/) ? '手机' : '电脑')
-    });
-  } catch(e) {
-    console.warn('Firebase push failed:', e);
-  }
-}
-
-// Hook into persistOrders / storageSet — defined after they exist
-// (called from init after firebase is set up)
-function fbHookPersistence() {
-  const origPersist = window.persistOrders;
-  if (typeof origPersist === 'function') {
-    window.persistOrders = function() {
-      const ret = origPersist.apply(this, arguments);
-      fbScheduleWrite();
-      return ret;
-    };
-  }
-  // Also hook storageSet for settings changes
-  const origStorageSet = window.storageSet;
-  if (typeof origStorageSet === 'function') {
-    window.storageSet = async function(key, val) {
-      const ret = await origStorageSet(key, val);
-      if (key === 'ticket-organizer-pending' || key === 'ticket-organizer-settings') {
-        fbScheduleWrite();
-      }
-      return ret;
-    };
-  }
-}
-
-
-const ANTHROPIC_KEY_STORAGE = 'ticket-organizer-anthropic-key';
-const ANTHROPIC_PW_STORAGE  = 'ticket-organizer-anthropic-pw';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AES-GCM 加密同步 — Anthropic Key 跨设备共享
-//   首次设备：用户设密码 → PBKDF2(200k) 派生 → AES-GCM 加密 key → 上 Firebase
-//   新设备：拉到密文 → 用本机存的密码自动解密 → 写本机明文
-//   首次新设备无密码：状态条显示「🔓 解锁」按钮，用户输密码即可
-//   AES-GCM 自带认证标签，密码错会抛错，无歧义
-// ─────────────────────────────────────────────────────────────────────────────
-function _b64(buf)     { return btoa(String.fromCharCode(...new Uint8Array(buf))); }
-function _b64dec(s)    { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
-
-async function _deriveKey(password, salt) {
-  const pwKey = await crypto.subtle.importKey(
-    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
-    pwKey,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt', 'decrypt']
-  );
-}
-
-async function _aesEncrypt(plaintext, password) {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const iv   = crypto.getRandomValues(new Uint8Array(12));
-  const key  = await _deriveKey(password, salt);
-  const ct   = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, key, new TextEncoder().encode(plaintext)
-  );
-  return JSON.stringify({ v: 1, salt: _b64(salt), iv: _b64(iv), ct: _b64(ct) });
-}
-
-async function _aesDecrypt(blobStr, password) {
-  const blob = JSON.parse(blobStr);
-  const key  = await _deriveKey(password, _b64dec(blob.salt));
-  const pt   = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: _b64dec(blob.iv) }, key, _b64dec(blob.ct)
-  );  // 密码错会在这里 throw
-  return new TextDecoder().decode(pt);
-}
-
 function loadAnthropicPw()  { try { return localStorage.getItem(ANTHROPIC_PW_STORAGE) || ''; } catch(e) { return ''; } }
 function saveAnthropicPw(pw){ try { localStorage.setItem(ANTHROPIC_PW_STORAGE, pw); } catch(e) {} }
 function clearAnthropicPw() { try { localStorage.removeItem(ANTHROPIC_PW_STORAGE); } catch(e) {} }
 
-// 用本机密码加密本机 key，写入 settings.anthropicKeyEncrypted（待 fbScheduleWrite 推送）
-async function syncAnthropicKeyToCloud() {
-  const key = loadAnthropicKey();
-  const pw  = loadAnthropicPw();
-  if (!key || !pw) return false;
-  try {
-    settings.anthropicKeyEncrypted = await _aesEncrypt(key, pw);
-    await storageSet('ticket-organizer-settings', settings);
-    return true;
-  } catch(e) { console.warn('encrypt failed:', e); return false; }
-}
-
-// fbApplyRemote 收到云端密文 + 本机有密码 → 自动解密写本机
+// 本地存有密文 + 本机有密码 → 自动解密写本机（导入备份场景仍有用）
 async function tryAutoDecryptCloudKey() {
   const blob = settings.anthropicKeyEncrypted;
   const pw   = loadAnthropicPw();
@@ -28269,19 +27749,11 @@ async function saveAnthropicKey() {
         }
         saveAnthropicPw(pw);
       }
-      const ok = await syncAnthropicKeyToCloud();
-      if (ok) {
-        if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
-        toast('✓ API Key 已保存并加密同步到云端');
-      } else {
-        toast('✓ Key 已保存本地。云端同步失败（请检查 Firebase）');
-      }
+      toast('✓ API Key 已保存（仅本设备，不上云）');
     } else {
-      // 关闭同步 → 清云端密文 + 本机密码
       if (settings.anthropicKeyEncrypted) {
         delete settings.anthropicKeyEncrypted;
         await storageSet('ticket-organizer-settings', settings);
-        if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
       }
       clearAnthropicPw();
       toast('✓ API Key 已保存（仅本设备）');
@@ -28300,7 +27772,6 @@ async function clearAnthropicKey() {
   if (settings.anthropicKeyEncrypted) {
     delete settings.anthropicKeyEncrypted;
     await storageSet('ticket-organizer-settings', settings);
-    if (typeof fbScheduleWrite === 'function') fbScheduleWrite();
   }
   clearAnthropicPw();
 
@@ -28494,7 +27965,7 @@ async function importAllData(event) {
       const changed = runPendingMigrations(STATE.orders);
       // 恢复备份 = 用户显式的全量本地编辑：逐单盖新章（跨设备仲裁中获胜），
       // 刷新影子基线后经落章咽喉写入。禁止 raw storageSet 直写 pending——
-      // 唯一合法写手：persistOrdersNow / persistOrders 防抖体 / fbApplyRemote 豁免直写（07-25 专项审计立约）。
+      // 唯一合法写手：persistOrdersNow / persistOrders 防抖体（07-25 立约三写手；v-BA 摘除 Firebase 后收敛为二）。
       const _restoreTs = Date.now();
       STATE.orders.forEach(o => { if (o) o._lastEdit = _restoreTs; });
       _refreshPersistShadow();
@@ -28733,14 +28204,8 @@ async function mergeImportData(event) {
   loadDeviceName();        // load this device's friendly name from localStorage
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
-  updateFbStatus();        // show Firebase sync status in settings
-
-  // ── Firebase real-time sync: init at startup ────────────────────────────
-  // Hook persistence functions BEFORE init, so the very first changes also sync.
-  fbHookPersistence();
-  if (loadFbConfig()) {
-    fbInit().catch(e => console.warn('Firebase init failed:', e));
-  }
+  // Firebase 实时同步已于 v26.08.08-BA 摘除（用户决定：功能一直未用）。
+  if (typeof tryAutoDecryptCloudKey === 'function') tryAutoDecryptCloudKey();
 
   // Safety mechanism 3: Daily backup reminder.
   // Once per day, remind the user to export a JSON backup.

@@ -1,3 +1,13 @@
+## 2026-08-08 — 摘除 Firebase：本地为唯一数据源 · v26.08.08-BA
+
+用户决定：Firebase 功能一直未用，取消。**物理摘除**：SDK module script、设置区 🔥 同步面板、FIREBASE FIRESTORE SYNC 主区（config/init/onSnapshot/fbApplyRemote/fbScheduleWrite/fbPushNow/fbHookPersistence，含 AZ 的截图剥离与回填）、init 启动段、全部 fbScheduleWrite 调用行（正则清扫 + storageSet 尾钩子块）。**连锁立法更新**：pending 键唯一合法写手由三收敛为二（persistOrdersNow / persistOrders 防抖体）——fbApplyRemote 豁免直写随体摘除，审计不变量 `grep -c = 2`；咽喉 _stampChangedOrders 的 applying 恒 false（仲裁结构保留）；_lastEdit 落章与 deletedOrderIds 墓碑转休眠字段（无害保留，恢复同步或备份合并可复用）。**API Key 子系统**：落实"key 不上云"既有决策——删 syncAnthropicKeyToCloud 与保存流程云分支（一律「仅本设备」），tryAutoDecryptCloudKey 保留并接入启动（导入带密文备份仍可自动解密）。**急救链改造**：storageRescue 由"清本地→云端拉回"改为「①自动下载全量 JSON 备份 → ②清缓存刷新 → ③导入备份找回」；🧹 清理文案同步；每日备份提醒地位升级为唯一兜底。**影响声明**：多设备不再互通（各设备独立数据，跨设备迁移用 导出/导入备份）；Firestore 安全规则悬案（原全局风险第一位）就此销案。
+
+**测试**：pack/parse/fx/wrap 全量回归 + 全文 fb 符号清零断言（firebasejs/FB_DEFAULT_CONFIG/fbScheduleWrite/fbPushNow/fbApplyRemote=0）+ 写手=2 不变量 + AES/PW 依赖存活断言。语法块数因移除 module script 较基线少一块，属预期。
+
+**改动位置**：SDK/设置区/主区三段切除；storageSet 尾；咽喉 applying；API Key 流程；init；storageRescue/清理文案。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-08 — 白屏防护与存储瘦身：三层防护 + 云端截图剥离 · v26.08.08-AZ
 
 用户报浏览器白屏（疑缓存上限）。诊断：localStorage ~5MB 配额被订单截图 base64 与无限增长的出票记录顶穿；更严重的隐患是 Firestore 单文档 `ticket-organizer/main` 有 **1MiB 硬限**，整包含截图推送时 setDoc 抛错仅 console.warn——云同步可能早已静默失败。手术：①**急救双保险**——全局 error 监听：首屏渲染成功（renderPendingList 置 _bootOk）之前任何未捕获异常 → 顶部红色急救条「⚠️ 启动异常 + 🧹 清理缓存并从云端恢复」（storageRescue 清 pending/settings 两键后刷新，云端自动拉回）；②**云端推送剥离截图**——fbPushNow 的 orders 去除 screenshots（_ssCount 占位），截图改为设备本地资料不再上云（1MiB 硬限所迫）；fbApplyRemote 合并后从本地旧值回填，remote 胜出不丢图；③**出票记录封顶 400**（三条出票路径 unshift 后统一裁剪，更早记录以 Excel 月度备份为准）；④**新截图压缩收紧** 1200px/0.80 → 900px/0.72（存量不动）；⑤**🧹 一键释放**（头部 🌙 旁）：每单截图保最新 2 张（标 _ssTrimmed）/出票记录裁 400/清 -corrupt 隔离键，前后用量对比 toast；⑥启动 4s 后用量巡检（≥80% 黄提示）。
