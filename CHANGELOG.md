@@ -1,3 +1,15 @@
+## 2026-08-08 — 白屏防护与存储瘦身：三层防护 + 云端截图剥离 · v26.08.08-AZ
+
+用户报浏览器白屏（疑缓存上限）。诊断：localStorage ~5MB 配额被订单截图 base64 与无限增长的出票记录顶穿；更严重的隐患是 Firestore 单文档 `ticket-organizer/main` 有 **1MiB 硬限**，整包含截图推送时 setDoc 抛错仅 console.warn——云同步可能早已静默失败。手术：①**急救双保险**——全局 error 监听：首屏渲染成功（renderPendingList 置 _bootOk）之前任何未捕获异常 → 顶部红色急救条「⚠️ 启动异常 + 🧹 清理缓存并从云端恢复」（storageRescue 清 pending/settings 两键后刷新，云端自动拉回）；②**云端推送剥离截图**——fbPushNow 的 orders 去除 screenshots（_ssCount 占位），截图改为设备本地资料不再上云（1MiB 硬限所迫）；fbApplyRemote 合并后从本地旧值回填，remote 胜出不丢图；③**出票记录封顶 400**（三条出票路径 unshift 后统一裁剪，更早记录以 Excel 月度备份为准）；④**新截图压缩收紧** 1200px/0.80 → 900px/0.72（存量不动）；⑤**🧹 一键释放**（头部 🌙 旁）：每单截图保最新 2 张（标 _ssTrimmed）/出票记录裁 400/清 -corrupt 隔离键，前后用量对比 toast；⑥启动 4s 后用量巡检（≥80% 黄提示）。
+
+**白屏设备恢复步骤**：推送本版后 Ctrl+Shift+R 强刷即可（HTML 从 Pages 拉取，崩的是旧 JS）；若仍异常会出现红色急救条，点按钮即从云端恢复。
+
+**测试**：pack/parse/fx/wrap 四套全量回归 + 语法基线一致 + pending 三写手不变量 ✓ + 封顶×4/_ssCount/急救条 grep 断言。
+
+**改动位置**：存储健康模块；renderPendingList 置位；fbPushNow/fbApplyRemote；三处出票封顶；compressImage 默认参；头部 🧹。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-08 — 解析器：中文混排 PNR 五处补强（含 DOCS 脏数据容错） · v26.08.08-AY
 
 用户报解析问题（国内代理风格中文混排样本，规则与 AI 兜底均失败）。五处补强：①**中文航段行**新分支——`1. UA772 08月17日 北京首都 - 洛杉矶 12:00 09:30` → 航班/日期(17AUG)/城市（经 cnCityToIATA 转三字码，缺映射保留中文）/起降时刻（+2 跨天保留）；②**USD 带运价码分价行**——`成人：01 PPX03PTP+* 5695.23 USD`（序号前缀+运价码+可选 CNN/CHD/INF+USD），入 parsedFareByType（×rate 转 RMB 口径），顺带覆盖了此前挂账的运价码 `+*` 尾巴形态；③**乘机人 CHD/INF 尾巴剥离**——`4.XUE/MIAWISEMAN CHD` → 名剥后缀 + forcedType（儿童价铺设自动生效）；④**DOCS 点号姓名**——`ZHANG.JINHE/P1` 两条 DOCS 正则姓名分隔改 `[/.]`；⑤**DOCS 同姓模糊合并**——`XUE/FUQIN` 与名单 `XUE/FUQIU`（录入误差）按同姓+前缀/编辑距离≤1 合并，生日与护照效期不丢，SSR 行 given 尾 CHD 同步剥离并回填 forcedType。

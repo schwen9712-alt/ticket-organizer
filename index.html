@@ -2994,10 +2994,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.08-AY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.08-AZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-AY</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-AZ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3033,6 +3033,7 @@ html[data-lang="en"] .zh {
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
+    <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1;">🧹</button>
     <button onclick="showDayWrap()" title="收工小结 — 今日成绩单与明日预览" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="this.style.background='transparent'; this.style.color='var(--muted)'">🌙</button>
     <button id="settingsGearBtn" onclick="
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -15123,6 +15124,71 @@ async function aiTicketingAdvice() {
 // 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
+// ══ 存储健康：白屏防护 / 用量仪表 / 一键释放 ═══════════════════════════
+// 本地 localStorage 约 5MB 配额；Firestore 单文档 1MiB 硬限。
+// 三层防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条）；②云端推送剥离
+// 截图（见 fbPushNow）；③🧹 一键释放（截图保最新2张/出票记录裁400/隔离键清除）。
+function storageUsage() {
+  let b = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      b += (k.length + (localStorage.getItem(k) || '').length) * 2;
+    }
+  } catch (e) {}
+  const mb = b / 1048576;
+  return { mb, pct: mb / 5 * 100 };
+}
+function storageHealthCheck() {
+  const u = storageUsage();
+  if (u.pct >= 80) toast(`⚠️ 本地存储 ${u.mb.toFixed(1)}/5 MB（${Math.round(u.pct)}%）· 点顶部 🧹 释放空间`);
+}
+function storageCleanup() {
+  const before = storageUsage();
+  let ssTrim = 0;
+  const msg = `🧹 释放本地空间将执行：\n\n· 每单截图只保留最新 2 张（更早的剥离）\n· 出票记录保留最近 400 条（更早的以 Excel 备份为准）\n· 清除损坏数据隔离键\n\n云端同步数据不受影响。继续？`;
+  if (!confirm(msg)) return;
+  (STATE.orders || []).forEach(o => {
+    if (o && Array.isArray(o.screenshots) && o.screenshots.length > 2) {
+      ssTrim += o.screenshots.length - 2;
+      o.screenshots = o.screenshots.slice(-2);
+      o._ssTrimmed = true;
+      o._lastEdit = Date.now();
+    }
+  });
+  if (Array.isArray(settings.ticketed) && settings.ticketed.length > 400) settings.ticketed.length = 400;
+  try {
+    const rm = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.endsWith('-corrupt')) rm.push(k); }
+    rm.forEach(k => localStorage.removeItem(k));
+  } catch (e) {}
+  persistOrdersNow();
+  storageSet('ticket-organizer-settings', settings);
+  renderPendingList();
+  setTimeout(() => {
+    const after = storageUsage();
+    toast(`🧹 已释放 ${Math.max(0, (before.mb - after.mb) * 1024).toFixed(0)} KB（截图剥离 ${ssTrim} 张）· 现 ${after.mb.toFixed(1)}/5 MB`);
+  }, 600);
+}
+function storageRescue() {
+  if (!confirm('启动异常急救：将清除本机的订单与设置缓存并刷新页面。\n云端（Firebase）保存的数据会在刷新后自动恢复。\n\n继续？')) return;
+  try { localStorage.removeItem('ticket-organizer-pending'); } catch (e) {}
+  try { localStorage.removeItem('ticket-organizer-settings'); } catch (e) {}
+  location.reload();
+}
+window.addEventListener('error', (e) => {
+  if (window._bootOk) return;
+  if (document.getElementById('bootRescueBar')) return;
+  try {
+    const bar = document.createElement('div');
+    bar.id = 'bootRescueBar';
+    bar.style.cssText = 'position:fixed; top:0; left:0; right:0; z-index:9999; background:#b3261e; color:#fff; padding:10px 14px; font-size:13px; display:flex; gap:12px; align-items:center; font-family:sans-serif;';
+    bar.innerHTML = `<span style="flex:1;">⚠️ 启动异常（${String((e && e.message) || '').slice(0, 120)}）— 可能是本地缓存已满或损坏。</span><button onclick="storageRescue()" style="background:#fff; color:#b3261e; border:none; border-radius:4px; padding:6px 12px; font-weight:700; cursor:pointer;">🧹 清理缓存并从云端恢复</button>`;
+    (document.body || document.documentElement).appendChild(bar);
+  } catch (err) {}
+});
+setTimeout(() => { try { storageHealthCheck(); } catch (e) {} }, 4000);
+
 // ═══ 配账引擎 · v4 原样移植（用户独立计算器 points_combo_calculator_v4）═══
 // 整数分（cents）记账防浮点；lowbit DP 子集表；top-K=100；平手取不超、单数少；
 // 多账户 = 六种子（额度降/升/原序 × bestFill种子开关）+ 12 轮局部搜索
@@ -15870,6 +15936,7 @@ function _fxAfterTicketing() {
 }
 
 function renderPendingList() {
+  window._bootOk = true;
   renderAmbientFx();
   const area = document.getElementById('pendingArea');
   if (!area) return;
@@ -22846,6 +22913,7 @@ async function markAllTicketed() {
     settings.ticketed = settings.ticketed || [];
     settings.ticketed.unshift(entry);
   });
+  if (settings.ticketed.length > 400) settings.ticketed.length = 400;
   await storageSet('ticket-organizer-settings', settings);
   _fxAfterTicketing();
 
@@ -23297,6 +23365,7 @@ async function submitManualTicket(btn) {
 
   settings.ticketed = settings.ticketed || [];
   settings.ticketed.unshift(entry);
+  if (settings.ticketed.length > 400) settings.ticketed.length = 400;
   await storageSet('ticket-organizer-settings', settings);
   _fxAfterTicketing();
 
@@ -26450,8 +26519,8 @@ async function confirmTicketing() {
 
 // Compress an image File/Blob to a base64 JPEG string
 function compressImage(file, maxWidth, quality) {
-  maxWidth = maxWidth || 1200;
-  quality = quality || 0.80;
+  maxWidth = maxWidth || 900;
+  quality = quality || 0.72;
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -26764,6 +26833,7 @@ async function doMarkTicketed(idx) {
     };
     settings.ticketed = settings.ticketed || [];
     settings.ticketed.unshift(entry);
+    if (settings.ticketed.length > 400) settings.ticketed.length = 400;
     await storageSet('ticket-organizer-settings', settings);
     _fxAfterTicketing();
 
@@ -27917,6 +27987,14 @@ async function fbApplyRemote(remote, isInitial) {
       // 平局判云端：remote 先入座，_lastEdit 相同/缺失时保留云端版本；
       // 本地真正较新的编辑因 _lastEdit 更大仍然获胜。
       const merged = _filterTombstoned(_mergeById(remote.orders, STATE.orders, 'id', '_lastEdit'));
+      // 云端不携带截图（_ssCount 占位）：remote 胜出的单从本地旧值回填截图
+      merged.forEach(m => {
+        if (m && (!Array.isArray(m.screenshots) || !m.screenshots.length)) {
+          const loc = (STATE.orders || []).find(x => x && x.id === m.id);
+          if (loc && Array.isArray(loc.screenshots) && loc.screenshots.length) m.screenshots = loc.screenshots;
+        }
+        if (m && m._ssCount != null) delete m._ssCount;
+      });
       // 旧版设备贴的单经同步进来时没有 noSplit/seatCount 字段——迁移不只在启动跑，
       // 远端合并后同样补（纯内存、不落库不推送，见 07-24 回滚事故守则）。
       STATE.orders = merged;
@@ -28021,7 +28099,11 @@ async function fbPushNow() {
     localStorage.setItem('ticket-organizer-last-update', String(now));
 
     await setDoc(doc(db, 'ticket-organizer', 'main'), {
-      orders     : mergedOrders.length ? mergedOrders : (STATE.orders || []),
+      orders     : (mergedOrders.length ? mergedOrders : (STATE.orders || [])).map(o => {
+        if (!o || !Array.isArray(o.screenshots) || !o.screenshots.length) return o;
+        const { screenshots, ...rest } = o;
+        return { ...rest, _ssCount: screenshots.length };   // 截图为设备本地资料，不上云（Firestore 1MiB/doc）
+      }),
       currentIdx : STATE.currentIdx || 0,
       settings   : settings || {},
       updatedAt  : now,
