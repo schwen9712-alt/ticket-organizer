@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.08-BA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.08-BB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-BA</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-BB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15073,6 +15073,15 @@ async function aiTicketingAdvice() {
 // 本地 localStorage 约 5MB 配额（Firebase 已摘除，本地为唯一数据源）。
 // 防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条：先导出备份再清理）；
 // ②🧹 一键释放（截图保最新2张/出票记录裁400/隔离键清除）；③每日备份提醒。
+function _recordDeletedOrderId(id) {
+  if (!id) return;
+  settings.deletedOrderIds = settings.deletedOrderIds || [];
+  if (!settings.deletedOrderIds.includes(id)) {
+    settings.deletedOrderIds.push(id);
+    if (settings.deletedOrderIds.length > 800) settings.deletedOrderIds.splice(0, settings.deletedOrderIds.length - 800);
+    storageSet('ticket-organizer-settings', settings);
+  }
+}
 function storageUsage() {
   let b = 0;
   try {
@@ -15328,7 +15337,6 @@ function _packBestFillAl(capC, items) {
   return best || { sum: 0, idxs: [], al: '' };
 }
 const _packSumC = arr => arr.reduce((s, p) => s + p.c, 0);
-function _packPick(pool, mask) { const t = [], k = []; pool.forEach((p, i) => (mask & (1 << i)) ? t.push(p) : k.push(p)); return [t, k]; }
 const _packAccCost = (acc, arr) => Math.abs(acc.capC - _packSumC(arr));
 function _packSeqSolve(accIdxs, cand, accOrder, allowC) {
   let rest = cand; const takes = []; let tot = 0;
@@ -19450,7 +19458,7 @@ function toggleLanguage() {
   try { if (typeof renderChasePanel === 'function') renderChasePanel(); } catch(_) {}
   try { if (typeof renderTicketed === 'function') renderTicketed(); } catch(_) {}
   try { if (typeof renderActionsList === 'function') renderActionsList(); } catch(_) {}
-  try { if (typeof renderCardholders === 'function') renderCardholders(); } catch(_) {}
+  try { renderCardholdersList(); } catch(_) {}
   // Final pass: scrub any remaining hardcoded Chinese in dynamic UI using
   // the auto-translate phrase map. Runs after all renders so the DOM is
   // populated when we walk it. Also start/stop the observer.
@@ -27676,42 +27684,6 @@ async function loadPersistedOrders() {
   return false;
 }
 
-function loadAnthropicPw()  { try { return localStorage.getItem(ANTHROPIC_PW_STORAGE) || ''; } catch(e) { return ''; } }
-function saveAnthropicPw(pw){ try { localStorage.setItem(ANTHROPIC_PW_STORAGE, pw); } catch(e) {} }
-function clearAnthropicPw() { try { localStorage.removeItem(ANTHROPIC_PW_STORAGE); } catch(e) {} }
-
-// 本地存有密文 + 本机有密码 → 自动解密写本机（导入备份场景仍有用）
-async function tryAutoDecryptCloudKey() {
-  const blob = settings.anthropicKeyEncrypted;
-  const pw   = loadAnthropicPw();
-  if (!blob || !pw) return false;
-  try {
-    const key = await _aesDecrypt(blob, pw);
-    if (key && key.startsWith('sk-ant-')) {
-      localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
-      return true;
-    }
-    return false;
-  } catch(e) { return false; }
-}
-
-// 用户点「🔓 解锁」按钮 → 输密码 → 解密 → 同时存 key + pw
-async function unlockAnthropicKey() {
-  const blob = settings.anthropicKeyEncrypted;
-  if (!blob) { toast('云端没有加密 Key'); return; }
-  const pw = prompt('输入同步密码以解锁 API Key:');
-  if (!pw) return;
-  try {
-    const key = await _aesDecrypt(blob, pw);
-    if (!key.startsWith('sk-ant-')) throw new Error('bad plaintext');
-    localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
-    saveAnthropicPw(pw);
-    updateAiKeyStatus();
-    toast('✓ Key 已解锁并保存到本设备');
-  } catch(e) {
-    toast('✕ 密码错误或数据损坏');
-  }
-}
 
 function loadAnthropicKey() {
   try { return localStorage.getItem(ANTHROPIC_KEY_STORAGE) || ''; } catch(e) { return ''; }
@@ -27726,38 +27698,14 @@ async function saveAnthropicKey() {
     return;
   }
 
-  const syncChk = document.getElementById('s-anthropicKeySync');
-  const syncEnabled = !!(syncChk && syncChk.checked);
-
   try {
     localStorage.setItem(ANTHROPIC_KEY_STORAGE, key);
     if (inp) inp.value = '';  // 清 DOM
-
-    if (syncEnabled) {
-      let pw = loadAnthropicPw();
-      if (!pw) {
-        pw = prompt('设置同步密码（最少 6 个字符，新设备需用此密码解锁）：');
-        if (!pw || pw.length < 6) {
-          toast('密码至少 6 个字符。Key 已保存但未同步。');
-          updateAiKeyStatus();
-          return;
-        }
-        if (prompt('再输一次确认：') !== pw) {
-          toast('两次密码不一致。Key 已保存但未同步。');
-          updateAiKeyStatus();
-          return;
-        }
-        saveAnthropicPw(pw);
-      }
-      toast('✓ API Key 已保存（仅本设备，不上云）');
-    } else {
-      if (settings.anthropicKeyEncrypted) {
-        delete settings.anthropicKeyEncrypted;
-        await storageSet('ticket-organizer-settings', settings);
-      }
-      clearAnthropicPw();
-      toast('✓ API Key 已保存（仅本设备）');
+    if (settings.anthropicKeyEncrypted) {
+      delete settings.anthropicKeyEncrypted;   // 清历史密文残留
+      await storageSet('ticket-organizer-settings', settings);
     }
+    toast('✓ API Key 已保存（仅本设备）');
     updateAiKeyStatus();
   } catch(e) {
     toast('保存失败：' + e.message);
@@ -27765,15 +27713,13 @@ async function saveAnthropicKey() {
 }
 
 async function clearAnthropicKey() {
-  if (!confirm('确认清除 Anthropic API Key？清除后 AI 兜底识别 / 补价 / 排期建议将不可用。\n（若云端有加密 Key，本机也会一并清除）')) return;
+  if (!confirm('确认清除 Anthropic API Key？清除后 AI 兜底识别 / 补价 / 排期建议将不可用。')) return;
   try { localStorage.removeItem(ANTHROPIC_KEY_STORAGE); } catch(e) {}
 
-  // 顺手清云端密文 + 本机密码
   if (settings.anthropicKeyEncrypted) {
-    delete settings.anthropicKeyEncrypted;
+    delete settings.anthropicKeyEncrypted;   // 清历史密文残留
     await storageSet('ticket-organizer-settings', settings);
   }
-  clearAnthropicPw();
 
   updateAiKeyStatus();
   toast('✓ API Key 已清除');
@@ -27887,31 +27833,12 @@ function updateAiKeyStatus() {
   const el = document.getElementById('aiKeyStatusText');
   if (!el) return;
   const key = loadAnthropicKey();
-  const synced = !!settings.anthropicKeyEncrypted;
-  const hasPw  = !!loadAnthropicPw();
-
-  let html = '';
-  if (key) {
-    const masked = key.slice(0, 12) + '••••••••' + key.slice(-4);
-    html = `<span style="color:#7c3aed; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${masked}</span>`;
-    if (synced && hasPw) {
-      html += `  <span style="color:#2da44e; margin-left:8px;">· ☁ 已加密同步</span>`;
-    } else if (synced && !hasPw) {
-      html += `  <span style="color:#e67e22; margin-left:8px;">· ⚠ 云端有但本机密码缺失</span>`;
-    }
-  } else if (synced) {
-    html = `<span style="color:#e67e22; font-weight:700;">🔒 云端有加密 Key，本机未解锁</span>
-      <button class="btn small" onclick="unlockAnthropicKey()" style="margin-left:8px; background:#7c3aed; border-color:#7c3aed; color:#fff;">🔓 输密码解锁</button>`;
-  } else {
-    html = `<span style="color:var(--muted);">未配置 · 配置后启用 AI 兜底识别 / 补价 / 排期建议</span>`;
-  }
-  el.innerHTML = html;
-
-  // checkbox 跟随当前同步状态
+  el.innerHTML = key
+    ? `<span style="color:#7c3aed; font-weight:700;">✓ 已配置</span>  <span style="color:var(--muted);">${key.slice(0, 12) + '••••••••' + key.slice(-4)}</span>  <span style="color:var(--muted); margin-left:8px;">· 仅本设备</span>`
+    : `<span style="color:var(--muted);">未配置 · 配置后启用 AI 兜底识别 / 补价 / 排期建议</span>`;
   const chk = document.getElementById('s-anthropicKeySync');
-  if (chk) chk.checked = synced;
+  if (chk) { chk.checked = false; chk.disabled = true; }   // 历史同步开关停用（密文体系已摘除）
 }
-
 
 function exportAllData() {
   const data = {
@@ -28201,11 +28128,9 @@ async function mergeImportData(event) {
   _refreshPersistShadow();
 
   // (Cloud sync + Gist config removed in earlier cleanup — Firebase replaces both)
-  loadDeviceName();        // load this device's friendly name from localStorage
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
   // Firebase 实时同步已于 v26.08.08-BA 摘除（用户决定：功能一直未用）。
-  if (typeof tryAutoDecryptCloudKey === 'function') tryAutoDecryptCloudKey();
 
   // Safety mechanism 3: Daily backup reminder.
   // Once per day, remind the user to export a JSON backup.

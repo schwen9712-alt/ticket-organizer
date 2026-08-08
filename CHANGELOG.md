@@ -1,3 +1,15 @@
+## 2026-08-08 — 删除订单修复 + 全代码体检清理 · v26.08.08-BB
+
+**删除订单故障根因（自认）**：BA 摘除 Firebase 主区时带走了 `_recordDeletedOrderId` 与 `loadDeviceName` 的定义而调用残留——摘除断言只查了符号字符串清零，未查"调用-定义"配对。点「永久删除」→ ReferenceError 当场崩；init 尾部第一句 loadDeviceName 崩 → 设置区状态恢复/AI Key 状态/每日备份提醒整段断链（"故障太多"的体感来源）。
+
+**修复与体检**（全局孤儿调用扫描器照单）：①重建 `_recordDeletedOrderId` 本地版（墓碑休眠账本，封顶 800）——删除功能复活；②删 init 的 loadDeviceName 死调用——init 尾部链恢复，备份提醒复活；③笔误修复：`renderCardholders` → `renderCardholdersList`（该刷新点因 typeof 保护静默失效已久）；④**密文残端体系整摘**：tryAutoDecryptCloudKey / unlockAnthropicKey / pw 三函数与常量 / 保存流程同步密码询问段 / updateAiKeyStatus 云端分支与 🔓 按钮——保存与状态一律「仅本设备」，历史密文字段遇到即清，同步 checkbox 停用；⑤删死函数 `_packPick`（AS 后孤儿；_packPickIdx 为现役，不受影响）；⑥误报澄清：purgeRollingBackups / checkDailyBackupReminder 为已自执行具名 IIFE（活）。**审计基线固化**：语法失败集 expected="4"；孤儿断言组纳入发货链。
+
+**测试**：pack/parse/fx/wrap 全量回归 + 写手=2 + 孤儿断言组 + 语法失败集=4。
+
+**改动位置**：墓碑重建；init 两行；笔误一处；密文体系六处；_packPick。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-08 — 摘除 Firebase：本地为唯一数据源 · v26.08.08-BA
 
 用户决定：Firebase 功能一直未用，取消。**物理摘除**：SDK module script、设置区 🔥 同步面板、FIREBASE FIRESTORE SYNC 主区（config/init/onSnapshot/fbApplyRemote/fbScheduleWrite/fbPushNow/fbHookPersistence，含 AZ 的截图剥离与回填）、init 启动段、全部 fbScheduleWrite 调用行（正则清扫 + storageSet 尾钩子块）。**连锁立法更新**：pending 键唯一合法写手由三收敛为二（persistOrdersNow / persistOrders 防抖体）——fbApplyRemote 豁免直写随体摘除，审计不变量 `grep -c = 2`；咽喉 _stampChangedOrders 的 applying 恒 false（仲裁结构保留）；_lastEdit 落章与 deletedOrderIds 墓碑转休眠字段（无害保留，恢复同步或备份合并可复用）。**API Key 子系统**：落实"key 不上云"既有决策——删 syncAnthropicKeyToCloud 与保存流程云分支（一律「仅本设备」），tryAutoDecryptCloudKey 保留并接入启动（导入带密文备份仍可自动解密）。**急救链改造**：storageRescue 由"清本地→云端拉回"改为「①自动下载全量 JSON 备份 → ②清缓存刷新 → ③导入备份找回」；🧹 清理文案同步；每日备份提醒地位升级为唯一兜底。**影响声明**：多设备不再互通（各设备独立数据，跨设备迁移用 导出/导入备份）；Firestore 安全规则悬案（原全局风险第一位）就此销案。
