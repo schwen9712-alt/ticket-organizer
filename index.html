@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.08-BB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.11-BC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.08-BB</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.11-BC</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9464,6 +9464,9 @@ function parseSingleBooking(raw) {
   let parsedBasicFareLabel = '';     // 原始标签如"基础商务舱"
   let parsedPaxPrices = undefined;
   let parsedFareByType = undefined;
+  let _uaPendSeg = null;      // UA官网中文详情：航段头暂存（航班号分行在后）
+  let _uaPendCabin = '';
+  let _uaSawTotal = false;
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
@@ -10438,6 +10441,59 @@ function parseSingleBooking(raw) {
           _d(trimmed, '✅ SEG', '中文航段 ' + zh[1].toUpperCase() + zh[2]);
           continue;
         }
+      }
+    }
+    // ── UA 官网中文行程详情（航段头与航班号分行）─────────────────────────
+    {
+      const cn12 = (ap, hm) => {
+        let h = parseInt(hm.split(':')[0], 10), m2 = hm.split(':')[1];
+        if ((ap === '下午' || ap === '晚上') && h < 12) h += 12;
+        if ((ap === '上午' || ap === '凌晨') && h === 12) h = 0;
+        return String(h).padStart(2, '0') + ':' + m2;
+      };
+      if (/至/.test(trimmed) && /(次经停|直飞)/.test(trimmed) && /时长/.test(trimmed)) {
+        _d(trimmed, '⏭ SKIP', 'OD 总览行');
+        continue;
+      }
+      const uh = trimmed.match(/^([\u4e00-\u9fa5]+)\(?([A-Z]{3})\)?[A-Z]{0,3}至\|?([\u4e00-\u9fa5]*)\(?([A-Z]{3})\)?(\d{1,2})月(\d{1,2})日·(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})至(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})/);
+      if (uh) {
+        const mi = parseInt(uh[5], 10) - 1;
+        if (mi >= 0 && mi < 12) {
+          _uaPendSeg = {
+            from: uh[2], to: uh[4],
+            date: String(parseInt(uh[6], 10)).padStart(2, '0') + _MN3[mi],
+            depTime: cn12(uh[7], uh[8]), arrTime: cn12(uh[9], uh[10])
+          };
+          _d(trimmed, '⏳ SEG?', `暂存 ${uh[2]}→${uh[4]} 待航班号`);
+          continue;
+        }
+      }
+      if (/^(基础经济舱|经济舱|超级经济舱|商务舱|头等舱|Basic Economy)$/.test(trimmed)) {
+        _uaPendCabin = trimmed;
+        continue;
+      }
+      const uf = trimmed.match(/^航班号[:：]\s*([A-Z0-9]{2})\s*(\d{2,4})\b/);
+      if (uf && _uaPendSeg) {
+        segs.push({ ..._uaPendSeg, flight: uf[1].toUpperCase() + uf[2], cls: _uaPendCabin || '' });
+        if (!airline) airline = uf[1].toUpperCase();
+        _d(trimmed, '✅ SEG', `UA详情 ${uf[1].toUpperCase()}${uf[2]} ${_uaPendSeg.from}→${_uaPendSeg.to}`);
+        _uaPendSeg = null;
+        continue;
+      }
+      if (/^合计应付/.test(trimmed)) { _uaSawTotal = true; continue; }
+      if (_uaSawTotal) {
+        const ym = trimmed.match(/^¥\s*([\d,]+(?:\.\d+)?)/);
+        if (ym) {
+          const amt = parseFloat(ym[1].replace(/,/g, ''));
+          if (amt > 100 && amt < 2000000 && amt > (rmb || 0)) {
+            rmb = amt;
+            _d(trimmed, '💰 FARE', `UA详情合计 ¥${amt}`);
+          }
+          continue;
+        }
+      }
+      if (/^(时长[:：]|飞机类型[:：]|每个座位类型的排放|隐藏详细信息$|票价$|旅客[:：]\s*\d+$|\d+名成人)/.test(trimmed)) {
+        continue;
       }
     }
     // ── 全程<舱位>: "全程商务 …" → order-level cabin ─────────────────────────
