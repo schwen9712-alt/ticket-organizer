@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.12-BD\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.12-BE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.12-BD</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.12-BE</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10952,7 +10952,7 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
+    const bareDocMatch = trimmed.match(/^P[-\/][A-Z]+[-\/][A-Z0-9]+[-\/][A-Z]+[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(?:儿童|婴儿|CHD|INF|CHILD|INFANT))?\s*$/i);
     if (bareDocMatch) {
       const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
       const dob = _pad2b(bareDocMatch[1].toUpperCase());
