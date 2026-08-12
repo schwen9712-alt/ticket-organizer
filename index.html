@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.11-BC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.12-BD\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.11-BC</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.12-BD</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9467,6 +9467,7 @@ function parseSingleBooking(raw) {
   let _uaPendSeg = null;      // UA官网中文详情：航段头暂存（航班号分行在后）
   let _uaPendCabin = '';
   let _uaSawTotal = false;
+  let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
@@ -10189,7 +10190,7 @@ function parseSingleBooking(raw) {
     // Carrier code may contain a digit in either position (B6=JetBlue, 9C=Spring,
     // 3U=Sichuan), but not be all-digits — enforced by the (?=...[A-Z]) lookahead
     // so a bare "1." index can't be misread as a carrier code.
-    /^\s*\d*\.?\s*[.*]?\s*(?=[A-Z0-9]{0,1}[A-Z])([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Za-z]|超级经济舱|超级经济|超经|经济舱|商务舱|公务舱|头等舱)\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\d*\.?\s*[.*]?\s*(?=[A-Z0-9]{0,1}[A-Z])([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Za-z]|超级经济舱|超级经济|超经|经济舱|商务舱|公务舱|头等舱)\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?/,
     // ETAS variant WITHOUT a class code: "1.  UA153     SU28JUN  HKGLAX DK1   1240 1115".
     // The weekday (SU/MO/...) is REQUIRED here as the anchor, since without a class
     // letter there's nothing else separating flight number from date. Produces
@@ -10197,9 +10198,9 @@ function parseSingleBooking(raw) {
     // length===6 handler branch (cls=''); trailing times/junk are ignored.
     /^\s*\d*\.?\s*[.*]?\s*(?=[A-Z0-9]{0,1}[A-Z])([A-Z0-9]{2})\s*(\d{1,4})\s+(?:MO|TU|WE|TH|FR|SA|SU)(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*([A-Z]{3})/,
     // Sabre "1 AA 100Y 26MAY J PVGLAX HK1 930A 1030A"
-    /^\s*\d+\s+\*?\s*([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+[A-Z]?\s*([A-Z]{3})([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\d+\s+\*?\s*([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+[A-Z]?\s*([A-Z]{3})([A-Z]{3})(?:\s+[A-Z]{2,3}\d?)?(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?/,
     // Amadeus "AA 100 Y 26MAY 4 PVGLAX 0930 1030"
-    /^\s*\*?\s*([A-Z0-9]{2})\s+(\d{1,4})\s+([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+\d*\s*([A-Z]{3})\s*([A-Z]{3})(?:\s+(\d{3,4}[AP]?))?(?:\s+(\d{3,4}[AP]?))?/,
+    /^\s*\*?\s*([A-Z0-9]{2})\s+(\d{1,4})\s+([A-Z])\d?\s+(\d{1,2}[A-Z]{3}\d{0,4})\s+\d*\s*([A-Z]{3})\s*([A-Z]{3})(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?(?:\s+(\d{3,4}[AP]?(?:\+\d)?))?/,
     // Loose "AA 100 Y 15MAY JFK-LAX"
     /\*?\s*([A-Z0-9]{2})\s*(\d{1,4})\s+([A-Z])\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?(\d{1,2}[A-Z]{3}\d{0,4})\s+([A-Z]{3})\s*[-\s>→]\s*([A-Z]{3})/,
     // E-ticket "AA 100 26MAY PVG LAX"
@@ -10494,6 +10495,36 @@ function parseSingleBooking(raw) {
       }
       if (/^(时长[:：]|飞机类型[:：]|每个座位类型的排放|隐藏详细信息$|票价$|旅客[:：]\s*\d+$|\d+名成人)/.test(trimmed)) {
         continue;
+      }
+    }
+    // ── 中文标签乘客资料块（姓名：/性别：/出生年月日：/护照有效期：…）────
+    {
+      const nm = trimmed.match(/^姓名\s*[:：]\s*([A-Za-z]+(?:\s+[A-Za-z]+)+)\s*$/);
+      if (nm) {
+        const ws = nm[1].toUpperCase().split(/\s+/);
+        const name = ws[0] + '/' + ws.slice(1).join(' ');
+        let ex = pax.find(p => p.name === name);
+        if (!ex) { ex = { name, gender: '', dob: '' }; pax.push(ex); }
+        _cnPaxRef = ex;
+        _d(trimmed, '✅ PAX', '中文资料块 ' + name);
+        continue;
+      }
+      if (_cnPaxRef) {
+        const g = trimmed.match(/^性别\s*[:：]\s*(男|女|M|F)/i);
+        if (g) { _cnPaxRef.gender = (g[1] === '女' || g[1].toUpperCase() === 'F') ? 'F' : 'M'; continue; }
+        const b = trimmed.match(/^出生(?:年月日|日期)?\s*[:：]\s*(\d{4})[.\-\/年]\s*(\d{1,2})[.\-\/月]\s*(\d{1,2})/);
+        if (b) {
+          const mi = parseInt(b[2], 10) - 1;
+          if (mi >= 0 && mi < 12) _cnPaxRef.dob = String(parseInt(b[3], 10)).padStart(2, '0') + _MN3[mi] + b[1].slice(2);
+          continue;
+        }
+        const pe = trimmed.match(/^护照有效期\s*[:：]\s*(\d{1,2})[\/.\-](\d{1,2})[\/.\-\s]+(\d{4})/);
+        if (pe) {
+          const mi2 = parseInt(pe[2], 10) - 1;
+          if (mi2 >= 0 && mi2 < 12) _cnPaxRef.passportExpiry = String(parseInt(pe[1], 10)).padStart(2, '0') + _MN3[mi2] + pe[3].slice(2);
+          continue;
+        }
+        if (/^护照(号|签发国家?)\s*[:：]/.test(trimmed)) continue;
       }
     }
     // ── 全程<舱位>: "全程商务 …" → order-level cabin ─────────────────────────
