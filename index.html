@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.13-BG\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.13-BH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BG</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BH</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14605,6 +14605,59 @@ async function sendBuyingToDiscord() {
   const dlg = document.getElementById('sendDialogOverlay');
   if (dlg) dlg.remove();
 }
+const _TG_CONF_KEY = 'to-telegram-conf';
+const _SLACK_WH_KEEY = null; // (保留位)
+const _SLACK_WH_KEY = 'to-slack-webhook';
+function _getTgConf() {
+  try { const j = JSON.parse(localStorage.getItem(_TG_CONF_KEY) || 'null'); return (j && j.token && j.chat) ? j : null; } catch (e) { return null; }
+}
+function _tgValidConf(token, chat) {
+  return /^\d{6,12}:[A-Za-z0-9_-]{30,50}$/.test(String(token || '').trim())
+    && /^(-?\d{5,16}|@[A-Za-z0-9_]{4,32})$/.test(String(chat || '').trim());
+}
+async function sendBuyingToTelegram() {
+  const conf = _getTgConf();
+  if (!conf) { toast('先填 Bot Token 与群 Chat ID 并保存'); return; }
+  const parts = _splitForDiscord(_lastBuyingText, 4000);
+  if (!parts.length) { toast('没有可发送的内容'); return; }
+  let ok = 0;
+  for (const p of parts) {
+    try {
+      const res = await fetch('https://api.telegram.org/bot' + conf.token + '/sendMessage', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: conf.chat, text: p, disable_web_page_preview: true })
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!j.ok) {
+        if (res.status === 401 || res.status === 404) toast('❌ Bot Token 不对（' + res.status + '）— 找 @BotFather 核对');
+        else if (res.status === 400) toast('❌ Chat ID 不对或 bot 不在群里（400）— 先把 bot 拉进收分群');
+        else toast('❌ Telegram 发送失败（' + res.status + '）');
+        return;
+      }
+      ok++;
+      await new Promise(r => setTimeout(r, 350));
+    } catch (e) { toast('❌ 发送失败：网络异常'); return; }
+  }
+  toast(`✓ 已发送到 Telegram（${ok} 条消息）`);
+  const dlg = document.getElementById('sendDialogOverlay');
+  if (dlg) dlg.remove();
+}
+function _getSlackWebhook() { try { return localStorage.getItem(_SLACK_WH_KEY) || ''; } catch (e) { return ''; } }
+async function sendBuyingToSlack() {
+  const wh = _getSlackWebhook();
+  if (!wh) { toast('先粘贴 Slack Incoming Webhook 链接并保存'); return; }
+  const parts = _splitForDiscord(_lastBuyingText, 3800);
+  if (!parts.length) { toast('没有可发送的内容'); return; }
+  for (const p of parts) {
+    try {
+      await fetch(wh, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ text: p }) });
+      await new Promise(r => setTimeout(r, 350));
+    } catch (e) { toast('❌ Slack 发送异常：网络或链接不对'); return; }
+  }
+  toast(`✓ 已发出 ${parts.length} 条到 Slack（Slack 不给浏览器回执，去频道确认一眼）`);
+  const dlg = document.getElementById('sendDialogOverlay');
+  if (dlg) dlg.remove();
+}
 function sendBuyingToWhatsApp() {
   if (!_lastBuyingText) { toast('先点「📋 收单需求」生成并确认复制'); return; }
   window.open('https://wa.me/?text=' + encodeURIComponent(_lastBuyingText), '_blank');
@@ -14629,6 +14682,17 @@ function openSendDialog() {
         : `<div style="display:flex; gap:8px; margin-bottom:8px;"><input id="dcWhInput" type="text" placeholder="https://discord.com/api/webhooks/…" style="flex:1; font-size:12px;" title="Discord 频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接"><button class="btn small" onclick="const v=document.getElementById('dcWhInput').value.trim(); if(!/^https:\\/\\/(discord|discordapp)\\.com\\/api\\/webhooks\\//.test(v)){toast('链接格式不对：应以 https://discord.com/api/webhooks/ 开头');return;} try{localStorage.setItem(_DISCORD_WH_KEY, v);}catch(e){}; toast('✓ Webhook 已保存（仅本设备）'); openSendDialog();">保存</button></div>
         <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">获取：Discord 收分频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接（仅存本机，不进备份）</div>`}
       <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToDiscord()" ${wh ? '' : 'disabled'}>📤 发送到 Discord${parts.length > 1 ? `（${parts.length} 条）` : ''}</button>
+      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Telegram（Bot 直发 · 带回执）</div>
+      ${(() => { const tg = _getTgConf(); return tg
+        ? `<div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:8px;"><span style="color:#3ba55c;">✓ 已配置</span><span style="color:var(--muted); font-family:monospace;">bot…${escapeHtml(String(tg.token).slice(-6))} → ${escapeHtml(String(tg.chat))}</span><a href="javascript:void(0)" onclick="try{localStorage.removeItem(_TG_CONF_KEY);}catch(e){}; openSendDialog();">清除</a></div>`
+        : `<div style="display:flex; gap:6px; margin-bottom:4px;"><input id="tgTokenInput" type="text" placeholder="Bot Token（@BotFather /newbot 获取）" style="flex:1.4; font-size:12px;"><input id="tgChatInput" type="text" placeholder="群 Chat ID（负数）" style="flex:1; font-size:12px;"><button class="btn small" onclick="const t=document.getElementById('tgTokenInput').value.trim(), c=document.getElementById('tgChatInput').value.trim(); if(!_tgValidConf(t,c)){toast('格式不对：Token 形如 123456789:AA…，Chat ID 是负数或 @频道名');return;} try{localStorage.setItem(_TG_CONF_KEY, JSON.stringify({token:t, chat:c}));}catch(e){}; toast('✓ Telegram 已保存（仅本设备）'); openSendDialog();">保存</button></div>
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">建 bot → 拉进收分群 → 群里发条消息 → 浏览器开 api.telegram.org/bot<span style="opacity:0.6;">TOKEN</span>/getUpdates 找 chat.id（群为负数）</div>`; })()}
+      <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToTelegram()" ${_getTgConf() ? '' : 'disabled'}>📤 发送到 Telegram</button>
+      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Slack（Webhook 直发 · 无回执）</div>
+      ${(() => { const sw = _getSlackWebhook(); return sw
+        ? `<div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:8px;"><span style="color:#3ba55c;">✓ 已配置</span><span style="color:var(--muted); font-family:monospace;">…${escapeHtml(sw.slice(-10))}</span><a href="javascript:void(0)" onclick="try{localStorage.removeItem(_SLACK_WH_KEY);}catch(e){}; openSendDialog();">清除</a></div>`
+        : `<div style="display:flex; gap:8px; margin-bottom:8px;"><input id="skWhInput" type="text" placeholder="https://hooks.slack.com/services/…" style="flex:1; font-size:12px;" title="Slack App → Incoming Webhooks → Activate → 选频道 → 复制链接"><button class="btn small" onclick="const v=document.getElementById('skWhInput').value.trim(); if(!/^https:\\/\\/hooks\\.slack\\.com\\//.test(v)){toast('链接格式不对：应以 https://hooks.slack.com/ 开头');return;} try{localStorage.setItem(_SLACK_WH_KEY, v);}catch(e){}; toast('✓ Slack Webhook 已保存（仅本设备）'); openSendDialog();">保存</button></div>`; })()}
+      <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToSlack()" ${_getSlackWebhook() ? '' : 'disabled'}>📤 发送到 Slack</button>
       <div style="font-weight:800; font-size:12px; margin-bottom:4px;">WhatsApp（预填跳转）</div>
       <button class="btn ghost" style="width:100%;" onclick="sendBuyingToWhatsApp()">WhatsApp ↗ 打开并预填 — 选群后按发送</button>
     </div>

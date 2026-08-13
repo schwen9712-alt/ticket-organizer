@@ -1,3 +1,13 @@
+## 2026-08-13 — 📤 发送扩展：Telegram Bot 直发（带回执）+ Slack Webhook（盲发） · v26.08.13-BH
+
+用户追问 Slack/Telegram。四通道边界如实：**Telegram = 全场最优**——Bot API 支持浏览器跨域、真自动且逐条回执可判成败（@BotFather 建 bot → 拉进收分群 → 填 Token+Chat ID；4096 上限按 4000 分段；401/404 判 Token 错、400 判 Chat/未入群，均给修复指引）；**Slack = Incoming Webhook 盲发**——hooks.slack.com 不返回 CORS 头，以 no-cors 模式发出（消息可达但浏览器读不到回执，提示去频道确认）；Discord/WhatsApp 沿用。配置各自独立存本机 localStorage（_TG_CONF_KEY / _SLACK_WH_KEY，同 API Key 策略不进备份，可清除），发送窗四区块紧凑排列，未配置通道按钮置灰。
+
+**测试**：send_test 增至 6 断言（T1 合法 Token/负数群 ID/@频道名；T2 三种非法形态拒收）+ 全量回归 + 语法失败集=4 + 写手=2。
+
+**改动位置**：发送模块三函数与两常量；发送窗四通道 UI。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-13 — 📤 收分需求一键发送：Discord 直发 + WhatsApp 预填 · v26.08.13-BG
 
 用户诉求：每次手动往 WhatsApp/Discord 发收分需求太累。能力边界如实拆分：**Discord 走 Webhook 真·一键直发**（纯前端 POST，无需后端/登录；频道 ⚙→整合→Webhook→复制链接，粘贴一次长期生效）；**WhatsApp 无后端做不到全自动**（商业 API 需 Meta 认证且有封号风险），做成 `wa.me` 预填跳转——点开 WhatsApp 文本已在输入框，选群按发送即可。实现：①「确认复制」时文本存入会话（_lastBuyingText），toast 提示可发送；②工具条新增「📤 发送」→ 发送窗：字数/分条预览、Webhook 配置（格式校验；**仅存本机 localStorage，同 API Key 策略不进备份**，可清除）、「发送到 Discord」（_splitForDiscord 段落≤1900 智能分条＋行切＋硬切兜底，条间 450ms 防限流；401/403/404 识别失效引导重配）、「WhatsApp ↗ 预填」。
