@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.13-BH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.13-BJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BH</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BJ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10910,7 +10910,7 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
+    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
     if (ssrMatch) {
       const _pad2 = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');  // "2MAR71"→"02MAR71"
       const dob = _pad2(ssrMatch[1].toUpperCase());
@@ -10957,7 +10957,7 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P[-\/][A-Z]+[-\/][A-Z0-9]+[-\/][A-Z]+[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/P\d+)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
+    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
     if (bareDocMatch) {
       const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
       const dob = _pad2b(bareDocMatch[1].toUpperCase());
@@ -14658,6 +14658,10 @@ async function sendBuyingToSlack() {
   const dlg = document.getElementById('sendDialogOverlay');
   if (dlg) dlg.remove();
 }
+function sendBuyingToTgShare() {
+  if (!_lastBuyingText) { toast('先点「📋 收单需求」生成并确认复制'); return; }
+  window.open('https://t.me/share/url?url=%20&text=' + encodeURIComponent(_lastBuyingText), '_blank');
+}
 function sendBuyingToWhatsApp() {
   if (!_lastBuyingText) { toast('先点「📋 收单需求」生成并确认复制'); return; }
   window.open('https://wa.me/?text=' + encodeURIComponent(_lastBuyingText), '_blank');
@@ -14682,12 +14686,13 @@ function openSendDialog() {
         : `<div style="display:flex; gap:8px; margin-bottom:8px;"><input id="dcWhInput" type="text" placeholder="https://discord.com/api/webhooks/…" style="flex:1; font-size:12px;" title="Discord 频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接"><button class="btn small" onclick="const v=document.getElementById('dcWhInput').value.trim(); if(!/^https:\\/\\/(discord|discordapp)\\.com\\/api\\/webhooks\\//.test(v)){toast('链接格式不对：应以 https://discord.com/api/webhooks/ 开头');return;} try{localStorage.setItem(_DISCORD_WH_KEY, v);}catch(e){}; toast('✓ Webhook 已保存（仅本设备）'); openSendDialog();">保存</button></div>
         <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">获取：Discord 收分频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接（仅存本机，不进备份）</div>`}
       <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToDiscord()" ${wh ? '' : 'disabled'}>📤 发送到 Discord${parts.length > 1 ? `（${parts.length} 条）` : ''}</button>
-      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Telegram（Bot 直发 · 带回执）</div>
+      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Telegram（自己的群=Bot 直发 · 别人的群=预填跳转）</div>
       ${(() => { const tg = _getTgConf(); return tg
         ? `<div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:8px;"><span style="color:#3ba55c;">✓ 已配置</span><span style="color:var(--muted); font-family:monospace;">bot…${escapeHtml(String(tg.token).slice(-6))} → ${escapeHtml(String(tg.chat))}</span><a href="javascript:void(0)" onclick="try{localStorage.removeItem(_TG_CONF_KEY);}catch(e){}; openSendDialog();">清除</a></div>`
         : `<div style="display:flex; gap:6px; margin-bottom:4px;"><input id="tgTokenInput" type="text" placeholder="Bot Token（@BotFather /newbot 获取）" style="flex:1.4; font-size:12px;"><input id="tgChatInput" type="text" placeholder="群 Chat ID（负数）" style="flex:1; font-size:12px;"><button class="btn small" onclick="const t=document.getElementById('tgTokenInput').value.trim(), c=document.getElementById('tgChatInput').value.trim(); if(!_tgValidConf(t,c)){toast('格式不对：Token 形如 123456789:AA…，Chat ID 是负数或 @频道名');return;} try{localStorage.setItem(_TG_CONF_KEY, JSON.stringify({token:t, chat:c}));}catch(e){}; toast('✓ Telegram 已保存（仅本设备）'); openSendDialog();">保存</button></div>
         <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">建 bot → 拉进收分群 → 群里发条消息 → 浏览器开 api.telegram.org/bot<span style="opacity:0.6;">TOKEN</span>/getUpdates 找 chat.id（群为负数）</div>`; })()}
-      <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToTelegram()" ${_getTgConf() ? '' : 'disabled'}>📤 发送到 Telegram</button>
+      <button class="btn" style="width:100%; margin-bottom:6px;" onclick="sendBuyingToTelegram()" ${_getTgConf() ? '' : 'disabled'}>📤 Bot 直发（自己的群）</button>
+      <button class="btn ghost" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToTgShare()">Telegram ↗ 预填 — 任意群，选中即发</button>
       <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Slack（Webhook 直发 · 无回执）</div>
       ${(() => { const sw = _getSlackWebhook(); return sw
         ? `<div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:8px;"><span style="color:#3ba55c;">✓ 已配置</span><span style="color:var(--muted); font-family:monospace;">…${escapeHtml(sw.slice(-10))}</span><a href="javascript:void(0)" onclick="try{localStorage.removeItem(_SLACK_WH_KEY);}catch(e){}; openSendDialog();">清除</a></div>`
