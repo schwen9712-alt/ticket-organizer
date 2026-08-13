@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.12-BF\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.13-BG\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.12-BF</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BG</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3430,6 +3430,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
             style="position:absolute;right:2px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;" title="清除（Esc）">✕</button>
         </div>
         <button class="btn small" id="buyingListBtn" onclick="copyBuyingList()" title="第一次点：高亮全部待收订单进入选择模式；点订单行可取消/恢复；再点按钮确认复制">📋 收单需求</button>
+        <button class="btn small ghost" onclick="openSendDialog()" title="把刚生成的收分需求一键发送：Discord Webhook 直发 / WhatsApp 预填跳转">📤 发送</button>
         <button class="btn small ghost" id="buyMaxBtn" onclick="toggleBuyMax()" title="MAX 拆单模式：默认整单收分；紧急收不到分时一键开启——多人单标注全部可拆档位/组合/脚注">⚡MAX</button>
         <button class="btn small ghost" onclick="openPackingDialog()" title="配账结算：未分配订单 × 卡主积分额度 → 计算最贴近的订单组合，一键分配">🧮 配账</button>
         <button id="bulkModeToggle" onclick="toggleBulkMode()"
@@ -14553,6 +14554,87 @@ function _sgOrdLink(x) {
 }
 
 // ── BUYING LIST（收单需求）─────────────────────────────────────────────────
+// ── 📤 一键发送：Discord Webhook 直发（真自动）+ WhatsApp 预填跳转（选群后按发送）──
+// Webhook 链接仅存本机 localStorage（同 API Key 策略，不进 settings/备份）。
+let _lastBuyingText = '';
+const _DISCORD_WH_KEY = 'to-discord-webhook';
+function _getDiscordWebhook() { try { return localStorage.getItem(_DISCORD_WH_KEY) || ''; } catch (e) { return ''; } }
+function _splitForDiscord(text, limit) {
+  limit = limit || 1900;
+  const out = [];
+  let cur = '';
+  const flush = () => { if (cur.trim()) out.push(cur.trimEnd()); cur = ''; };
+  String(text || '').split(/\n{2,}/).forEach(block => {
+    const b = block.trimEnd();
+    if (!b) return;
+    if (b.length > limit) {
+      flush();
+      let seg = '';
+      b.split('\n').forEach(line => {
+        while (line.length > limit) { if (seg) { out.push(seg); seg = ''; } out.push(line.slice(0, limit)); line = line.slice(limit); }
+        if (seg && (seg + '\n' + line).length > limit) { out.push(seg); seg = line; }
+        else seg = seg ? seg + '\n' + line : line;
+      });
+      if (seg) out.push(seg);
+      return;
+    }
+    if (cur && (cur + '\n\n' + b).length > limit) flush();
+    cur = cur ? cur + '\n\n' + b : b;
+  });
+  flush();
+  return out;
+}
+async function sendBuyingToDiscord() {
+  const wh = _getDiscordWebhook();
+  if (!wh) { toast('先粘贴 Discord Webhook 链接并保存'); return; }
+  const parts = _splitForDiscord(_lastBuyingText, 1900);
+  if (!parts.length) { toast('没有可发送的内容'); return; }
+  let ok = 0;
+  for (const p of parts) {
+    try {
+      const res = await fetch(wh, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: p }) });
+      if (res.status === 401 || res.status === 403 || res.status === 404) {
+        toast('❌ Webhook 已失效（' + res.status + '）— 去频道 ⚙ 整合里重新生成并粘贴');
+        return;
+      }
+      if (res.ok || res.status === 204) ok++;
+      await new Promise(r => setTimeout(r, 450));
+    } catch (e) { toast('❌ 发送失败：网络异常或链接不对'); return; }
+  }
+  toast(`✓ 已发送到 Discord（${ok} 条消息）`);
+  const dlg = document.getElementById('sendDialogOverlay');
+  if (dlg) dlg.remove();
+}
+function sendBuyingToWhatsApp() {
+  if (!_lastBuyingText) { toast('先点「📋 收单需求」生成并确认复制'); return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(_lastBuyingText), '_blank');
+}
+function openSendDialog() {
+  if (!_lastBuyingText) { toast('先点「📋 收单需求」选单并确认复制，再点发送'); return; }
+  const wh = _getDiscordWebhook();
+  const parts = _splitForDiscord(_lastBuyingText, 1900);
+  const old = document.getElementById('sendDialogOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'sendDialogOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:520px;">
+    <div class="verify-modal-header"><h3>📤 发送收分需求</h3><button onclick="document.getElementById('sendDialogOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">当前文本 ${_lastBuyingText.length} 字 · 将按 Discord 上限拆成 <strong>${parts.length}</strong> 条消息</div>
+      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">Discord（Webhook 直发）</div>
+      ${wh
+        ? `<div style="display:flex; gap:8px; align-items:center; font-size:12px; margin-bottom:8px;"><span style="color:#3ba55c;">✓ 已配置</span><span style="color:var(--muted); font-family:monospace;">…${escapeHtml(wh.slice(-10))}</span><a href="javascript:void(0)" onclick="try{localStorage.removeItem(_DISCORD_WH_KEY);}catch(e){}; openSendDialog();">清除</a></div>`
+        : `<div style="display:flex; gap:8px; margin-bottom:8px;"><input id="dcWhInput" type="text" placeholder="https://discord.com/api/webhooks/…" style="flex:1; font-size:12px;" title="Discord 频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接"><button class="btn small" onclick="const v=document.getElementById('dcWhInput').value.trim(); if(!/^https:\\/\\/(discord|discordapp)\\.com\\/api\\/webhooks\\//.test(v)){toast('链接格式不对：应以 https://discord.com/api/webhooks/ 开头');return;} try{localStorage.setItem(_DISCORD_WH_KEY, v);}catch(e){}; toast('✓ Webhook 已保存（仅本设备）'); openSendDialog();">保存</button></div>
+        <div style="font-size:10px; color:var(--muted); margin-bottom:8px;">获取：Discord 收分频道 → ⚙ 编辑频道 → 整合 → Webhook → 新 Webhook → 复制链接（仅存本机，不进备份）</div>`}
+      <button class="btn" style="width:100%; margin-bottom:12px;" onclick="sendBuyingToDiscord()" ${wh ? '' : 'disabled'}>📤 发送到 Discord${parts.length > 1 ? `（${parts.length} 条）` : ''}</button>
+      <div style="font-weight:800; font-size:12px; margin-bottom:4px;">WhatsApp（预填跳转）</div>
+      <button class="btn ghost" style="width:100%;" onclick="sendBuyingToWhatsApp()">WhatsApp ↗ 打开并预填 — 选群后按发送</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
 // 未分配卡主的待出订单，按航司合并美金票面（未打折，即卡上实际刷的数）：
 //   points = USD × 100 → "Buying 288K AMEX BP-UA"（$2,884 → 288K）
 // 常用机场坐标（lat, lon）— 用于按航段大圆距离判定收分需求的主航司。
@@ -14964,8 +15046,9 @@ async function copyBuyingList() {
     STATE.orders.forEach(o => { if (copiedSet.has(o.id)) o.buyPostedAt = Date.now(); });
     await persistOrdersNow();
   } catch (e) {}
+  _lastBuyingText = text;
   await copyText(text);
-  toast(`✓ 已复制 ${n} 条收单需求：\n` + text.split('\n').slice(0, 4).join('\n') + (n > 4 ? '\n…' : ''));
+  toast(`✓ 已复制 ${n} 条收单需求（可点「📤 发送」直发 Discord / WhatsApp）：\n` + text.split('\n').slice(0, 4).join('\n') + (n > 4 ? '\n…' : ''));
 }
 
 // AI-recommended priority orders (set by aiTicketingAdvice) → animated marks.
