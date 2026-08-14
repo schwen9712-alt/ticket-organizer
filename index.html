@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.13-BJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.14-BM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.13-BJ</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.14-BM</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3017,6 +3017,7 @@ html[data-lang="en"] .zh {
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
+    <button onclick="openAgentInbox()" title="代理收件箱：代理端 agent.html 提交的订单在此接收入库" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1;">📥</button>
     <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1;">🧹</button>
     <button onclick="showDayWrap()" title="收工小结 — 今日成绩单与明日预览" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="this.style.background='transparent'; this.style.color='var(--muted)'">🌙</button>
     <button id="settingsGearBtn" onclick="
@@ -9149,6 +9150,47 @@ function splitChunkByProposals(chunkText) {
   return result;
 }
 
+// ── 微信聊天记录清洗：剥说话人前缀/时间戳/占位噪音，识别唯一代理名 ──────────
+// 防误伤三重保险：说话人需出现 ≥2 次；解析关键词黑名单；多说话人时不剥行内前缀。
+const _WC_BLACKLIST = ['成人', '大人', '儿童', '小孩', '小儿', '婴儿', '姓名', '性别', '出生年月日', '出生日期', '护照号', '护照有效期', '护照签发国家', '护照签发国', '运价', '乘机人', '旅客', '乘客', '合计应付', '时长', '航班号', '飞机类型', '票价', '备注', '价格', '客户', '代理', '航司', '舱位'];
+function _wechatClean(raw) {
+  const lines = String(raw || '').split('\n');
+  const tsSolo = /^\s*(\d{4}[\/年.\-]\d{1,2}[\/月.\-]\d{1,2}日?\s*(\d{1,2}:\d{2})?|\d{1,2}:\d{2}|(昨天|今天|前天|星期[一二三四五六日天])\s*\d{1,2}:\d{2})\s*$/;
+  const noise = /^\s*(\[(图片|照片|视频|语音|链接|文件|表情|动画表情|转账|红包)\]|—+)\s*$/;
+  const cHead = /^\s*(\S{1,12})\s+\d{4}[\/年.\-]\d{1,2}[\/月.\-]\d{1,2}日?\s+\d{1,2}:\d{2}\s*$/;
+  const aSolo = /^\s*(\S{1,12})[:：]\s*$/;
+  const bPrefix = /^\s*(\S{1,12})[:：]\s+(.+)$/;
+  const votes = {};
+  const vote = (nm) => {
+    nm = nm.trim();
+    if (!nm || _WC_BLACKLIST.includes(nm) || /\d/.test(nm)) return;
+    votes[nm] = (votes[nm] || 0) + 1;
+  };
+  lines.forEach(l => {
+    const c = l.match(cHead); if (c) { vote(c[1]); return; }
+    const a = l.match(aSolo); if (a) { vote(a[1]); return; }
+    const b = l.match(bPrefix); if (b) vote(b[1]);
+  });
+  const cands = Object.keys(votes).filter(k => votes[k] >= 2);
+  const agent = cands.length === 1 ? cands[0] : null;
+  const multi = cands.length > 1;
+  let stripped = 0;
+  const out = [];
+  lines.forEach(l => {
+    if (tsSolo.test(l) || noise.test(l)) { stripped++; return; }
+    const c = l.match(cHead);
+    if (c && (agent ? c[1].trim() === agent : (votes[c[1].trim()] || 0) >= 2)) { stripped++; return; }
+    if (agent) {
+      const a = l.match(aSolo);
+      if (a && a[1].trim() === agent) { stripped++; return; }
+      const b = l.match(bPrefix);
+      if (b && b[1].trim() === agent) { stripped++; out.push(b[2]); return; }
+    }
+    out.push(l);
+  });
+  return { cleaned: out.join('\n'), agent, multi, stripped };
+}
+
 function splitIntoBookings(raw) {
   // Pre-normalize: some agents paste "第11单 87折1. UA858 ..." with no newline
   // between the order marker and segment list. Segments must start on their
@@ -9468,6 +9510,7 @@ function parseSingleBooking(raw) {
   let _uaPendSeg = null;      // UA官网中文详情：航段头暂存（航班号分行在后）
   let _uaPendCabin = '';
   let _uaSawTotal = false;
+  let _uaSawTotalEn = 0;      // 英文票价区：1=在区内 2=刚过 Total due 待取金额
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -10470,8 +10513,9 @@ function parseSingleBooking(raw) {
           continue;
         }
       }
-      if (/^(基础经济舱|经济舱|超级经济舱|商务舱|头等舱|Basic Economy)$/.test(trimmed)) {
+      if (/^(基础经济舱|经济舱|超级经济舱|商务舱|头等舱|Basic Economy|Economy|Premium Economy|Business|First)$/.test(trimmed)) {
         _uaPendCabin = trimmed;
+        if (segs.length && !segs[segs.length - 1].cls) segs[segs.length - 1].cls = trimmed;
         continue;
       }
       const uf = trimmed.match(/^航班号[:：]\s*([A-Z0-9]{2})\s*(\d{2,4})\b/);
@@ -10481,6 +10525,52 @@ function parseSingleBooking(raw) {
         _d(trimmed, '✅ SEG', `UA详情 ${uf[1].toUpperCase()}${uf[2]} ${_uaPendSeg.from}→${_uaPendSeg.to}`);
         _uaPendSeg = null;
         continue;
+      }
+      // ── UA 英文官网：date change 警告 → 最近段补 +1 ──
+      if (/date change/i.test(trimmed)) {
+        if (segs.length) {
+          const ls = segs[segs.length - 1];
+          if (ls.arrTime && !/\+\d/.test(ls.arrTime)) ls.arrTime += '+1';
+        }
+        _d(trimmed, '✅ SEG', '跨天警告 → 末段 +1');
+        continue;
+      }
+      // ── UA 英文官网票价区：/person 入每人价；Total due 后首个 $ 为整单 ──
+      {
+        const pp = trimmed.match(/^\$?([\d,]+\.\d{2})\s*\/\s*person\b/i) || trimmed.match(/\$([\d,]+\.\d{2})\s*\/\s*person\b/i);
+        if (pp) {
+          const amt = parseFloat(pp[1].replace(/,/g, ''));
+          if (amt >= 50 && amt <= 100000 && settings.rate > 0) {
+            if (!parsedFareByType) parsedFareByType = {};
+            if (parsedFareByType.adult == null) parsedFareByType.adult = +(amt * settings.rate).toFixed(2);
+            _d(trimmed, '💰 FARE', `EN 每人 $${amt}`);
+          }
+          continue;
+        }
+        if (/^Total due\b/i.test(trimmed)) {
+          const inl = trimmed.match(/\$([\d,]+(?:\.\d+)?)/);
+          if (inl) {
+            const amt = parseFloat(inl[1].replace(/,/g, ''));
+            if (amt > 100 && amt < 300000 && settings.rate > 0) { rmb = +(amt * settings.rate).toFixed(2); _d(trimmed, '💰 FARE', `EN 合计 $${amt}`); }
+            _uaSawTotalEn = 0;
+          } else _uaSawTotalEn = 2;
+          continue;
+        }
+        if (/^(Fare|Taxes and fees)$/i.test(trimmed)) { _uaSawTotalEn = 1; continue; }
+        if (_uaSawTotalEn) {
+          const ym = trimmed.match(/^\$\s*([\d,]+(?:\.\d+)?)\s*$/);
+          if (ym) {
+            if (_uaSawTotalEn === 2) {
+              const amt = parseFloat(ym[1].replace(/,/g, ''));
+              if (amt > 100 && amt < 300000 && settings.rate > 0) { rmb = +(amt * settings.rate).toFixed(2); _d(trimmed, '💰 FARE', `EN 合计 $${amt}`); }
+              _uaSawTotalEn = 1;
+            }
+            continue;
+          }
+        }
+        if (/^(ROUNDTRIP\b|ONE[- ]?WAY\b|Revise this trip$|Show details$|Nonstop$|\d+ stops?$|\d+[\d,]*\s*kg CO2?₂?$|\d+ (adults?|travelers?)\b)/i.test(trimmed)) {
+          continue;
+        }
       }
       if (/^合计应付/.test(trimmed)) { _uaSawTotal = true; continue; }
       if (_uaSawTotal) {
@@ -12896,8 +12986,21 @@ function showBlockingModal(strong, weak) {
 
 async function parsePNR() {
   try {
-  const raw = document.getElementById('rawInput').value;
+  let raw = document.getElementById('rawInput').value;
   if (!raw.trim()) { toast('请先粘贴内容'); return; }
+  // 微信聊天记录清洗：噪音剥离 + 唯一说话人识别为代理
+  try {
+    const wc = _wechatClean(raw);
+    if (wc.stripped > 0) {
+      raw = wc.cleaned;
+      document.getElementById('rawInput').value = wc.cleaned;
+      if (wc.agent) {
+        const af = document.getElementById('f-agent');
+        if (af && !af.value.trim()) { af.value = wc.agent; try { syncDOMToOrder(); } catch (e2) {} }
+      }
+      toast(`🧼 已清洗微信记录（删 ${wc.stripped} 行噪音${wc.agent ? '，代理=' + wc.agent : ''}${wc.multi ? '；检测到多位说话人，建议分开贴' : ''}）`);
+    }
+  } catch (e) {}
 
   // Sync DOM fields (agent, tableLabel etc.) to STATE before reading curr()
   try { syncDOMToOrder(); } catch(e) { console.warn('syncDOMToOrder error:', e); }
@@ -15316,6 +15419,105 @@ async function aiTicketingAdvice() {
 // 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
+// ══ 📥 代理收件箱：agent.html 提交 → 接收入库（走 parsePNR 全管道）════════
+// 数据通道：Firestore agent-orders（匿名 Auth 隔离，firestore.rules 管权限）。
+// 管理端需把本设备 UID 加入 Firebase 控制台 admin/config 的 uids 数组。
+let _agentInboxTimer = null;
+function openAgentInbox() {
+  _renderAgentInbox('connecting');
+  window._agentInboxOnReady = () => { _agentInboxLoad(); };
+  window._agentInboxOnError = (e) => { _renderAgentInbox('error', null, e); };
+  if (window._fbx && window._fbx.ready) _agentInboxLoad();
+  else if (typeof window._fbxConnect === 'function') window._fbxConnect();
+  else _renderAgentInbox('error', null, { code: 'no-bridge' });
+  clearInterval(_agentInboxTimer);
+  _agentInboxTimer = setInterval(() => {
+    if (document.getElementById('agentInboxOverlay') && window._fbx && window._fbx.ready) _agentInboxLoad(true);
+    if (!document.getElementById('agentInboxOverlay')) clearInterval(_agentInboxTimer);
+  }, 60000);
+}
+async function _agentInboxLoad(silent) {
+  const F = window._fbx;
+  if (!F || !F.ready) return;
+  try {
+    const snap = await F.getDocs(F.query(F.collection(F.db, 'agent-orders'), F.where('status', '==', 'pending')));
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    rows.sort((a, b) => (a.at || 0) - (b.at || 0));
+    _renderAgentInbox('ok', rows);
+  } catch (e) {
+    if (!silent) _renderAgentInbox('error', null, e);
+  }
+}
+function _renderAgentInbox(state, rows, err) {
+  const old = document.getElementById('agentInboxOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'agentInboxOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) { clearInterval(_agentInboxTimer); ov.remove(); } };
+  let body = '';
+  if (state === 'connecting') body = '<div style="color:var(--muted); font-size:12px;">连接 Firebase 中…（首次需 1–3 秒）</div>';
+  else if (state === 'error') {
+    const c = (err && err.code) || '';
+    body = `<div style="color:var(--warning-deep); font-size:12px;">${c === 'permission-denied' ? '权限不足：请到 Firebase 控制台把下方设备 UID 加入 admin/config 的 uids 数组，并确认 firestore.rules 已发布。' : c === 'no-bridge' ? '桥未加载：请硬刷新页面。' : '连接失败（' + escapeHtml(c || '网络异常') + '）：需可访问 Google 服务的网络。'}</div>`;
+  } else {
+    body = (rows && rows.length)
+      ? rows.map(r => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 12px; margin-top:8px; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <strong>${escapeHtml(r.agent || '未署名')}</strong>
+            <span style="color:var(--muted);">${new Date(r.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+          ${r.note ? `<div style="color:var(--ink); margin-top:3px;">📝 ${escapeHtml(r.note)}</div>` : ''}
+          <div style="color:var(--muted); font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:64px; overflow:hidden; margin-top:4px;">${escapeHtml(String(r.raw || '').slice(0, 260))}</div>
+          <div style="text-align:right; margin-top:6px;">
+            <button class="btn small" onclick="acceptAgentOrder('${escapeAttr(r.id)}')">✓ 接收 → 解析录入</button>
+            <button class="btn ghost small" onclick="rejectAgentOrder('${escapeAttr(r.id)}')">✕ 拒收</button>
+          </div>
+        </div>`).join('')
+      : '<div style="color:var(--muted); font-size:12px; margin-top:8px;">没有待接收的提交</div>';
+  }
+  const uid = (window._fbx && window._fbx.uid) || '';
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:600px; max-height:84vh; overflow:auto;">
+    <div class="verify-modal-header"><h3>📥 代理收件箱</h3><button onclick="clearInterval(_agentInboxTimer); document.getElementById('agentInboxOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">代理提交页：<strong>agent.html</strong>（发链接给代理即可）· 每 60 秒自动刷新${uid ? ` · 本设备 UID <span style="font-family:monospace;">${escapeHtml(uid.slice(0, 10))}…</span> <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeAttr(uid)}').then(()=>toast('✓ UID 已复制，去 Firebase 控制台 admin/config 的 uids 数组里加上'))">复制</a>` : ''}</div>
+      ${body}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+async function acceptAgentOrder(id) {
+  const F = window._fbx;
+  if (!F || !F.ready) return;
+  try {
+    const snap = await F.getDocs(F.query(F.collection(F.db, 'agent-orders'), F.where('status', '==', 'pending')));
+    let target = null;
+    snap.forEach(d => { if (d.id === id) target = { id: d.id, ...d.data() }; });
+    if (!target) { toast('该条已被处理或撤回'); _agentInboxLoad(); return; }
+    const ri = document.getElementById('rawInput');
+    if (ri) ri.value = target.raw || '';
+    const af = document.getElementById('f-agent');
+    if (af && target.agent) af.value = target.agent;
+    await F.updateDoc(F.doc(F.db, 'agent-orders', id), { status: 'accepted', acceptedAt: Date.now() });
+    clearInterval(_agentInboxTimer);
+    const dlg = document.getElementById('agentInboxOverlay');
+    if (dlg) dlg.remove();
+    parsePNR();
+    toast(`✓ 已接收 ${target.agent || ''} 的提交 — 解析完成，核对后选表保存${target.note ? '（备注：' + target.note.slice(0, 40) + '）' : ''}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) { toast('接收失败：' + ((e && e.code) || '网络异常')); }
+}
+async function rejectAgentOrder(id) {
+  const F = window._fbx;
+  if (!F || !F.ready) return;
+  if (!confirm('拒收这条提交？代理端将显示「已拒收」。')) return;
+  try {
+    await F.updateDoc(F.doc(F.db, 'agent-orders', id), { status: 'rejected', rejectedAt: Date.now() });
+    _agentInboxLoad();
+  } catch (e) { toast('操作失败：' + ((e && e.code) || '网络异常')); }
+}
+
 // ══ 存储健康：白屏防护 / 用量仪表 / 一键释放 ═══════════════════════════
 // 本地 localStorage 约 5MB 配额（Firebase 已摘除，本地为唯一数据源）。
 // 防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条：先导出备份再清理）；
@@ -28440,6 +28642,41 @@ async function mergeImportData(event) {
   }, 60000);
 })();
 
+</script>
+<script type="module">
+// 代理收件箱专用 Firebase 桥（匿名 Auth + Firestore agent-orders；主数据仍在本地）
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, query, where, getDocs, updateDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+window._fbx = { ready: false };
+window._fbxConnect = function() {
+  if (window._fbx.ready || window._fbx.connecting) return;
+  window._fbx.connecting = true;
+  try {
+    const app = initializeApp({
+      apiKey: "AIzaSyB8i6_JRA1C5K_tRJgCMxN38ceg4WqY-Mk",
+      authDomain: "ticker-orangizer.firebaseapp.com",
+      projectId: "ticker-orangizer",
+      storageBucket: "ticker-orangizer.firebasestorage.app",
+      messagingSenderId: "358841344991",
+      appId: "1:358841344991:web:c73fd8f1a4736e3fec5a6a"
+    });
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    onAuthStateChanged(auth, (u) => {
+      if (!u) return;
+      window._fbx = { ready: true, uid: u.uid, db, collection, query, where, getDocs, updateDoc, doc };
+      if (typeof window._agentInboxOnReady === 'function') window._agentInboxOnReady();
+    });
+    signInAnonymously(auth).catch(e => {
+      window._fbx.connecting = false;
+      if (typeof window._agentInboxOnError === 'function') window._agentInboxOnError(e);
+    });
+  } catch (e) {
+    window._fbx.connecting = false;
+    if (typeof window._agentInboxOnError === 'function') window._agentInboxOnError(e);
+  }
+};
 </script>
 </body>
 </html>

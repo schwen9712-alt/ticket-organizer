@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>订单提交 · Ticket Organizer 代理端</title>
+<style>
+  :root { --ink:#0c1b2a; --muted:#6b7a8c; --line:#e3e8ee; --bg:#f6f4ef; --ok:#2e7d32; --warn:#b3261e; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--ink); padding-bottom:40px; }
+  header { background:var(--ink); color:#fff; padding:14px 16px; font-weight:800; letter-spacing:0.04em; }
+  header small { display:block; font-weight:400; opacity:0.65; font-size:11px; margin-top:2px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:12px; margin:12px; padding:14px; }
+  label { display:block; font-size:12px; font-weight:700; margin:10px 0 4px; }
+  input, textarea { width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; font-size:14px; font-family:inherit; }
+  textarea { min-height:150px; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  button.primary { width:100%; margin-top:12px; background:var(--ink); color:#fff; border:none; border-radius:10px; padding:13px; font-size:15px; font-weight:800; cursor:pointer; }
+  button.primary:disabled { opacity:0.5; }
+  .item { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-top:8px; font-size:12px; }
+  .badge { display:inline-block; padding:1px 8px; border-radius:99px; font-size:11px; font-weight:700; }
+  .b-pending { background:#e3ecfb; color:#1a56b0; }
+  .b-accepted { background:#e3f4e4; color:var(--ok); }
+  .b-rejected { background:#fdeaea; color:var(--warn); }
+  .b-cancelled { background:#eee; color:#777; }
+  .cancel-link { color:var(--warn); font-size:11px; cursor:pointer; text-decoration:underline; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:10px; font-size:13px; display:none; max-width:88vw; z-index:99; }
+  .muted { color:var(--muted); }
+  .raw-preview { color:var(--muted); font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:52px; overflow:hidden; margin-top:4px; }
+</style>
+</head>
+<body>
+<header>✈️ 订单提交 <small>Ticket Organizer 代理端 · 提交后等待管理员接收</small></header>
+
+<div class="card">
+  <label>我的名字（代理）</label>
+  <input id="agentName" list="agentList" placeholder="选择或输入你的名字">
+  <datalist id="agentList">
+    <option value="季凯"><option value="东莞"><option value="罗"><option value="南京">
+    <option value="向红"><option value="恒途"><option value="梁海波"><option value="ZHAOJIE">
+  </datalist>
+  <label>订单原文（PNR / 行程 / 乘客资料，可多单一起贴）</label>
+  <textarea id="rawText" placeholder="把订单原文粘到这里…"></textarea>
+  <label>备注（可选：价格、加急、拆单要求等）</label>
+  <input id="noteText" placeholder="例：加急，明早前出">
+  <button class="primary" id="submitBtn" onclick="submitOrder()">提 交 订 单</button>
+</div>
+
+<div class="card">
+  <div style="font-weight:800; font-size:13px;">我的提交 <span id="listCount" class="muted" style="font-weight:400;"></span></div>
+  <div id="myList"><div class="muted" style="font-size:12px; margin-top:8px;">连接中…</div></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const app = initializeApp({
+  apiKey: "AIzaSyB8i6_JRA1C5K_tRJgCMxN38ceg4WqY-Mk",
+  authDomain: "ticker-orangizer.firebaseapp.com",
+  projectId: "ticker-orangizer",
+  storageBucket: "ticker-orangizer.firebasestorage.app",
+  messagingSenderId: "358841344991",
+  appId: "1:358841344991:web:c73fd8f1a4736e3fec5a6a"
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+let UID = null;
+
+const $ = (id) => document.getElementById(id);
+const toast = (m) => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._t); t._t = setTimeout(() => t.style.display = 'none', 3200); };
+const STATUS = { pending: ['待接收', 'b-pending'], accepted: ['已接收', 'b-accepted'], rejected: ['已拒收', 'b-rejected'], cancelled: ['已撤单', 'b-cancelled'] };
+
+$('agentName').value = localStorage.getItem('agent-portal-name') || '';
+$('agentName').addEventListener('input', e => localStorage.setItem('agent-portal-name', e.target.value.trim()));
+
+window.submitOrder = async function() {
+  const agent = $('agentName').value.trim();
+  const raw = $('rawText').value.trim();
+  if (!agent) { toast('先填你的名字'); return; }
+  if (!raw) { toast('订单原文不能为空'); return; }
+  if (raw.length > 18000) { toast('内容太长，请拆开提交'); return; }
+  if (!UID) { toast('还在连接，稍等两秒再点'); return; }
+  const btn = $('submitBtn');
+  btn.disabled = true; btn.textContent = '提交中…';
+  try {
+    await addDoc(collection(db, 'agent-orders'), {
+      agent, raw, note: $('noteText').value.trim().slice(0, 300),
+      status: 'pending', ownerUid: UID, at: Date.now(), createdAt: serverTimestamp()
+    });
+    $('rawText').value = ''; $('noteText').value = '';
+    toast('✓ 已提交，等待管理员接收');
+    loadMine();
+  } catch (e) {
+    toast(e.code === 'permission-denied' ? '通道尚未开通或规则未部署，请联系管理员' : '提交失败：' + (e.code || '网络异常'));
+  }
+  btn.disabled = false; btn.textContent = '提 交 订 单';
+};
+
+window.cancelOrder = async function(id) {
+  if (!confirm('确认撤回这条提交？撤回后管理员将不再处理。')) return;
+  try {
+    await updateDoc(doc(db, 'agent-orders', id), { status: 'cancelled', cancelledAt: Date.now() });
+    toast('✓ 已撤单');
+    loadMine();
+  } catch (e) { toast('撤单失败：' + (e.code === 'permission-denied' ? '该单已被处理，无法撤回' : e.code || '网络异常')); }
+};
+
+async function loadMine() {
+  if (!UID) return;
+  try {
+    const snap = await getDocs(query(collection(db, 'agent-orders'), where('ownerUid', '==', UID)));
+    const rows = [];
+    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
+    rows.sort((a, b) => (b.at || 0) - (a.at || 0));
+    $('listCount').textContent = rows.length ? `· ${rows.length} 条` : '';
+    $('myList').innerHTML = rows.length ? rows.slice(0, 50).map(r => {
+      const [label, cls] = STATUS[r.status] || [r.status, 'b-cancelled'];
+      const esc = (s) => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      return `<div class="item">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span><span class="badge ${cls}">${label}</span> <span class="muted">${new Date(r.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span></span>
+          ${r.status === 'pending' ? `<span class="cancel-link" onclick="cancelOrder('${r.id}')">申请撤单</span>` : ''}
+        </div>
+        <div class="raw-preview">${esc(r.raw).slice(0, 160)}</div>
+        ${r.note ? `<div class="muted" style="margin-top:3px;">📝 ${esc(r.note)}</div>` : ''}
+      </div>`;
+    }).join('') : '<div class="muted" style="font-size:12px; margin-top:8px;">还没有提交记录</div>';
+  } catch (e) {
+    $('myList').innerHTML = `<div class="muted" style="font-size:12px; margin-top:8px;">${e.code === 'permission-denied' ? '通道尚未开通（规则未部署）' : '加载失败：' + (e.code || '网络异常')}</div>`;
+  }
+}
+
+onAuthStateChanged(auth, (u) => { if (u) { UID = u.uid; loadMine(); } });
+signInAnonymously(auth).catch(() => { $('myList').innerHTML = '<div class="muted" style="font-size:12px; margin-top:8px;">无法连接（需可访问 Google 服务的网络）</div>'; });
+setInterval(loadMine, 60000);
+</script>
+</body>
+</html>
