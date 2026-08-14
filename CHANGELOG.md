@@ -1,3 +1,13 @@
+## 2026-08-14 — 阶段性代码治理：整理/审核/清洁/优化/美化 · v26.08.14-BN
+
+全维度体检（1.29MB · 28,683 行）与定点治理。**审核**：全局孤儿调用扫描——真孤儿 **0**（大量候选经定性均为注释英文词/CSS 函数/module import 误报）；零引用定义 15 个中 14 个为已归档误报（purgeRollingBackups/checkDailyBackupReminder 具名 IIFE + 12 个函数内局部量），真死 1 个；TODO/FIXME 7 处全为占位符误报（真待办 **0**）；console.log=0、重复函数=0、setInterval/clearInterval 收支平衡 5/5。**清洁**：删 BH 手滑的废常量 `_SLACK_WH_KEEY`；行尾空白 3 行清零；3+ 连续空行压缩。**整理**：主脚本头部新增**区块索引 TOC**（十大区块导航，不带行号防漂移）。**审核-注释矫正**：五处 Firebase 时代过时注释改真——最误导的 `Data safety is provided by Firebase cloud sync` 等已在撒谎的描述全部改为现状（本地唯一数据源+备份提醒兜底），两处历史事故文献（07-23/07-25 根因）保留原文并加过去式标注。**优化/美化立场声明**：拒绝全文件格式化重排（28k 行锚点体系与备份 diff 的破坏远超收益）；无 O(n²) 热点报告；区块头风格已在历次新增中统一。**遗留拍板项**：本地滚动快照是否恢复（当年因"有云同步"删除，理由已失效）。**误报名单固化**（供未来扫描对照）：purgeRollingBackups / checkDailyBackupReminder / expYY / expMM / expDD / headerLabel / hdrStyle / logoSvg / chaseUrBadge / maxUsd / makeSelect / oldDiscount / todayStr / progressPct。
+
+**测试**：parse 18 断言 ✓ + 语法失败块=2 + 写手=2 + 十枚关键函数存活 + 零 log/零重复。
+
+**改动位置**：废常量删除；五处注释矫正；TOC；空白卫生。零逻辑改动。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-14 — 解析器：UA 官网英文版行程（金额污染修复 + date change） · v26.08.14-BM
 
 用户举例：代理会发 UA 官网英文行程。探针：两段航段与 12 小时制转换**早已工作**（英文头行+日期行既有分支），但三处真伤：①**金额污染**——`$1,180.20/person` 被当整单入 rmb（¥8,497，真实整单 $2,537.26≈¥18,268，差一倍多）；②`Please note this flight involves a date change` 未消费，SFO→PVG 段丢 +1；③Basic Economy 舱位未接。修复：英文票价区状态机——`/person` 行入 parsedFareByType.adult（每人 RMB）、`Total due` 后首个 $（行内或下一行）为整单 rmb、Fare/Taxes 标签行拦截防污染；date change 警告 → 最近落座段 arrTime 补 +1（未带 + 时）；舱位行（扩 Economy/Premium Economy/Business/First）存 pendCabin 同时回填已落座末段（英文流先落座后见舱位，中文流不受影响）；ROUNDTRIP/Show details/Nonstop/kg CO2/N adults 等噪音显式跳过。注：英文官网复制不含航班号（需点 Show details），flight 留空待人工补。

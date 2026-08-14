@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.14-BM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.14-BN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.14-BM</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.14-BN</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5627,6 +5627,18 @@ textarea:focus {
 <!-- POLISH_LAYER_MARKER: refinement pass applied -->
 
 <script>
+// ╔════════════════════════════════════════════════════════════════════════╗
+// ║  区块索引（主脚本 · 自上而下）                                            ║
+// ║  存储层：storageGet/Set · persistOrdersNow 咽喉（pending 键唯一二写手）   ║
+// ║  解析器：_wechatClean 微信清洗 → splitIntoBookings → parseSingleBooking   ║
+// ║  订单渲染：renderPendingList · 各类徽章 · 放松层 FX（✈️🎉🕊️）             ║
+// ║  出票流程：openTicketingModal / confirmTicketing（三路径）                ║
+// ║  收单需求：copyBuyingList · 📤 四通道发送（Discord/TG/Slack/WA）          ║
+// ║  配账引擎：_PACK_* 折半枚举 · 快配 · 💠 选定 · 收价 bp                    ║
+// ║  📥 代理收件箱：agent-orders（Firestore 匿名 Auth · 惰性连接）            ║
+// ║  存储健康：白屏防护 · 用量仪表 · 🧹 释放 · 墓碑账本                      ║
+// ║  🌙 收工小结 · 对账/账单 · 付款单导入 · AI 功能 · 设置与 init             ║
+// ╚════════════════════════════════════════════════════════════════════════╝
 // ============================================
 // STATE & PERSISTENCE
 // ============================================
@@ -6915,6 +6927,7 @@ function formatETADuration(ms) {
 // ── _lastEdit 全量自动落章（07-25 二次回滚事故修复）────────────────────────
 // AF 将拉取侧平局改判云端后，未落章的本地编辑会被任何远端快照冲掉（活跃设备
 // 的在编内容反而脆弱）。与其在上百条编辑路径逐一补章，这里在持久化咽喉做脏检测：
+// （注：Firebase 已于 v-BA 摘除；落章体系休眠保留，供备份合并/未来同步复用。）
 // 任何字段变化的订单在落库瞬间自动盖 _lastEdit；远端应用期间不盖（防"最后接收
 // 者赢"的时间戳通胀），仅刷新影子基线。影子 = 排除 _lastEdit 后的 JSON 快照。
 let _persistShadow = new Map();
@@ -14709,7 +14722,6 @@ async function sendBuyingToDiscord() {
   if (dlg) dlg.remove();
 }
 const _TG_CONF_KEY = 'to-telegram-conf';
-const _SLACK_WH_KEEY = null; // (保留位)
 const _SLACK_WH_KEY = 'to-slack-webhook';
 function _getTgConf() {
   try { const j = JSON.parse(localStorage.getItem(_TG_CONF_KEY) || 'null'); return (j && j.token && j.chat) ? j : null; } catch (e) { return null; }
@@ -17578,7 +17590,7 @@ function openCardholderDialog(idx) {
           <div class="cardholder-quick-input" style="margin-bottom:14px; padding:12px; background:var(--cream); border-radius:4px; border:1px solid var(--line);">
             <div style="font-weight:600; font-size:12px; color:var(--ink); margin-bottom:6px;">✨ 输入卡主名字（新卡主自动创建，已有的自动匹配）</div>
             <div style="display:flex; gap:8px; align-items:stretch;">
-              <input id="cardholderQuickName" type="text" placeholder="输入名字后按回车或点【分配】" 
+              <input id="cardholderQuickName" type="text" placeholder="输入名字后按回车或点【分配】"
                 style="flex:1; padding:8px 10px; border:1px solid var(--line); border-radius:3px; font-family:inherit; font-size:13px;"
                 oninput="filterCardholderList(this.value)"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();quickAssignCardholder(${idx});}">
@@ -18143,9 +18155,6 @@ function orderMatchesSearch(o, q) {
 }
 
 
-
-
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // 4. AUTO BACKUP REMINDER — every 50 ticketed orders prompt export
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -18456,7 +18465,7 @@ function initKeyboardShortcuts() {
     // Don't fire when typing in inputs/textareas
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     // Don't fire with modifier keys (except Ctrl/Cmd + specific shortcuts)
-    
+
     // Ctrl/Cmd + K  OR  /  → focus pending search
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault();
@@ -18480,7 +18489,7 @@ function initKeyboardShortcuts() {
       return;
     }
 
-    // Ctrl/Cmd + D → stats dashboard  
+    // Ctrl/Cmd + D → stats dashboard
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
       e.preventDefault();
       openStatsDashboard();
@@ -21459,6 +21468,7 @@ function _migrateMarkersFromRawPnr() {
   });
   // 刻意不 persist：07-23 数据回滚事故根因之一——启动期写库会触发 Firebase 推送，
   // 让陈旧设备一开机就把旧数据推上云。回填是逐设备幂等派生，待下一次真实编辑随手落库。
+  //（Firebase 已摘除，该风险成历史；"启动期不写库"作为原则继续遵守。）
   return changed;
 }
 
@@ -26911,7 +26921,7 @@ async function confirmTicketing() {
 // ============================================
 // ROLLING BACKUP REMOVED (2026-06) — snapshots tripled localStorage usage.
 // One-time purge below frees any previously stored snapshot ring.
-// Data safety is provided by Firebase cloud sync.
+// Data safety = 每日备份提醒 + 手动导出 JSON（Firebase 已摘除，本地为唯一数据源）。
 // ============================================
 (function purgeRollingBackups() {
   try { localStorage.removeItem('ticket-organizer-rolling-backup'); } catch (e) {}
@@ -27197,7 +27207,7 @@ async function doMarkTicketed(idx) {
     return;
   }
 
-  // Auto rolling backup removed — Firebase 实时同步 is the safety net.
+  // Auto rolling backup removed（当年理由=云同步兜底；Firebase 摘除后安全网=每日备份提醒+导出。要更强兜底可恢复本地滚动快照——待拍板）。
 
   try {
     const rate = effectiveRate(o);
@@ -28576,7 +28586,7 @@ async function mergeImportData(event) {
   if (_migN) toast(`♻ 已为 ${_migN} 个历史订单回填 禁拆/满座 标记（依据原文）`);
   _refreshPersistShadow();
 
-  // (Cloud sync + Gist config removed in earlier cleanup — Firebase replaces both)
+  // (Cloud sync / Gist / Firebase 均已先后摘除——localStorage 为唯一数据源，备份靠导出)
   applyAllSectionStates(); // restore collapsed/expanded state of form sections
   updateAiKeyStatus();     // show Anthropic API key status in settings
   // Firebase 实时同步已于 v26.08.08-BA 摘除（用户决定：功能一直未用）。
