@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.14-BN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.16-BO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.14-BN</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.16-BO</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9163,6 +9163,26 @@ function splitChunkByProposals(chunkText) {
   return result;
 }
 
+// ── 📊 订单更改分析：批次 vs 该代理已上单，找出"本批未见"（疑似撤单）─────────
+// 键口径刻意窄于 fingerprintOrder 的模糊匹配：乘客名集合 + 首段航班+日期 全等。
+// 宁可多报"未见"交人工确认，不做任何自动删除。
+function _ordKey(o) {
+  const pax = ((o && o.passengers) || []).map(p => String((p && p.name) || '').toUpperCase().replace(/\s+/g, ' ').trim()).filter(Boolean).sort().join('|');
+  const s1 = ((o && o.segments) || [])[0] || {};
+  return pax + '#' + String(s1.flight || '').toUpperCase().trim() + '#' + String(s1.date || '').toUpperCase().trim();
+}
+function _analyzeAgentChanges(batchOrders, existingAgentOrders) {
+  const bk = new Set((batchOrders || []).map(_ordKey));
+  const missing = (existingAgentOrders || []).filter(e => !bk.has(_ordKey(e)));
+  return { missing };
+}
+function _ordLine(o) {
+  const p0 = ((o.passengers || [])[0] || {}).name || '?';
+  const n = (o.passengers || []).length;
+  const s1 = (o.segments || [])[0] || {};
+  return `${p0}${n > 1 ? ' 等' + n + '人' : ''} · ${s1.flight || '?'} ${s1.date || ''} ${s1.from || ''}→${s1.to || ''}`;
+}
+
 // ── 微信聊天记录清洗：剥说话人前缀/时间戳/占位噪音，识别唯一代理名 ──────────
 // 防误伤三重保险：说话人需出现 ≥2 次；解析关键词黑名单；多说话人时不剥行内前缀。
 const _WC_BLACKLIST = ['成人', '大人', '儿童', '小孩', '小儿', '婴儿', '姓名', '性别', '出生年月日', '出生日期', '护照号', '护照有效期', '护照签发国家', '护照签发国', '运价', '乘机人', '旅客', '乘客', '合计应付', '时长', '航班号', '飞机类型', '票价', '备注', '价格', '客户', '代理', '航司', '舱位'];
@@ -13525,7 +13545,25 @@ async function parsePNR() {
   if (existingMeaningful.length > 0) {
     summaryParts.push(`合计 ${STATE.orders.length}单`);
   }
+  // ── 📊 订单更改分析：该代理已上单中"本批未见"者（疑似撤单，仅提示不删）──
+  let _ocaMissing = [];
+  let _ocaAgent = '';
+  try {
+    const batchAll = filteredOrders.concat(strong.map(d => d.newOrder)).filter(Boolean);
+    _ocaAgent = ((batchAll[0] || {}).agent || '').trim();
+    if (_ocaAgent) {
+      const covered = new Set(strong.map(d => d.existing).filter(Boolean));
+      const baseline = STATE.orders.filter(o => isMeaningfulOrder(o)
+        && String(o.agent || '').trim() === _ocaAgent
+        && !batchAll.includes(o) && !covered.has(o));
+      _ocaMissing = _analyzeAgentChanges(batchAll, baseline).missing;
+      if (_ocaMissing.length) summaryParts.push(`⚠️ 本批未见 ${_ocaMissing.length}单`);
+    }
+  } catch (e) {}
   toast(summaryParts.join('，') || '已处理');
+  if (_ocaMissing.length || strong.length) {
+    setTimeout(() => { try { _showOrderChangeAnalysis(_ocaAgent, filteredOrders, strong, _ocaMissing); } catch (e) {} }, 600);
+  }
 
   // Auto-reset special discount toggle after a successful parse
   // (prevents accidentally applying it to the NEXT paste)
@@ -15431,6 +15469,30 @@ async function aiTicketingAdvice() {
 // 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
+// ══ 📊 订单更改分析面板 ═══════════════════════════════════════════════════
+function _showOrderChangeAnalysis(agent, added, strongArr, missing) {
+  const old = document.getElementById('ocaOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'ocaOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  const sec = (title, color, items, note) => items.length ? `
+    <div style="font-weight:800; font-size:12px; margin:10px 0 4px; color:${color};">${title}（${items.length}）</div>
+    ${note ? `<div style="font-size:10px; color:var(--muted); margin-bottom:4px;">${note}</div>` : ''}
+    ${items.map(t => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; margin-top:4px; font-size:12px; font-family:'JetBrains Mono',monospace;">${escapeHtml(t)}</div>`).join('')}` : '';
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:560px; max-height:82vh; overflow:auto;">
+    <div class="verify-modal-header"><h3>📊 订单更改分析 · ${escapeHtml(agent || '')}</h3><button onclick="document.getElementById('ocaOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:12px 16px;">
+      ${sec('🆕 本批新增', 'var(--ink)', added.map(_ordLine))}
+      ${sec('♻️ 重复已拦（系统已有，未重复入库）', '#8a6d1a', strongArr.map(d => _ordLine(d.newOrder)))}
+      ${sec('⚠️ 本批未见（该代理已上单中这次没出现）', 'var(--warning-deep)', missing.map(_ordLine), '疑似撤单——若该代理习惯增量发单可忽略；确认撤单请到对应卡片手动删除。')}
+      ${!added.length && !strongArr.length && !missing.length ? '<div style="color:var(--muted); font-size:12px;">无差异</div>' : ''}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
 // ══ 📥 代理收件箱：agent.html 提交 → 接收入库（走 parsePNR 全管道）════════
 // 数据通道：Firestore agent-orders（匿名 Auth 隔离，firestore.rules 管权限）。
 // 管理端需把本设备 UID 加入 Firebase 控制台 admin/config 的 uids 数组。

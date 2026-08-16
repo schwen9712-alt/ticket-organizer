@@ -1,3 +1,13 @@
+## 2026-08-16 — 📊 订单更改分析：录入时自动比对该代理已上单 · v26.08.16-BO
+
+用户诉求：每次录入与该代理已上单比对——什么单不在了（疑似撤单）、新增了什么。实现（在既有 strong/weak 重复检测基建上补齐缺口翼）：①**纯函数分析器** `_ordKey`（乘客名集合排序+首段航班+日期，大小写空格归一）+ `_analyzeAgentChanges`——键口径刻意窄于 fingerprintOrder 模糊匹配，宁可多报交人工确认，**绝不自动删单**；②**parsePNR 挂点**：解析入库后取本批代理，基线=该代理全部待出票单（排除本批新增与 strong 覆盖旧单），算"本批未见"，toast 摘要追加 `⚠️ 本批未见 N单`；③**分析面板**（有重复拦截或未见时 0.6s 自动弹，纯新增不打扰）：🆕 本批新增 / ♻️ 重复已拦 / ⚠️ 本批未见（按语：疑似撤单，代理增量发单可忽略；确认撤单到卡片手动删）。行格式 `乘客 等N人 · 航班 日期 From→To`。
+
+**测试**：parse_test 增 O 组 3 断言（未见识别+归一/乘客序不敏感/首段日期改判不同单）。语法失败块=2 + 写手=2。
+
+**改动位置**：_ordKey/_analyzeAgentChanges/_ordLine；parsePNR toast 前挂点；_showOrderChangeAnalysis 面板。
+
+**回滚**：.backups/ 上一版。
+---
 ## 2026-08-14 — 阶段性代码治理：整理/审核/清洁/优化/美化 · v26.08.14-BN
 
 全维度体检（1.29MB · 28,683 行）与定点治理。**审核**：全局孤儿调用扫描——真孤儿 **0**（大量候选经定性均为注释英文词/CSS 函数/module import 误报）；零引用定义 15 个中 14 个为已归档误报（purgeRollingBackups/checkDailyBackupReminder 具名 IIFE + 12 个函数内局部量），真死 1 个；TODO/FIXME 7 处全为占位符误报（真待办 **0**）；console.log=0、重复函数=0、setInterval/clearInterval 收支平衡 5/5。**清洁**：删 BH 手滑的废常量 `_SLACK_WH_KEEY`；行尾空白 3 行清零；3+ 连续空行压缩。**整理**：主脚本头部新增**区块索引 TOC**（十大区块导航，不带行号防漂移）。**审核-注释矫正**：五处 Firebase 时代过时注释改真——最误导的 `Data safety is provided by Firebase cloud sync` 等已在撒谎的描述全部改为现状（本地唯一数据源+备份提醒兜底），两处历史事故文献（07-23/07-25 根因）保留原文并加过去式标注。**优化/美化立场声明**：拒绝全文件格式化重排（28k 行锚点体系与备份 diff 的破坏远超收益）；无 O(n²) 热点报告；区块头风格已在历次新增中统一。**遗留拍板项**：本地滚动快照是否恢复（当年因"有云同步"删除，理由已失效）。**误报名单固化**（供未来扫描对照）：purgeRollingBackups / checkDailyBackupReminder / expYY / expMM / expDD / headerLabel / hdrStyle / logoSvg / chaseUrBadge / maxUsd / makeSelect / oldDiscount / todayStr / progressPct。
