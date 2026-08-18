@@ -2978,10 +2978,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.16-BO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.18-BR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.16-BO</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BR</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10601,7 +10601,40 @@ function parseSingleBooking(raw) {
             continue;
           }
         }
-        if (/^(ROUNDTRIP\b|ONE[- ]?WAY\b|Revise this trip$|Show details$|Nonstop$|\d+ stops?$|\d+[\d,]*\s*kg CO2?₂?$|\d+ (adults?|travelers?)\b)/i.test(trimmed)) {
+        if (/^(ROUNDTRIP\b|ONE[- ]?WAY\b)/i.test(trimmed)) {
+          const tv = trimmed.match(/\((\d+)\s+TRAVELERS?\)/i);
+          if (tv) travelerCount = parseInt(tv[1], 10);
+          continue;
+        }
+        if (/^(Revise this trip$|Show details$|Nonstop$|\d+ stops?$|\d+[\d,]*\s*kg CO2?₂?$|\d+ (adults?|travelers?)\b)/i.test(trimmed)) {
+          continue;
+        }
+      }
+      // ── 乘法算式运价: "普通经济1PC 3807*0.9*3" (+ 可选下行 "=10278.9000") ──
+      {
+        const fx = trimmed.match(/^(\d{3,6}(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)(?:\s*[*×xX]\s*(\d+(?:\.\d+)?))?\s*(?:=\s*([\d,]+(?:\.\d+)?))?\s*$/);
+        if (fx) {
+          // 语义与 pCabinMulti 同构：首数=每人票面原价；<1 因子=结算折扣（入折扣字段）；≥2 整数=人数
+          const a = parseFloat(fx[1]);
+          const factors = [parseFloat(fx[2])];
+          if (fx[3]) factors.push(parseFloat(fx[3]));
+          let disc = null, cnt = 1;
+          factors.forEach(f => { if (f > 0 && f < 1) disc = (disc == null ? 1 : disc) * f; else if (f >= 2) cnt *= Math.round(f); });
+          if (a >= 100 && a < 500000) {
+            if (!rmb) rmb = +a.toFixed(2);   // rmb 契约=每人票面
+            if (!parsedFareByType) parsedFareByType = {};
+            if (parsedFareByType.adult == null) parsedFareByType.adult = +a.toFixed(2);
+            if (disc != null && parsedDiscount == null) {
+              const pct = Math.round(disc * 100);
+              if (pct >= 10 && pct <= 100) parsedDiscount = pct;
+            }
+            _d(trimmed, '💰 FARE', `算式 每人票面${a}${disc != null ? ' 折扣' + Math.round(disc * 100) + '%' : ''} ×${cnt}人`);
+            continue;
+          }
+        }
+        const eqm = trimmed.match(/^=\s*([\d,]+(?:\.\d+)?)\s*$/);
+        if (eqm) {
+          _d(trimmed, '💰 FARE', `=合计确认行（仅核对，不改每人价 rmb）`);
           continue;
         }
       }
@@ -12060,7 +12093,7 @@ function parseSingleBooking(raw) {
     // ── Multi-part cabin fare: "普通经济9120*0.88*3+9050*0.88" ────────────
     // Format: cabinLabel + price*discount*count + price*discount*count ...
     const pCabinMulti = !pA && !pB && !pPrefix && !pYunjia && !pCO &&
-      trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)(\d[\d\*\.\+]+)$/);
+      trimmed.match(/(?:普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(?:\d+PC)?\s*(\d[\d\*\.\+]+)\s*$/);
     if (pCabinMulti) {
       const expr = pCabinMulti[1];
       const groups = expr.split('+');
@@ -17798,178 +17831,10 @@ async function assignCardholder(idx, cardholderId) {
       }
     }, 60);
   }
-  // After assigning a cardholder, prompt for miles/profit check
-  if (cardholderId) {
-    setTimeout(() => openProfitCheckDialog(idx), 300);
-  }
+  // 2026-08 用户指令：分配卡主后不再强弹「出票前利润核算」——收益在账单/对账处自然可见。
+  // miles/积分类型仍可在订单卡「完成出票」区（#f-miles 等字段）随时填写。
 }
 
-function openProfitCheckDialog(idx) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  const revenue = computeFinalPrice(o) || 0;
-  const revenueUsd = effectiveRate(o) > 0 ? (revenue / effectiveRate(o)) : 0;
-  const ch = o.cardholderId ? (settings.cardholders || []).find(c => c.id === o.cardholderId) : null;
-  // Safe defaults
-  const existingMiles = (o.miles > 0) ? o.miles : '';
-  const existingExch = (o.cpmExchange > 0 && o.cpmExchange < 1) ? o.cpmExchange
-    : (settings.defaultCpmExchange > 0 && settings.defaultCpmExchange < 1) ? settings.defaultCpmExchange
-    : 0.0130;
-  const existingType = o.pointsType || '';
-
-  // Build points type options
-  const typeOpts = Object.entries(POINTS_TYPES || {}).map(([k, v]) =>
-    `<option value="${escapeAttr(k)}" ${existingType===k?'selected':''}>${escapeHtml(v.label || k)} (×${v.mult})</option>`
-  ).join('');
-
-  const html = `
-  <div class="verify-modal-overlay" id="profitCheckOverlay" onclick="closeProfitCheckDialog(event)">
-    <div class="verify-modal" onclick="event.stopPropagation()" style="max-width:480px;">
-      <div class="verify-modal-header" style="background:var(--ink);color:#fff;padding:14px 18px;border-radius:4px 4px 0 0;">
-        <h3 style="margin:0;font-size:15px;">💰 出票前利润核算 — 订单 #${idx+1}</h3>
-        <button onclick="closeProfitCheckDialog()" class="close-btn" style="color:#fff;">×</button>
-      </div>
-      <div class="verify-modal-body" style="padding:18px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;padding:12px;background:#f9f6f0;border-radius:4px;font-size:13px;">
-          <div><span style="color:var(--muted);font-size:11px;">卡主</span><br><strong>${escapeHtml(ch?.name || '—')}</strong></div>
-          <div><span style="color:var(--muted);font-size:11px;">收入 Revenue</span><br><strong style="color:var(--accent);">¥${Math.round(revenue).toLocaleString()}</strong> ≈ <span style="color:var(--muted);">$${revenueUsd.toFixed(0)}</span></div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">✈ 所需积分 MILES *</label>
-            <input id="pc-miles" type="number" placeholder="如 131193" value="${existingMiles}"
-              style="width:100%;box-sizing:border-box;padding:8px;border:2px solid var(--accent);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;"
-              oninput="updateProfitPreview(${idx})" autofocus>
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">积分类型</label>
-            <select id="pc-type" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:12px;"
-              onchange="updateProfitPreview(${idx})">
-              <option value="">— 选择 —</option>
-              ${typeOpts}
-            </select>
-          </div>
-        </div>
-        <div style="margin-bottom:16px;">
-          <label style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:4px;">CPM 汇率 (积分兑换率 $/分)</label>
-          <input id="pc-exch" type="number" step="0.0001" min="0.001" max="0.5" placeholder="如 0.0130" value="${existingExch}"
-            style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:13px;"
-            oninput="updateProfitPreview(${idx})">
-        </div>
-
-        <!-- Profit preview -->
-        <div id="pc-profit-preview" style="padding:14px;border-radius:6px;border:2px solid var(--line);text-align:center;font-size:13px;margin-bottom:16px;background:#fff;">
-          <span style="color:var(--muted);">填写积分后自动计算利润</span>
-        </div>
-
-        <div style="display:flex;gap:8px;">
-          <button class="btn accent" onclick="saveProfitCheck(${idx})" style="flex:1;font-size:14px;padding:10px;">✓ 确认并继续出票</button>
-          <button class="btn ghost" onclick="closeProfitCheckDialog()" style="font-size:13px;padding:10px;">跳过</button>
-        </div>
-        <div style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px;">积分数据会保存到订单，随时可修改</div>
-      </div>
-    </div>
-  </div>`;
-
-  document.body.insertAdjacentHTML('beforeend', html);
-  document.getElementById('pc-miles')?.focus();
-  updateProfitPreview(idx);
-
-  // Keyboard shortcuts: Enter = confirm, Esc = close
-  const keyHandler = (e) => {
-    if (e.key === 'Escape') { closeProfitCheckDialog(); document.removeEventListener('keydown', keyHandler); }
-    if (e.key === 'Enter' && e.target.id !== 'pc-type') { saveProfitCheck(idx); document.removeEventListener('keydown', keyHandler); }
-  };
-  document.addEventListener('keydown', keyHandler);
-}
-
-function updateProfitPreview(idx) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  const preview = document.getElementById('pc-profit-preview');
-  if (!preview) return;
-  const miles = parseFloat(document.getElementById('pc-miles')?.value);
-  const exch = parseFloat(document.getElementById('pc-exch')?.value);
-  const typeKey = document.getElementById('pc-type')?.value;
-  const typeConf = POINTS_TYPES && POINTS_TYPES[typeKey];
-  const mult = typeConf?.mult ?? 1.0;
-  if (!miles || miles <= 0 || !exch || exch <= 0 || exch > 0.5) {
-    preview.innerHTML = exch > 0.5 ? '<span style="color:var(--red);">⚠️ CPM 汇率异常（应在 0.001~0.5 之间），请检查</span>'
-      : '<span style="color:var(--muted);">填写积分后自动计算利润</span>';
-    preview.style.borderColor = exch > 0.5 ? 'var(--red)' : 'var(--line)';
-    preview.style.background = exch > 0.5 ? 'var(--red-light)' : '#fff';
-    return;
-  }
-  const cashUsd = Number(o.cashUsd) || 0;
-  const pointsCost = miles * mult * exch;
-  const cost = pointsCost + cashUsd;  // USD cost (incl. cash supplement if any)
-  const revenue = computeFinalPrice(o) || 0;
-  const rate = effectiveRate(o) || settings.rate || 6.84;
-  const revenueUsd = revenue / rate;
-  const profitUsd = revenueUsd - cost;
-  const profitRmb = profitUsd * rate;
-  const margin = revenueUsd > 0 ? profitUsd / revenueUsd * 100 : 0;
-  const isLoss = profitUsd < 0;
-  const isWarn = margin < 5 && !isLoss;
-
-  preview.style.borderColor = isLoss ? 'var(--red)' : isWarn ? 'var(--warning-deep)' : 'var(--green)';
-  preview.style.background = isLoss ? 'var(--red-light)' : isWarn ? 'var(--warning-light)' : 'var(--green-light)';
-  preview.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--muted);">${cashUsd > 0 ? '积分成本' : '积分成本'}</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${pointsCost.toFixed(2)}</span>
-    </div>
-    ${cashUsd > 0 ? `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--accent-deep);">+ 现金补</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent-deep);">$${cashUsd.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-top:1px dashed var(--line);padding-top:6px;">
-      <span style="font-size:11px;color:var(--muted);font-weight:600;">总成本</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">$${cost.toFixed(2)}</span>
-    </div>` : ''}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--muted);">收入</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;">$${revenueUsd.toFixed(2)}</span>
-    </div>
-    <div style="height:1px;background:var(--line);margin:6px 0;"></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:13px;font-weight:700;color:${isLoss?'var(--red)':isWarn?'var(--warning-deep)':'var(--green)'};">
-        ${isLoss ? '⚠️ 亏损！' : isWarn ? '⚠️ 利润偏低' : '✓ 利润正常'}
-      </span>
-      <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:800;color:${isLoss?'var(--red)':isWarn?'var(--warning-deep)':'var(--green)'};">
-        ${profitUsd >= 0 ? '+' : ''}$${profitUsd.toFixed(2)} (¥${Math.round(profitRmb).toLocaleString()})
-      </span>
-    </div>
-    <div style="font-size:11px;color:var(--muted);text-align:right;margin-top:2px;">利润率 ${margin.toFixed(1)}%</div>
-    ${isLoss ? '<div style="font-size:12px;color:var(--red);margin-top:8px;font-weight:600;">⛔ 当前设置会亏损，请确认积分数量或汇率是否正确</div>' : ''}
-  `;
-}
-
-async function saveProfitCheck(idx) {
-  const o = STATE.orders[idx];
-  if (!o) return;
-  const miles = parseFloat(document.getElementById('pc-miles')?.value);
-  const exch = parseFloat(document.getElementById('pc-exch')?.value);
-  const typeKey = document.getElementById('pc-type')?.value;
-  if (!isNaN(miles)) o.miles = miles;
-  if (!isNaN(exch)) o.cpmExchange = exch;
-  if (typeKey) o.pointsType = typeKey;
-  await persistOrdersNow();
-  closeProfitCheckDialog();
-  renderPendingList();
-  toast('✓ 积分已保存');
-}
-
-function closeProfitCheckDialog(e) {
-  if (e && e.type === 'click' && e.target.id !== 'profitCheckOverlay') return;
-  const el = document.getElementById('profitCheckOverlay');
-  if (el) el.remove();
-  // keyHandler cleans itself up on next Esc/Enter
-}
-
-// Reparse dialog: paste a fresh PNR and re-extract all fields for this order in place
 function openReparseDialog(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
