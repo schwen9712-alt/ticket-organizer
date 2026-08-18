@@ -2981,10 +2981,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.18-BS\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.18-BT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BS</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BT</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3082,7 +3082,7 @@ html[data-lang="en"] .zh {
   <!-- Raw input - ONE paste, creates multiple orders -->
   <div class="section">
     <div class="section-title"><span class="num">1</span>PASTE PNR <span class="zh">粘贴原始票面（支持多单）</span></div>
-    <textarea class="raw-input" id="rawInput" placeholder="把一份或多份 PNR 粘到这里，点【解析】后自动分成多单。
+    <textarea class="raw-input" id="rawInput" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();parsePNR();}" placeholder="把一份或多份 PNR 粘到这里，Ctrl+Enter 或点【解析】后自动分成多单。
 
 分隔符可以是：
   =======
@@ -15704,6 +15704,12 @@ window.addEventListener('error', (e) => {
   } catch (err) {}
 });
 setTimeout(() => { try { storageHealthCheck(); } catch (e) {} }, 4000);
+// ⌨️ Esc 关闭最上层弹窗（verify-modal 家族通用）
+window.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const ovs = document.querySelectorAll('.verify-modal-overlay');
+  if (ovs.length) { ovs[ovs.length - 1].remove(); e.stopPropagation(); }
+});
 
 // ═══ 配账引擎 · v4 原样移植（用户独立计算器 points_combo_calculator_v4）═══
 // 整数分（cents）记账防浮点；lowbit DP 子集表；top-K=100；平手取不超、单数少；
