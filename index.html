@@ -2960,6 +2960,14 @@ html[data-lang="en"] .zh {
 .tool-btn { margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1; transition:border-color .15s, color .15s, transform .15s; }
 .tool-btn:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-1px); }
 .tool-btn:active { transform:translateY(0); }
+/* ── 折叠头三层信息层级（v-BU 重设计）── */
+.collapse-summary.cs-wrap { display:flex; align-items:center; gap:10px; flex:1; min-width:0; }
+.cs-pax { font-weight:700; color:var(--ink); flex-shrink:0; }
+.cs-mid { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.cs-price { margin-left:auto; flex-shrink:0; font-family:'JetBrains Mono', monospace; font-weight:800; font-size:13px; color:var(--ink); letter-spacing:0.01em; }
+.cs-price-empty { color:var(--muted); font-weight:400; }
+.urgent-btn:not(.is-urgent) { opacity:0.35; transition:opacity .15s; }
+.order-collapse-header:hover .urgent-btn:not(.is-urgent) { opacity:0.8; }
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -2981,10 +2989,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.18-BT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.18-BU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BT</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BU</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -17001,7 +17009,7 @@ function renderPendingList() {
         // Order number
         const numSpan = document.createElement('span');
         numSpan.className = 'collapse-num';
-        numSpan.textContent = `ORDER #${displayNum}`;
+        numSpan.textContent = `#${displayNum}`;
         header.appendChild(numSpan);
 
         // ── Urgent (加急) toggle button ─────────────────────────────────────
@@ -17049,6 +17057,15 @@ function renderPendingList() {
         }
         // ───────────────────────────────────────────────────────────────────
 
+        // Imminent-departure chip（前移到判别区：行动级警示优先于信息徽章）
+        const imminentHtml = buildImminentDepartureHTML(o);
+        if (imminentHtml) {
+          const imminentWrap = document.createElement('span');
+          imminentWrap.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
+          imminentWrap.innerHTML = imminentHtml;
+          header.appendChild(imminentWrap);
+        }
+
         // Age badge
         if (o.createdAt) {
           const ageBadge = buildAgeBadge(o.createdAt);
@@ -17063,17 +17080,29 @@ function renderPendingList() {
           header.appendChild(lockSpan);
         }
 
-        // Summary line (pax + route + price)
+        // Summary — 三层信息层级：乘客(判别锚·加重) · 行程(可截断) · 价格(右锚定等宽)
         const paxNames = (o.passengers||[]).map(p => (p.name || '').split('/')[0]).filter(Boolean).join(' / ');
         const seg0 = o.segments[0], segN = o.segments[o.segments.length - 1];
         const routePart = seg0 ? `${seg0.from} → ${(segN || seg0).to}` : '';
         const datePart = seg0 && seg0.date ? seg0.date : '';
-        const pricePart = o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '';
         const cabinPart = o.cabin ? o.cabin.replace('舱', '') : '';
-        const summaryParts = [paxNames, routePart + (datePart ? ' · ' + datePart : ''), cabinPart, pricePart].filter(Boolean);
+        const midText = [routePart + (datePart ? ' · ' + datePart : ''), cabinPart].filter(Boolean).join(' · ');
         const summarySpan = document.createElement('span');
-        summarySpan.className = 'collapse-summary';
-        summarySpan.textContent = summaryParts.join('  ·  ');
+        summarySpan.className = 'collapse-summary cs-wrap';
+        const paxEl = document.createElement('span');
+        paxEl.className = 'cs-pax';
+        paxEl.textContent = paxNames || '（无乘客）';
+        const midEl = document.createElement('span');
+        midEl.className = 'cs-mid';
+        midEl.textContent = midText;
+        midEl.title = midText;
+        const priceEl = document.createElement('span');
+        priceEl.className = 'cs-price';
+        priceEl.textContent = o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '—';
+        if (!o.rmb) priceEl.classList.add('cs-price-empty');
+        summarySpan.appendChild(paxEl);
+        summarySpan.appendChild(midEl);
+        summarySpan.appendChild(priceEl);
         header.appendChild(summarySpan);
 
         // AI-fallback recognized — remind to verify before ticketing
@@ -17096,15 +17125,6 @@ function renderPendingList() {
           header.appendChild(w);
         }
 
-        // Imminent-departure chip (24h / 48h / 72h) — inserted after the
-        // summary so it sits next to date/route. Returns '' for >72h.
-        const imminentHtml = buildImminentDepartureHTML(o);
-        if (imminentHtml) {
-          const imminentWrap = document.createElement('span');
-          imminentWrap.style.cssText = 'margin-left:6px; display:inline-flex; align-items:center;';
-          imminentWrap.innerHTML = imminentHtml;
-          header.appendChild(imminentWrap);
-        }
 
         // Chevron
         const chevron = document.createElement('span');
