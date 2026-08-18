@@ -2957,6 +2957,9 @@ html[data-lang="en"] .zh {
   color: var(--ink) !important;
 }
 
+.tool-btn { margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1; transition:border-color .15s, color .15s, transform .15s; }
+.tool-btn:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-1px); }
+.tool-btn:active { transform:translateY(0); }
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -2978,10 +2981,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.18-BR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.18-BS\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BR</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BS</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3017,8 +3020,8 @@ html[data-lang="en"] .zh {
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
-    <button onclick="openAgentInbox()" title="代理收件箱：代理端 agent.html 提交的订单在此接收入库" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1;">📥</button>
-    <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); line-height:1;">🧹</button>
+    <button onclick="openAgentInbox()" title="代理收件箱：代理端 agent.html 提交的订单在此接收入库" class="tool-btn">📥</button>
+    <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" class="tool-btn">🧹</button>
     <button onclick="showDayWrap()" title="收工小结 — 今日成绩单与明日预览" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="this.style.background='transparent'; this.style.color='var(--muted)'">🌙</button>
     <button id="settingsGearBtn" onclick="
       document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -3159,7 +3162,7 @@ SUN/KAILAI MS 女 28SEP08
       </div>
       <div class="field">
         <label>表 Label <span style="color:var(--red); font-weight:700;" title="必填">*</span></label>
-        <select id="f-tableLabel" onchange="syncDOMToOrder(); toggleTableYVisibility(); renderPreview();">
+        <select id="f-tableLabel" onchange="try{localStorage.setItem('to-last-table-label', this.value)}catch(e){}; syncDOMToOrder(); toggleTableYVisibility(); renderPreview();">
           <option value="">— 选择 —</option>
           <option value="A">表 A</option>
           <option value="B">表 B</option>
@@ -5647,7 +5650,7 @@ function newOrder(init = {}) {
   return {
     id: 'o-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     createdAt: init.createdAt || Date.now(),
-    tableLabel: init.tableLabel || '',
+    tableLabel: init.tableLabel || (function () { try { return localStorage.getItem('to-last-table-label') || ''; } catch (e) { return ''; } })(),   // 记住上次选择（可改，必填校验仍在）
     // 表 Y is a special branch of 表 A — locks discount to 90% (unless manually
     // overridden) and grants top-priority sorting + Y badge in待出票.
     // Only meaningful when tableLabel === 'A'.
@@ -27695,7 +27698,7 @@ async function pauseAgent(agentName) {
   if (reason === null) return;  // cancelled
   const trimmed = reason.trim();
   if (!trimmed) {
-    alert('⚠️ 暂停原因不能为空。');
+    toast('⚠️ 暂停原因不能为空');
     return;
   }
   settings.pausedAgents = settings.pausedAgents || {};
@@ -27738,7 +27741,7 @@ async function editAgentPauseReason(agentName) {
   const newReason = prompt(`修改「${agentName}」的暂停原因：`, info.reason || '');
   if (newReason === null) return;
   const trimmed = newReason.trim();
-  if (!trimmed) { alert('⚠️ 原因不能为空。'); return; }
+  if (!trimmed) { toast('⚠️ 原因不能为空'); return; }
   settings.pausedAgents[agentName].reason = trimmed;
   await storageSet('ticket-organizer-settings', settings);
   toast(`已更新暂停原因`);
