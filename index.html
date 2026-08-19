@@ -2989,10 +2989,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.18-BU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-BV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.18-BU</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BV</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3443,6 +3443,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         </div>
         <button class="btn small" id="buyingListBtn" onclick="copyBuyingList()" title="第一次点：高亮全部待收订单进入选择模式；点订单行可取消/恢复；再点按钮确认复制">📋 收单需求</button>
         <button class="btn small ghost" onclick="openSendDialog()" title="把刚生成的收分需求一键发送：Discord Webhook 直发 / WhatsApp 预填跳转">📤 发送</button>
+        <button class="btn small ghost" onclick="openFareCheck()" title="快速运价核对：代理人民币价折算美金 vs 美国运价（每人口径）">⚖ 核价</button>
         <button class="btn small ghost" id="buyMaxBtn" onclick="toggleBuyMax()" title="MAX 拆单模式：默认整单收分；紧急收不到分时一键开启——多人单标注全部可拆档位/组合/脚注">⚡MAX</button>
         <button class="btn small ghost" onclick="openPackingDialog()" title="配账结算：未分配订单 × 卡主积分额度 → 计算最贴近的订单组合，一键分配">🧮 配账</button>
         <button id="bulkModeToggle" onclick="toggleBulkMode()"
@@ -15513,6 +15514,58 @@ async function aiTicketingAdvice() {
 // 单账户凑满：穷举子集（≤20 单精确），可行=组合 ≤ 额度+允许超额；
 // 排序 最贴近（先不超后微超，越贴越前）或 订单最少；超额 ≥警戒% 标⚠。
 // 多账户自动分配：FFD 贪心（大单先入余量最大账户）。选中组合一键分配 cardholderId。
+// ══ ⚖ 快速运价核对：代理 RMB 折算 USD vs 美国运价（每人口径）═══════════════
+function _fareCheckCalc(rmb, rate, usd) {
+  rmb = Number(rmb); rate = Number(rate); usd = Number(usd);
+  if (!(rmb > 0) || !(rate > 0)) return null;
+  const cnUsd = +(rmb / rate).toFixed(2);
+  if (!(usd > 0)) return { cnUsd, diff: null, diffPct: null };
+  const diff = +(cnUsd - usd).toFixed(2);          // 正=中国价折算更贵（美国价低，有空间）
+  const diffPct = +((diff / usd) * 100).toFixed(1);
+  return { cnUsd, diff, diffPct };
+}
+function _fareCheckRender() {
+  const rmb = parseFloat((document.getElementById('fcRmb') || {}).value);
+  const rate = parseFloat((document.getElementById('fcRate') || {}).value);
+  const usd = parseFloat((document.getElementById('fcUsd') || {}).value);
+  const out = document.getElementById('fcOut');
+  if (!out) return;
+  const r = _fareCheckCalc(rmb, rate, usd);
+  if (!r) { out.innerHTML = '<div style="color:var(--muted); font-size:12px;">输入人民币价与汇率后自动计算</div>'; return; }
+  let cmp = '';
+  if (r.diff != null) {
+    const good = r.diff > 0;
+    const col = good ? '#2e7d32' : (r.diff < 0 ? 'var(--red)' : 'var(--muted)');
+    const word = good ? '美国价更低（有空间）' : r.diff < 0 ? '美国价更贵' : '完全一致';
+    cmp = `<div style="margin-top:8px; font-size:13px; color:${col}; font-weight:700;">Δ $${Math.abs(r.diff).toLocaleString('en-US')} · ${Math.abs(r.diffPct)}% — ${word}</div>`;
+  }
+  out.innerHTML = `<div style="font-size:12px; color:var(--muted);">折算美金（每人）</div>
+    <div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800; color:var(--ink);">$${r.cnUsd.toLocaleString('en-US')}</div>${cmp}`;
+}
+function openFareCheck(prefillRmb) {
+  const old = document.getElementById('fareCheckOverlay');
+  if (old) old.remove();
+  const rate = (typeof settings !== 'undefined' && settings.rate > 0) ? settings.rate : 7.2;
+  const ov = document.createElement('div');
+  ov.id = 'fareCheckOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:400px;">
+    <div class="verify-modal-header"><h3>⚖ 快速运价核对 <span style="font-size:11px; color:var(--muted); font-weight:400;">每人口径</span></h3><button onclick="document.getElementById('fareCheckOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <label style="font-size:11px; font-weight:700;">代理人民币价 ¥<input id="fcRmb" type="number" step="0.01" value="${prefillRmb ? Number(prefillRmb) : ''}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
+        <label style="font-size:11px; font-weight:700;">汇率 USD/CNY<input id="fcRate" type="number" step="0.0001" value="${rate}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
+      </div>
+      <label style="font-size:11px; font-weight:700; display:block; margin-top:10px;">美国运价 $（你查到的）<input id="fcUsd" type="number" step="0.01" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()" placeholder="如 1180.20"></label>
+      <div id="fcOut" style="margin-top:14px; padding:12px; background:var(--bg); border-radius:var(--r-md);"></div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  _fareCheckRender();
+  setTimeout(() => { const el = document.getElementById(prefillRmb ? 'fcUsd' : 'fcRmb'); if (el) el.focus(); }, 60);
+}
+
 // ══ 📊 订单更改分析面板 ═══════════════════════════════════════════════════
 function _showOrderChangeAnalysis(agent, added, strongArr, missing) {
   const old = document.getElementById('ocaOverlay');
@@ -17100,6 +17153,11 @@ function renderPendingList() {
         priceEl.className = 'cs-price';
         priceEl.textContent = o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '—';
         if (!o.rmb) priceEl.classList.add('cs-price-empty');
+        if (o.rmb) {
+          priceEl.style.cursor = 'pointer';
+          priceEl.title = '点击核价：折算美金 vs 美国运价';
+          priceEl.addEventListener('click', (e) => { e.stopPropagation(); openFareCheck(o.rmb); });
+        }
         summarySpan.appendChild(paxEl);
         summarySpan.appendChild(midEl);
         summarySpan.appendChild(priceEl);
