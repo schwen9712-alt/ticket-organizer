@@ -3006,10 +3006,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-BW\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-BY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BW</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BY</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3045,6 +3045,8 @@ html[data-lang="en"] .zh {
     <button class="btn ghost small lang-toggle" onclick="toggleLanguage()" title="Toggle language / 切换语言" style="margin-left:8px; font-family:'JetBrains Mono',monospace; letter-spacing:0.05em;">
       <span id="langToggleLabel">🌐 EN</span>
     </button>
+    <button id="errDot" onclick="openErrLog()" title="运行错误日志" class="tool-btn" style="display:none; color:var(--red); border-color:var(--red); font-size:11px; font-weight:800; align-items:center;">⚠</button>
+    <button onclick="openSnapPanel()" title="本地快照：IndexedDB 每日自动兜底，可随时恢复" class="tool-btn">🛟</button>
     <button onclick="openAgentInbox()" title="代理收件箱：代理端 agent.html 提交的订单在此接收入库" class="tool-btn">📥</button>
     <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" class="tool-btn">🧹</button>
     <button onclick="showDayWrap()" title="收工小结 — 今日成绩单与明日预览" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="this.style.background='transparent'; this.style.color='var(--muted)'">🌙</button>
@@ -9229,9 +9231,11 @@ function _t2min(t) {
   return null;
 }
 function _dateOrd(d) {
+  // 自包含月表：本函数被渲染路径调用，禁止引用解析器闭包或测试桩变量（v-BY 事故立法）
+  const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   const m = String(d || '').toUpperCase().match(/^(\d{1,2})([A-Z]{3})/);
   if (!m) return null;
-  const mi = _MN3.indexOf(m[2]);
+  const mi = MONTHS.indexOf(m[2]);
   if (mi < 0) return null;
   const cum = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
   return cum[mi] + (+m[1]);
@@ -15745,6 +15749,121 @@ async function rejectAgentOrder(id) {
   } catch (e) { toast('操作失败：' + ((e && e.code) || '网络异常')); }
 }
 
+// ══ 🛟 数据保险箱：IndexedDB 每日滚动快照（不占 localStorage 配额）═════════
+// 兜底哲学：数据不死是所有功能的前提。每日静默 1 份、保 7 份、恢复前自动再存一份。
+const _SNAP_DB = 'to-snapshots', _SNAP_STORE = 'snaps', _SNAP_KEEP = 7;
+function _snapOpen() {
+  return new Promise((res, rej) => {
+    try {
+      const rq = indexedDB.open(_SNAP_DB, 1);
+      rq.onupgradeneeded = () => { rq.result.createObjectStore(_SNAP_STORE, { keyPath: 'day' }); };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error);
+    } catch (e) { rej(e); }
+  });
+}
+function _snapAll(db, mode, fn) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(_SNAP_STORE, mode);
+    const st = tx.objectStore(_SNAP_STORE);
+    const out = fn(st);
+    tx.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function _snapSaveNow(tag) {
+  const db = await _snapOpen();
+  const day = new Date().toISOString().slice(0, 10) + (tag ? ' · ' + tag : '');
+  const payload = { day, at: Date.now(), n: (STATE.orders || []).length,
+    settings: JSON.parse(JSON.stringify(settings)), orders: JSON.parse(JSON.stringify(STATE.orders || [])) };
+  await _snapAll(db, 'readwrite', st => st.put(payload));
+  const rows = await _snapAll(db, 'readonly', st => st.getAll());
+  const sorted = (rows || []).sort((a, b) => (b.at || 0) - (a.at || 0));
+  for (const r of sorted.slice(_SNAP_KEEP)) await _snapAll(db, 'readwrite', st => st.delete(r.day));
+  db.close();
+  return day;
+}
+async function _snapDaily() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const db = await _snapOpen();
+    const rows = await _snapAll(db, 'readonly', st => st.getAll());
+    db.close();
+    if ((rows || []).some(r => r.day === today)) return;
+    await _snapSaveNow();
+  } catch (e) {}
+}
+async function _snapRestore(day) {
+  if (!confirm(`恢复「${day}」的快照？\n\n当前全部数据将被该快照覆盖。\n（放心：恢复前会先把当前状态另存一份快照）`)) return;
+  try {
+    await _snapSaveNow('恢复前');
+    const db = await _snapOpen();
+    const rows = await _snapAll(db, 'readonly', st => st.getAll());
+    db.close();
+    const snap = (rows || []).find(r => r.day === day);
+    if (!snap) { toast('快照不存在'); return; }
+    localStorage.setItem('ticket-organizer-settings', JSON.stringify(snap.settings));
+    localStorage.setItem('ticket-organizer-pending', JSON.stringify({ orders: snap.orders, currentIdx: 0 }));
+    toast('✓ 已恢复，正在刷新…');
+    setTimeout(() => location.reload(), 600);
+  } catch (e) { toast('恢复失败：' + (e && e.message || e)); }
+}
+async function openSnapPanel() {
+  let rows = [];
+  try {
+    const db = await _snapOpen();
+    rows = await _snapAll(db, 'readonly', st => st.getAll());
+    db.close();
+  } catch (e) {}
+  rows = (rows || []).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const old = document.getElementById('snapOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'snapOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  const kb = (o) => { try { return Math.round(JSON.stringify(o).length / 1024); } catch (e) { return '?'; } };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:480px;">
+    <div class="verify-modal-header"><h3>🛟 本地快照（IndexedDB · 每日自动）</h3><button onclick="document.getElementById('snapOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="font-size:11px; color:var(--muted); margin-bottom:10px;">独立于 localStorage 的兜底仓库 · 每日后台自动存 1 份 · 保留最近 ${_SNAP_KEEP} 份 · 与手动导出 JSON 互为双保险</div>
+      ${rows.length ? rows.map(r => `<div style="display:flex; justify-content:space-between; align-items:center; border:1px solid var(--line); border-radius:var(--r-sm); padding:8px 12px; margin-top:6px; font-size:12px;">
+        <span><strong>${escapeHtml(r.day)}</strong> <span style="color:var(--muted);">· ${r.n} 单 · ~${kb(r)}KB · ${new Date(r.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span></span>
+        <button class="btn ghost small" onclick="_snapRestore('${escapeAttr(r.day)}')">恢复</button>
+      </div>`).join('') : '<div style="color:var(--muted); font-size:12px;">还没有快照（今天的会在后台自动生成）</div>'}
+      <button class="btn small" style="margin-top:12px;" onclick="_snapSaveNow('手动').then(() => { toast('✓ 快照已存'); openSnapPanel(); })">📸 立即快照</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+// ══ 🚨 错误可观测：未捕获错误环形日志 + 头部红点 ═══════════════════════════
+const _errLog = [];
+function _errPush(m) {
+  _errLog.push({ at: Date.now(), m: String(m).slice(0, 220) });
+  if (_errLog.length > 20) _errLog.shift();
+  const dot = document.getElementById('errDot');
+  if (dot) { dot.style.display = 'inline-flex'; dot.textContent = '⚠' + _errLog.length; }
+}
+window.addEventListener('error', (e) => _errPush((e.message || '脚本错误') + ' @' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?')));
+window.addEventListener('unhandledrejection', (e) => _errPush('Promise: ' + ((e.reason && e.reason.message) || e.reason || '未知')));
+function openErrLog() {
+  const old = document.getElementById('errLogOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'errLogOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:560px;">
+    <div class="verify-modal-header"><h3>🚨 运行错误日志（本次会话）</h3><button onclick="document.getElementById('errLogOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      ${_errLog.length ? _errLog.slice().reverse().map(r => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:6px 10px; margin-top:5px; font-size:11px; font-family:'JetBrains Mono',monospace; word-break:break-all;"><span style="color:var(--muted);">${new Date(r.at).toLocaleTimeString('zh-CN')}</span> ${escapeHtml(r.m)}</div>`).join('') : '<div style="color:var(--muted); font-size:12px;">无错误（功能异常时这里会有线索，报修时截图给开发）</div>'}
+      ${_errLog.length ? `<button class="btn ghost small" style="margin-top:10px;" onclick="_errLog.length = 0; const d = document.getElementById('errDot'); if (d) d.style.display = 'none'; document.getElementById('errLogOverlay').remove();">清空</button>` : ''}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
 // ══ 存储健康：白屏防护 / 用量仪表 / 一键释放 ═══════════════════════════
 // 本地 localStorage 约 5MB 配额（Firebase 已摘除，本地为唯一数据源）。
 // 防护：①全局 error 监听（首屏渲染成功前崩溃 → 急救条：先导出备份再清理）；
@@ -15827,6 +15946,8 @@ window.addEventListener('keydown', (e) => {
   const ovs = document.querySelectorAll('.verify-modal-overlay');
   if (ovs.length) { ovs[ovs.length - 1].remove(); e.stopPropagation(); }
 });
+// 🛟 每日快照：启动 9 秒后静默执行（IndexedDB，不触碰 localStorage——遵守启动期不写库原则）
+setTimeout(() => { try { _snapDaily(); } catch (e) {} }, 9000);
 
 // ═══ 配账引擎 · v4 原样移植（用户独立计算器 points_combo_calculator_v4）═══
 // 整数分（cents）记账防浮点；lowbit DP 子集表；top-K=100；平手取不超、单数少；
