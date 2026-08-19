@@ -2971,6 +2971,7 @@ html[data-lang="en"] .zh {
 /* ── ⏱ 转机时长行（融入虚线时间轴设计语言）── */
 .layover-row { text-align:center; font-size:11px; color:var(--muted); padding:5px 0; margin:2px 12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
 .layover-tight { color:var(--red); font-weight:700; }
+.layover-gap { color:#b45309; font-weight:700; }
 .layover-long { opacity:0.75; }
 /* ── 弹窗淡入（verify-modal 全家族）── */
 @keyframes vmOvIn { from { opacity:0; } to { opacity:1; } }
@@ -3006,10 +3007,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-BY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-BZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BY</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BZ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9247,10 +9248,14 @@ function _layoverMinutes(seg1, seg2) {
   let dayGap = d2 - d1;
   if (dayGap < -180) dayGap += 365;    // 跨年
   const diff = (dayGap + b.plus - a.plus) * 1440 + (b.min - a.min);
-  if (diff <= 0 || diff > 3 * 1440) return null;
+  if (diff <= 0 || diff > 370 * 1440) return null;
   return diff;
 }
 function _fmtLayover(min) {
+  if (min >= 1440) {
+    const d = Math.floor(min / 1440), h = Math.floor((min % 1440) / 60);
+    return d + '天' + (h ? ' ' + h + 'h' : '');
+  }
   const h = Math.floor(min / 60), m = min % 60;
   return (h ? h + 'h ' : '') + m + 'm';
 }
@@ -22265,10 +22270,18 @@ function buildCardHTML(o, idx) {
   });
   displaySegments.forEach((s, _si) => {
     if (_si > 0) {
-      const _lay = _layoverMinutes(displaySegments[_si - 1], s);
-      if (_lay != null) {
-        const _cls = _lay < 60 ? ' layover-tight' : (_lay > 300 ? ' layover-long' : '');
-        html += `<div class="layover-row${_cls}">⏱ 转机 ${escapeHtml(displaySegments[_si - 1].to || '')} · ${_fmtLayover(_lay)}${_lay < 60 ? ' · 转机紧张' : ''}</div>`;
+      const _prev = displaySegments[_si - 1];
+      const _lay = _layoverMinutes(_prev, s);
+      const _gap = _prev.to && s.from && _prev.to !== s.from;   // 换城断口（开口票）
+      if (_gap) {
+        html += `<div class="layover-row layover-gap">✂ 换城衔接 ${escapeHtml(_prev.to)} → ${escapeHtml(s.from)}${_lay != null ? ' · ' + _fmtLayover(_lay) : ''} · 非转机，出票请核对</div>`;
+      } else if (_lay != null) {
+        if (_lay > 1440) {
+          html += `<div class="layover-row layover-long">🛏 停留 ${escapeHtml(_prev.to || '')} · ${_fmtLayover(_lay)}</div>`;
+        } else {
+          const _cls = _lay < 60 ? ' layover-tight' : (_lay > 300 ? ' layover-long' : '');
+          html += `<div class="layover-row${_cls}">⏱ 转机 ${escapeHtml(_prev.to || '')} · ${_fmtLayover(_lay)}${_lay < 60 ? ' · 转机紧张' : ''}</div>`;
+        }
       }
     }
     const fromCity = STATE.airlineCityMap[s.from] || '';

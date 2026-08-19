@@ -108,4 +108,6 @@ eq('L2 4位与跨天标', [_t2min('1915+1'), _t2min('0900+1'), _t2min('17:50')],
 eq('L3 同日转机(Amex样本)', _layoverMinutes({arrTime:'5:50PM',date:'20SEP'},{depTime:'8:55PM',date:'20SEP'}), 185);
 eq('L4 跨日转机', _layoverMinutes({arrTime:'23:50',date:'20SEP'},{depTime:'01:30',date:'21SEP'}), 100);
 eq('L5 缺数据守卫', [_layoverMinutes({arrTime:'',date:'20SEP'},{depTime:'01:30',date:'21SEP'}), _layoverMinutes(null,null)], [null,null]);
+eq('L6 换城断口36天(截图样本)', [_layoverMinutes({arrTime:'12:29PM',date:'14SEP'},{depTime:'12:35PM',date:'20OCT'}), _fmtLayover(51846)], [51846, '36天']);
+eq('L7 同城停留天级', _fmtLayover(1440 * 2 + 185), '2天 3h');
 process.exit(fails ? 1 : 0);
