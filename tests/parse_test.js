@@ -102,4 +102,10 @@ const F2 = parseSingleBooking(`公务2PC 12000*0.85`);
 eq('F2 舱位前缀+折扣入字段', [F2.rmb, F2.discount], [12000, 85]);
 const F3 = parseSingleBooking(`3500*4`);
 eq('F3 裸算式每人票面', [F3.rmb, F3.discount || null, (F3.fareByType||{}).adult], [3500, null, 3500]);
+// 转机时长
+eq('L1 12小时制归一', [_t2min('5:50PM'), _t2min('2:09pm'), _t2min('12:10AM')], [{min:1070,plus:0},{min:849,plus:0},{min:10,plus:0}]);
+eq('L2 4位与跨天标', [_t2min('1915+1'), _t2min('0900+1'), _t2min('17:50')], [{min:1155,plus:1},{min:540,plus:1},{min:1070,plus:0}]);
+eq('L3 同日转机(Amex样本)', _layoverMinutes({arrTime:'5:50PM',date:'20SEP'},{depTime:'8:55PM',date:'20SEP'}), 185);
+eq('L4 跨日转机', _layoverMinutes({arrTime:'23:50',date:'20SEP'},{depTime:'01:30',date:'21SEP'}), 100);
+eq('L5 缺数据守卫', [_layoverMinutes({arrTime:'',date:'20SEP'},{depTime:'01:30',date:'21SEP'}), _layoverMinutes(null,null)], [null,null]);
 process.exit(fails ? 1 : 0);

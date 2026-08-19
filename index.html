@@ -2968,6 +2968,23 @@ html[data-lang="en"] .zh {
 .cs-price-empty { color:var(--muted); font-weight:400; }
 .urgent-btn:not(.is-urgent) { opacity:0.35; transition:opacity .15s; }
 .order-collapse-header:hover .urgent-btn:not(.is-urgent) { opacity:0.8; }
+/* ── ⏱ 转机时长行（融入虚线时间轴设计语言）── */
+.layover-row { text-align:center; font-size:11px; color:var(--muted); padding:5px 0; margin:2px 12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+.layover-tight { color:var(--red); font-weight:700; }
+.layover-long { opacity:0.75; }
+/* ── 弹窗淡入（verify-modal 全家族）── */
+@keyframes vmOvIn { from { opacity:0; } to { opacity:1; } }
+@keyframes vmIn { from { opacity:0; transform:translateY(10px) scale(0.985); } to { opacity:1; transform:none; } }
+.verify-modal-overlay { animation: vmOvIn .14s ease-out; }
+.verify-modal { animation: vmIn .18s cubic-bezier(.2,.8,.3,1); }
+/* ── 卡片 hover 微阴影 ── */
+.preview-order-group { transition: box-shadow .18s ease; }
+.preview-order-group:hover { box-shadow: 0 2px 10px rgba(12,27,42,0.07); }
+/* ── 动效无障碍：尊重系统减弱动画 ── */
+@media (prefers-reduced-motion: reduce) {
+  .verify-modal-overlay, .verify-modal { animation: none; }
+  .preview-order-group { transition: none; }
+}
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -2989,10 +3006,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-BV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-BW\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BV</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BW</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9193,6 +9210,45 @@ function _ordLine(o) {
   const n = (o.passengers || []).length;
   const s1 = (o.segments || [])[0] || {};
   return `${p0}${n > 1 ? ' 等' + n + '人' : ''} · ${s1.flight || '?'} ${s1.date || ''} ${s1.from || ''}→${s1.to || ''}`;
+}
+
+// ── ⏱ 转机时长：多格式时刻归一 + 段间停留分钟（同年假设，DEC→JAN 跨年修正）──
+function _t2min(t) {
+  if (!t) return null;
+  const s = String(t).trim();
+  const pm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (pm) { let h = (+pm[1]) % 12; if (/PM/i.test(pm[3])) h += 12; return { min: h * 60 + (+pm[2]), plus: 0 }; }
+  const plus = +((s.match(/\+(\d)/) || [])[1] || 0);
+  const c = s.replace(/\+\d.*$/, '').trim();
+  let m = c.match(/^(\d{1,2}):(\d{2})$/);
+  if (m) return { min: (+m[1]) * 60 + (+m[2]), plus };
+  m = c.match(/^(\d{2})(\d{2})$/);
+  if (m) return { min: (+m[1]) * 60 + (+m[2]), plus };
+  m = c.match(/^(\d)(\d{2})$/);
+  if (m) return { min: (+m[1]) * 60 + (+m[2]), plus };
+  return null;
+}
+function _dateOrd(d) {
+  const m = String(d || '').toUpperCase().match(/^(\d{1,2})([A-Z]{3})/);
+  if (!m) return null;
+  const mi = _MN3.indexOf(m[2]);
+  if (mi < 0) return null;
+  const cum = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  return cum[mi] + (+m[1]);
+}
+function _layoverMinutes(seg1, seg2) {
+  const a = _t2min(seg1 && seg1.arrTime), b = _t2min(seg2 && seg2.depTime);
+  const d1 = _dateOrd(seg1 && seg1.date), d2 = _dateOrd(seg2 && seg2.date);
+  if (!a || !b || d1 == null || d2 == null) return null;
+  let dayGap = d2 - d1;
+  if (dayGap < -180) dayGap += 365;    // 跨年
+  const diff = (dayGap + b.plus - a.plus) * 1440 + (b.min - a.min);
+  if (diff <= 0 || diff > 3 * 1440) return null;
+  return diff;
+}
+function _fmtLayover(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return (h ? h + 'h ' : '') + m + 'm';
 }
 
 // ── 微信聊天记录清洗：剥说话人前缀/时间戳/占位噪音，识别唯一代理名 ──────────
@@ -22086,7 +22142,14 @@ function buildCardHTML(o, idx) {
     const ofacChip = buildOFACInlineChip(p.name);
     html += `<div class="passenger-line">P${displayIdx+1}: <span class="copyable-name" onclick="copyText('${escapeAttr(p.name)}', this)" title="点击复制姓名">${escapeHtml(p.name)}</span>${badge}${ofacChip}</div>`;
   });
-  displaySegments.forEach(s => {
+  displaySegments.forEach((s, _si) => {
+    if (_si > 0) {
+      const _lay = _layoverMinutes(displaySegments[_si - 1], s);
+      if (_lay != null) {
+        const _cls = _lay < 60 ? ' layover-tight' : (_lay > 300 ? ' layover-long' : '');
+        html += `<div class="layover-row${_cls}">⏱ 转机 ${escapeHtml(displaySegments[_si - 1].to || '')} · ${_fmtLayover(_lay)}${_lay < 60 ? ' · 转机紧张' : ''}</div>`;
+      }
+    }
     const fromCity = STATE.airlineCityMap[s.from] || '';
     const toCity = STATE.airlineCityMap[s.to] || '';
     const dep = formatTime(s.depTime);
