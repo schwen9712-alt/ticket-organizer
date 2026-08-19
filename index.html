@@ -3008,10 +3008,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-CA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-CB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-CA</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-CB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9251,6 +9251,37 @@ function _layoverMinutes(seg1, seg2) {
   const diff = (dayGap + b.plus - a.plus) * 1440 + (b.min - a.min);
   if (diff <= 0 || diff > 370 * 1440) return null;
   return diff;
+}
+// ── 常用枢纽最短转机参考表（分钟）· [国内→国际, 国际→国内(含入关), 国内→国内, 国际→国际]
+// 参考值按各枢纽官方 MCT 保守取下限，非违规判定——官网可售衔接均合法，此表只提示风险敞口。
+const _MCT_TABLE = {
+  SFO: [60, 105, 35, 75], LAX: [75, 135, 50, 105], ORD: [60, 105, 40, 75],
+  EWR: [75, 135, 50, 105], JFK: [75, 150, 60, 105], DFW: [60, 105, 40, 60],
+  SEA: [60, 105, 40, 75], IAH: [60, 105, 40, 60], DEN: [60, 90, 35, 60],
+  ATL: [60, 105, 40, 75], BOS: [75, 105, 50, 75], MIA: [75, 135, 50, 105],
+  HKG: [0, 0, 0, 50], ICN: [0, 0, 0, 70], NRT: [0, 0, 0, 75], HND: [0, 0, 0, 60],
+  TPE: [0, 0, 0, 50], PVG: [0, 0, 0, 120], PEK: [0, 0, 0, 120], SIN: [0, 0, 0, 55],
+  KUL: [0, 0, 0, 60], BKK: [0, 0, 0, 75], DOH: [0, 0, 0, 60], DXB: [0, 0, 0, 75]
+};
+const _US_APTS = new Set(['SFO','LAX','ORD','EWR','JFK','DFW','SEA','IAH','DEN','ATL','BOS','MIA','SAN','LAS','PHX','SLC','MCO','FLL','TPA','AUS','MSP','DTW','CLT','PHL','IAD','DCA','BWI','SJC','OAK','PDX','HNL','SNA','SMF','STL','MDW','HOU','ANC','RDU','BNA','MSY']);
+function _mctCheck(prevSeg, seg, layMin) {
+  if (layMin == null || !prevSeg || !seg) return null;
+  const apt = String(prevSeg.to || '').toUpperCase();
+  const row = _MCT_TABLE[apt];
+  if (!row) return null;
+  const legIsDom = (a, b) => _US_APTS.has(a) && _US_APTS.has(b);
+  let mct;
+  if (_US_APTS.has(apt)) {
+    const inDom = legIsDom(String(prevSeg.from || '').toUpperCase(), apt);
+    const outDom = legIsDom(apt, String(seg.to || '').toUpperCase());
+    mct = row[inDom ? (outDom ? 2 : 0) : (outDom ? 1 : 3)];
+  } else {
+    mct = row[3];
+  }
+  if (!mct) return null;
+  if (layMin < mct) return { level: 'risk', mct };
+  if (layMin < mct * 1.5) return { level: 'tight', mct };
+  return null;
 }
 function _fmtLayover(min) {
   if (min >= 1440) {
@@ -22285,8 +22316,14 @@ function buildCardHTML(o, idx) {
         if (_lay > 1440) {
           html += `<div class="layover-row layover-long">🛏 停留 ${escapeHtml(_prev.to || '')} · ${_fmtLayover(_lay)}</div>`;
         } else {
-          const _cls = _lay < 60 ? ' layover-tight' : (_lay > 300 ? ' layover-long' : '');
-          html += `<div class="layover-row${_cls}">⏱ 转机 ${escapeHtml(_prev.to || '')} · ${_fmtLayover(_lay)}${_lay < 60 ? ' · 转机紧张' : ''}</div>`;
+          const _mc = _mctCheck(_prev, s, _lay);
+          let _cls = _lay > 300 ? ' layover-long' : '';
+          let _note = '';
+          if (_mc) {
+            if (_mc.level === 'risk') { _cls = ' layover-tight'; _note = ` · ⚠ 低于 ${escapeHtml(_prev.to)} 参考最短转机 ${_fmtLayover(_mc.mct)}，风险高`; }
+            else { _cls = ' layover-gap'; _note = ` · 偏紧（${escapeHtml(_prev.to)} 参考最短 ${_fmtLayover(_mc.mct)}）`; }
+          } else if (_lay < 60) { _cls = ' layover-tight'; _note = ' · 转机紧张'; }
+          html += `<div class="layover-row${_cls}">⏱ 转机 ${escapeHtml(_prev.to || '')} · ${_fmtLayover(_lay)}${_note}</div>`;
         }
       }
     }

@@ -110,4 +110,9 @@ eq('L4 跨日转机', _layoverMinutes({arrTime:'23:50',date:'20SEP'},{depTime:'0
 eq('L5 缺数据守卫', [_layoverMinutes({arrTime:'',date:'20SEP'},{depTime:'01:30',date:'21SEP'}), _layoverMinutes(null,null)], [null,null]);
 eq('L6 换城断口36天(截图样本)', [_layoverMinutes({arrTime:'12:29PM',date:'14SEP'},{depTime:'12:35PM',date:'20OCT'}), _fmtLayover(51846)], [51846, '36天']);
 eq('L7 同城停留天级', _fmtLayover(1440 * 2 + 185), '2天 3h');
+// MCT 判级
+eq('M1 SFO国内转国际偏紧(截图样本)', _mctCheck({from:'LAX',to:'SFO'},{from:'SFO',to:'ICN'},67), {level:'tight',mct:60});
+eq('M2 低于参考线风险', _mctCheck({from:'LAX',to:'SFO'},{from:'SFO',to:'ICN'},45), {level:'risk',mct:60});
+eq('M3 亚洲枢纽宽裕与未知机场', [_mctCheck({from:'PVG',to:'HKG'},{from:'HKG',to:'JFK'},90), _mctCheck({from:'A',to:'XXX'},{from:'XXX',to:'B'},30)], [null, null]);
+eq('M4 国际入境含入关口径', _mctCheck({from:'ICN',to:'SFO'},{from:'SFO',to:'DEN'},95), {level:'risk',mct:105});
 process.exit(fails ? 1 : 0);
