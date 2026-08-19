@@ -2969,7 +2969,8 @@ html[data-lang="en"] .zh {
 .urgent-btn:not(.is-urgent) { opacity:0.35; transition:opacity .15s; }
 .order-collapse-header:hover .urgent-btn:not(.is-urgent) { opacity:0.8; }
 /* ── ⏱ 转机时长行（融入虚线时间轴设计语言）── */
-.layover-row { text-align:center; font-size:11px; color:var(--muted); padding:5px 0; margin:2px 12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+.layover-row { text-align:center; font-size:12px; color:var(--ink-2); font-weight:600; padding:6px 0; margin:3px 12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
+.layover-return { font-weight:700; }
 .layover-tight { color:var(--red); font-weight:700; }
 .layover-gap { color:#b45309; font-weight:700; }
 .layover-long { opacity:0.75; }
@@ -3007,10 +3008,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-BZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.19-CA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-BZ</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-CA</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -22272,8 +22273,13 @@ function buildCardHTML(o, idx) {
     if (_si > 0) {
       const _prev = displaySegments[_si - 1];
       const _lay = _layoverMinutes(_prev, s);
-      const _gap = _prev.to && s.from && _prev.to !== s.from;   // 换城断口（开口票）
-      if (_gap) {
+      const _gap = _prev.to && s.from && _prev.to !== s.from;             // 出发城 ≠ 上段到达城
+      const _rt = displaySegments.length > 1 && displaySegments[0].from
+        && displaySegments[displaySegments.length - 1].to === displaySegments[0].from;   // 整程往返
+      const _longBreak = _lay == null ? _gap : _lay > 1440;
+      if (_rt && _longBreak) {
+        html += `<div class="layover-row layover-return">↩ 回程 · 停留 ${_lay != null ? _fmtLayover(_lay) : '?'}${_gap ? ` · ${escapeHtml(_prev.to)} → ${escapeHtml(s.from)} 自行前往` : ''}</div>`;
+      } else if (_gap) {
         html += `<div class="layover-row layover-gap">✂ 换城衔接 ${escapeHtml(_prev.to)} → ${escapeHtml(s.from)}${_lay != null ? ' · ' + _fmtLayover(_lay) : ''} · 非转机，出票请核对</div>`;
       } else if (_lay != null) {
         if (_lay > 1440) {
