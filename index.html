@@ -3008,10 +3008,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.20-CE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.20-CF\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.20-CE</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.20-CF</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9654,6 +9654,7 @@ function parseSingleBooking(raw) {
   let _uaSawTotal = false;
   let _uaSawTotalEn = 0;      // 英文票价区：1=在区内 2=刚过 Total due 待取金额
   let _uaEnPend = null;       // UA 英文官网：航段头暂存（日期时刻行在后，含粘连形态）
+  let _uaDateChangePend = false;  // 变更警告先于航班号落座时悬挂，落座时消费 +1
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -10643,6 +10644,27 @@ function parseSingleBooking(raw) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
       }
+      // 中文详情分行版：头行独立（"旧金山SFO至香港(HKG)HKG"），日期时刻在下一行
+      const uhSolo = trimmed.match(/^([\u4e00-\u9fa5]+)\(?([A-Z]{3})\)?[A-Z]{0,3}至([\u4e00-\u9fa5]*)\(?([A-Z]{3})\)?[A-Z]{0,3}\s*$/);
+      if (uhSolo) {
+        _uaEnPend = { from: uhSolo[2], to: uhSolo[4] };
+        _d(trimmed, '✅ SEG', `CN 头 ${uhSolo[2]}→${uhSolo[4]} 待日期`);
+        continue;
+      }
+      const uhDT = _uaEnPend && trimmed.match(/^(\d{1,2})月(\d{1,2})日·(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})至(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})/);
+      if (uhDT) {
+        const mi = parseInt(uhDT[1], 10) - 1;
+        if (mi >= 0 && mi < 12) {
+          _uaPendSeg = {
+            from: _uaEnPend.from, to: _uaEnPend.to,
+            date: String(parseInt(uhDT[2], 10)).padStart(2, '0') + _MN3[mi],
+            depTime: cn12(uhDT[3], uhDT[4]), arrTime: cn12(uhDT[5], uhDT[6])
+          };
+          _uaEnPend = null;
+          _d(trimmed, '✅ SEG', `CN 日期 ${_uaPendSeg.date} 待航班号`);
+          continue;
+        }
+      }
       const uh = trimmed.match(/^([\u4e00-\u9fa5]+)\(?([A-Z]{3})\)?[A-Z]{0,3}至\|?([\u4e00-\u9fa5]*)\(?([A-Z]{3})\)?(\d{1,2})月(\d{1,2})日·(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})至(上午|下午|中午|晚上|凌晨)(\d{1,2}:\d{2})/);
       if (uh) {
         const mi = parseInt(uh[5], 10) - 1;
@@ -10663,6 +10685,7 @@ function parseSingleBooking(raw) {
       }
       const uf = trimmed.match(/^航班号[:：]\s*([A-Z0-9]{2})\s*(\d{2,4})\b/);
       if (uf && _uaPendSeg) {
+        if (_uaDateChangePend && _uaPendSeg.arrTime && !/\+\d/.test(_uaPendSeg.arrTime)) { _uaPendSeg.arrTime += '+1'; _uaDateChangePend = false; }
         segs.push({ ..._uaPendSeg, flight: uf[1].toUpperCase() + uf[2], cls: _uaPendCabin || '' });
         if (!airline) airline = uf[1].toUpperCase();
         _d(trimmed, '✅ SEG', `UA详情 ${uf[1].toUpperCase()}${uf[2]} ${_uaPendSeg.from}→${_uaPendSeg.to}`);
@@ -10708,12 +10731,13 @@ function parseSingleBooking(raw) {
         if (/\bkg CO2/i.test(trimmed) || /^Price breakdown$/i.test(trimmed) || /^Flight \d+ of \d+$/i.test(trimmed)) continue;
       }
       // ── UA 英文官网：date change 警告 → 最近段补 +1 ──
-      if (/date change/i.test(trimmed)) {
-        if (segs.length) {
+      if (/date change|日期变更/i.test(trimmed)) {
+        if (_uaPendSeg) { _uaDateChangePend = true; }
+        else if (segs.length) {
           const ls = segs[segs.length - 1];
           if (ls.arrTime && !/\+\d/.test(ls.arrTime)) ls.arrTime += '+1';
-        }
-        _d(trimmed, '✅ SEG', '跨天警告 → 末段 +1');
+        } else { _uaDateChangePend = true; }
+        _d(trimmed, '✅ SEG', '跨天警告' + (_uaDateChangePend ? '（悬挂待落座）' : ' → 末段 +1'));
         continue;
       }
       // ── UA 英文官网票价区：/person 入每人价；Total due 后首个 $ 为整单 ──
@@ -10725,6 +10749,16 @@ function parseSingleBooking(raw) {
             if (!parsedFareByType) parsedFareByType = {};
             if (parsedFareByType.adult == null) parsedFareByType.adult = +(amt * settings.rate).toFixed(2);
             _d(trimmed, '💰 FARE', `EN 每人 $${amt}`);
+          }
+          continue;
+        }
+        const totUsd = trimmed.match(/^TOTAL\s+USD\s+([\d,]+(?:\.\d+)?)\s*$/i);
+        if (totUsd) {
+          const amt = parseFloat(totUsd[1].replace(/,/g, ''));
+          if (amt > 100 && amt < 300000 && settings.rate > 0) {
+            if (!rmb) rmb = +(amt * settings.rate).toFixed(2);
+            if (!usd) usd = amt;
+            _d(trimmed, '💰 FARE', `TOTAL USD ${amt}`);
           }
           continue;
         }
@@ -10798,7 +10832,11 @@ function parseSingleBooking(raw) {
           continue;
         }
       }
-      if (/^(时长[:：]|飞机类型[:：]|每个座位类型的排放|隐藏详细信息$|票价$|旅客[:：]\s*\d+$|\d+名成人)/.test(trimmed)) {
+      {
+        const zt = trimmed.match(/^旅客[:：]\s*(\d+)\s*$/);
+        if (zt) { const n = parseInt(zt[1], 10); if (n >= 1 && n <= 20 && !travelerCount) travelerCount = n; continue; }
+      }
+      if (/^(时长[:：]|飞机类型[:：]|每个座位类型的排放|\^?\s*隐藏详细信息$|票价$|旅客[:：]\s*\d+$|\d+名成人)/.test(trimmed)) {
         continue;
       }
     }

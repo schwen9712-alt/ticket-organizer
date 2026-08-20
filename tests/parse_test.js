@@ -145,4 +145,26 @@ const e2 = parseSingleBooking(EN2);
 eq('N1 粘连日期两段落座', [(e2.segs||[]).length, e2.segs[0].from, e2.segs[0].to, e2.segs[0].date, e2.segs[0].depTime, e2.segs[0].arrTime], [2, 'SFO', 'HKG', '02OCT', '13:25', '18:55+1']);
 eq('N2 第二段与人数', [e2.segs[1].from, e2.segs[1].to, e2.segs[1].date, e2.segs[1].depTime, e2.segs[1].arrTime], ['KIX', 'SFO', '13OCT', '16:55', '11:00']);
 eq('N3 每人化契约+清零', [e2.rmb, JSON.stringify(e2.paxPrices), (e2.fareByType||{}).adult, (e2.unrecognizedLines||[]).length], [+(9323.19/3*7.2).toFixed(2), JSON.stringify([+(9323.19/3*7.2).toFixed(2), +(9323.19/3*7.2).toFixed(2), +(9323.19/3*7.2).toFixed(2)]), +(2991*7.2).toFixed(2), 0]);
+// UA 中文详情分行版
+const CN2 = String.raw`旧金山SFO至香港(HKG)HKG
+10月2日·下午1:25至下午6:55·直飞
+请注意，本航班涉及日期变更
+时长:14小时30分钟
+旅客:1
+航班号:UA869
+飞机类型:Boeing 777-300ER
+每个座位类型的排放:732千克二氧化碳
+^ 隐藏详细信息
+大阪KIX至旧金山SFO
+10月13日·下午4:55至上午11:00·直飞
+时长:10小时5分钟
+旅客:1
+航班号:UA34
+飞机类型:Boeing777-200
+每个座位类型的排放:457千克二氧化碳
+TOTAL USD 9,323.19
+`;
+const c2 = parseSingleBooking(CN2);
+eq('C1 中文分行两段+航班号+悬挂变更', [(c2.segs||[]).length, c2.segs[0].flight, c2.segs[0].arrTime, c2.segs[1].flight, c2.segs[1].date], [2, 'UA869', '18:55+1', 'UA34', '13OCT']);
+eq('C2 TOTAL USD+单人+清零', [c2.rmb, c2.usd, (c2.unrecognizedLines||[]).length], [+(9323.19*7.2).toFixed(2), 9323.19, 0]);
 process.exit(fails ? 1 : 0);
