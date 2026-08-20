@@ -9,7 +9,7 @@ const dateGapDays = () => 0;
 const _MN3 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 const MN2 = _MN3; const _CN_CABIN = {}; const POINTS_TYPES = {}; const toast = () => {};
 const CN_CITY_IATA = { '北京首都': 'PEK', '洛杉矶': 'LAX' };
-let _parseDebugMode = false; const _parseDebugLog = [];
+let _parseDebugMode = false; let _parseDebugLog = [];
 // parser.js 由跑测者从 index.html 抽取（锚定法）：
 //   hs=$(grep -n '^function _ordKey' index.html | cut -d: -f1)
 //   end=$(grep -n 'seatCount: _seatCountN };' index.html | tail -1 | cut -d: -f1)
@@ -115,4 +115,34 @@ eq('M1 SFO国内转国际偏紧(截图样本)', _mctCheck({from:'LAX',to:'SFO'},
 eq('M2 低于参考线风险', _mctCheck({from:'LAX',to:'SFO'},{from:'SFO',to:'ICN'},45), {level:'risk',mct:60});
 eq('M3 亚洲枢纽宽裕与未知机场', [_mctCheck({from:'PVG',to:'HKG'},{from:'HKG',to:'JFK'},90), _mctCheck({from:'A',to:'XXX'},{from:'XXX',to:'B'},30)], [null, null]);
 eq('M4 国际入境含入关口径', _mctCheck({from:'ICN',to:'SFO'},{from:'SFO',to:'DEN'},95), {level:'risk',mct:105});
+// 调试模式 DOM 守卫
+_parseDebugMode = true;
+const _dr = parseSingleBooking('运价 6417');
+eq('D1 调试模式无DOM环境安全', [typeof _dr, _dr.rmb], ['object', 6417]);
+_parseDebugMode = false;
+// UA 英文官网粘连形态
+const EN2 = String.raw`San Francisco SFO to Hong Kong (HKG) HKG
+Oct 2Friday, October 21:25 PM to 6:55 PMNonstop
+alertPlease note this flight involves a date change
+Show details
+2,185 kg CO2Carbon emissions estimate: 2,185 kilograms.Learn more about carbon emissions
+Flight 2 of 2
+Osaka KIX to San Francisco SFO
+Oct 13Tuesday, October 134:55 PM to 11:00 AMNonstop
+Show details
+1,364 kg CO2Carbon emissions estimate: 1,364 kilograms.Learn more about carbon emissions
+Price breakdown
+Fare
+$8,973.00
+3 adults 18+
+$2,991.00/person
+Taxes and fees
+$350.19
+Total due
+$9,323.19
+`;
+const e2 = parseSingleBooking(EN2);
+eq('N1 粘连日期两段落座', [(e2.segs||[]).length, e2.segs[0].from, e2.segs[0].to, e2.segs[0].date, e2.segs[0].depTime, e2.segs[0].arrTime], [2, 'SFO', 'HKG', '02OCT', '13:25', '18:55+1']);
+eq('N2 第二段与人数', [e2.segs[1].from, e2.segs[1].to, e2.segs[1].date, e2.segs[1].depTime, e2.segs[1].arrTime], ['KIX', 'SFO', '13OCT', '16:55', '11:00']);
+eq('N3 每人化契约+清零', [e2.rmb, JSON.stringify(e2.paxPrices), (e2.fareByType||{}).adult, (e2.unrecognizedLines||[]).length], [+(9323.19/3*7.2).toFixed(2), JSON.stringify([+(9323.19/3*7.2).toFixed(2), +(9323.19/3*7.2).toFixed(2), +(9323.19/3*7.2).toFixed(2)]), +(2991*7.2).toFixed(2), 0]);
 process.exit(fails ? 1 : 0);

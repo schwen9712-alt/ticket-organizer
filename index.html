@@ -3008,10 +3008,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.19-CB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.20-CE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.19-CB</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.20-CE</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9653,6 +9653,7 @@ function parseSingleBooking(raw) {
   let _uaPendCabin = '';
   let _uaSawTotal = false;
   let _uaSawTotalEn = 0;      // 英文票价区：1=在区内 2=刚过 Total due 待取金额
+  let _uaEnPend = null;       // UA 英文官网：航段头暂存（日期时刻行在后，含粘连形态）
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -10667,6 +10668,44 @@ function parseSingleBooking(raw) {
         _d(trimmed, '✅ SEG', `UA详情 ${uf[1].toUpperCase()}${uf[2]} ${_uaPendSeg.from}→${_uaPendSeg.to}`);
         _uaPendSeg = null;
         continue;
+      }
+      // ── UA 英文官网：航段头（三形态）+ 日期时刻行（标准/粘连统一）──
+      {
+        const enHead = !/\d/.test(trimmed) && trimmed.match(/^([A-Za-z .]+?)\s*(?:\(([A-Z]{3})\)\s*)?([A-Z]{3})?\s+to\s+([A-Za-z .]+?)\s*(?:\(([A-Z]{3})\)\s*)?([A-Z]{3})?\s*$/);
+        if (enHead) {
+          const ef = enHead[2] || enHead[3], et = enHead[5] || enHead[6];
+          if (ef && et && /^[A-Z]{3}$/.test(ef) && /^[A-Z]{3}$/.test(et)) {
+            _uaEnPend = { from: ef, to: et };
+            _d(trimmed, '✅ SEG', `EN 头 ${ef}→${et} 待日期`);
+            continue;
+          }
+        }
+        const enDT = trimmed.match(/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[.,]?\s+(\d{1,2}).*?([1-9]|1[0-2]):(\d{2})\s*([AP])\.?M\.?\s*to\s*([1-9]|1[0-2]):(\d{2})\s*([AP])\.?M\.?/i);
+        // 粘连免疫要点：时刻前不设 \b（October 2 粘 1:25 成 "21:25"，词边界反而堵死正确位置——v-CE 二分实证）
+        if (enDT && _uaEnPend) {
+          const mi = _MN3.indexOf(enDT[1].slice(0, 3).toUpperCase());
+          const h24 = (h, ap) => { h = (+h) % 12; if (/^P/i.test(ap)) h += 12; return String(h).padStart(2, '0'); };
+          if (mi >= 0) {
+            segs.push({
+              from: _uaEnPend.from, to: _uaEnPend.to,
+              date: String(parseInt(enDT[2], 10)).padStart(2, '0') + _MN3[mi],
+              flight: '', cls: _uaPendCabin || '',
+              depTime: h24(enDT[3], enDT[5]) + ':' + enDT[4],
+              arrTime: h24(enDT[6], enDT[8]) + ':' + enDT[7]
+            });
+            _d(trimmed, '✅ SEG', `EN ${_uaEnPend.from}→${_uaEnPend.to} 落座`);
+            _uaEnPend = null;
+            continue;
+          }
+        }
+        // N adults / travelers → 人数（每人化契约链）
+        const enAd = trimmed.match(/^(\d+)\s+(adults?|travelers?)\b/i);
+        if (enAd) {
+          const n = parseInt(enAd[1], 10);
+          if (n >= 1 && n <= 20 && !travelerCount) travelerCount = n;
+          continue;
+        }
+        if (/\bkg CO2/i.test(trimmed) || /^Price breakdown$/i.test(trimmed) || /^Flight \d+ of \d+$/i.test(trimmed)) continue;
       }
       // ── UA 英文官网：date change 警告 → 最近段补 +1 ──
       if (/date change/i.test(trimmed)) {
@@ -12443,12 +12482,13 @@ function parseSingleBooking(raw) {
   }
 
   // ── Emit debug log if requested ─────────────────────────────────────────
-  if (_dbg) {
+  if (_dbg && typeof document !== 'undefined') {
     const el = document.getElementById('parseDebugContent');
     const panel = document.getElementById('parseDebugPanel');
     if (el && panel) {
       panel.style.display = 'block';
-      el.innerHTML = `<span style="color:#888; font-size:10px;">输入 ${expandedLines.length} 行 → 航段 ${segs.length} 段，运价 ${rmb ? '¥'+rmb : '—'}，旅客 ${pax.length} 名</span>\n\n` +
+      el.innerHTML += (el.innerHTML ? '<div style="border-top:1px dashed #444; margin:8px 0;"></div>' : '') +
+        `<span style="color:#888; font-size:10px;">输入 ${expandedLines.length} 行 → 航段 ${segs.length} 段，运价 ${rmb ? '¥'+rmb : '—'}，旅客 ${pax.length} 名</span>\n\n` +
         _dbg.map(e => {
           const color = e.rule.startsWith('✅') ? '#5ecc6b'
             : e.rule.startsWith('🧑') ? '#7eb8f7'
@@ -13161,6 +13201,8 @@ function showBlockingModal(strong, weak) {
 
 async function parsePNR() {
   try {
+  // 调试面板：多单解析前清空一次（旧渲染块改为追加模式）
+  if (_parseDebugMode) { try { const _pd = document.getElementById('parseDebugContent'); if (_pd) _pd.innerHTML = ''; } catch (e) {} }
   let raw = document.getElementById('rawInput').value;
   if (!raw.trim()) { toast('请先粘贴内容'); return; }
   // 微信聊天记录清洗：噪音剥离 + 唯一说话人识别为代理
@@ -15663,6 +15705,50 @@ function openFareCheck(prefillRmb) {
   setTimeout(() => { const el = document.getElementById(prefillRmb ? 'fcUsd' : 'fcRmb'); if (el) el.focus(); }, 60);
 }
 
+// ══ 🔁 代理快速切换：选错代理无需删单重录 ═══════════════════════════════════
+function openAgentSwitch(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const cur = (o.agent || '').trim();
+  const used = [...new Set(STATE.orders.map(x => (x.agent || '').trim()).filter(Boolean))];
+  const preset = (settings.presetAgents || []);
+  const cands = [...new Set([...preset, ...used])].filter(a => a && a !== cur);
+  const old = document.getElementById('agentSwitchOverlay');
+  if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'agentSwitchOverlay';
+  ov.className = 'verify-modal-overlay';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div class="verify-modal-header"><h3>🔁 切换代理 · 单 #${idx + 1}</h3><button onclick="document.getElementById('agentSwitchOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-body" style="padding:14px 16px;">
+      <div style="font-size:12px; color:var(--muted); margin-bottom:10px;">当前代理：<strong style="color:var(--ink);">${escapeHtml(cur || '（未填）')}</strong> · 切换后单子自动移入新代理分组，其它字段不动</div>
+      ${cands.length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">${cands.map(a => `<button class="btn ghost small" onclick="_doAgentSwitch(${idx}, '${escapeAttr(a)}')">${escapeHtml(a)}</button>`).join('')}</div>` : ''}
+      <div style="display:flex; gap:8px;">
+        <input id="agentSwitchInput" type="text" placeholder="或输入新代理名" style="flex:1; font-size:13px;" onkeydown="if(event.key==='Enter'){_doAgentSwitch(${idx}, this.value);}">
+        <button class="btn small" onclick="_doAgentSwitch(${idx}, document.getElementById('agentSwitchInput').value)">确认</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => { const el = document.getElementById('agentSwitchInput'); if (el && !cands.length) el.focus(); }, 60);
+}
+function _doAgentSwitch(idx, name) {
+  name = String(name || '').trim();
+  if (!name) { toast('代理名不能为空'); return; }
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const from = (o.agent || '').trim() || '（未填）';
+  const ov = document.getElementById('agentSwitchOverlay');
+  if (name === (o.agent || '').trim()) { if (ov) ov.remove(); return; }
+  o.agent = name;
+  o._lastEdit = Date.now();
+  persistOrdersNow();
+  if (ov) ov.remove();
+  renderPendingList();
+  toast(`✓ 代理已切换：${from} → ${name}（单子已移入新分组）`);
+}
+
 // ══ 📊 订单更改分析面板 ═══════════════════════════════════════════════════
 function _showOrderChangeAnalysis(agent, added, strongArr, missing) {
   const old = document.getElementById('ocaOverlay');
@@ -17762,6 +17848,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="openMRZDialog(${idx}); closeOrderMenu()" style="${passportDone ? doneStyle : ''}" title="粘贴护照 MRZ 给此单添加乘客">${passportDone ? checkmark : ''}📷 加护照</button>
       <button class="btn ghost small" onclick="toggleWaitingForRelease(${idx}); closeOrderMenu()" title="标记/取消「等待放位」" style="${o.waitingForRelease ? doneStyle : ''}">${o.waitingForRelease ? '🔒 等待放位' : '🔒 放位'}</button>
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
+      <button class="btn ghost small" onclick="openAgentSwitch(${idx}); closeOrderMenu()" title="选错代理无需删单重录：一键切换并自动移入新代理分组">🔁 切换代理</button>
       <button class="btn ghost small" onclick="toggleNoSplit(${idx}); closeOrderMenu()" title="标记/解除禁止拆单（代理不允许拆开出票；-T 前的存量单可在此补旗）" style="${o.noSplit ? doneStyle : ''}">${o.noSplit ? '⛔ 已禁拆' : '⛔ 禁拆'}</button>
       <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
       <button class="btn ghost small" onclick="blacklistOrderPax(${idx}); closeOrderMenu()" title="把此单乘客加入在线开票黑名单（下次录入到同名会强提醒）">⛔ 加入黑名单</button>
