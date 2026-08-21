@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.21-CI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.21-CK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CI</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CK</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10759,16 +10759,14 @@ function parseSingleBooking(raw) {
         }
         const totCn = trimmed.match(/^TOTAL\s+(成人|大人|儿童|小孩|小儿|婴儿)\s+(?:CNY|RMB|¥)\s*([\d,]+(?:\.\d+)?)\s*$/i);
         if (totCn) {
+          // 语义修正（v-CK 用户纠正）：TOTAL 成人 CNY 20591 = 成人【每人】运价，
+          // 不是全员合计——直接存 fareByType（RMB 每人契约），禁止任何除人头运算。
           const tk = (totCn[1] === '儿童' || totCn[1] === '小孩' || totCn[1] === '小儿') ? 'child' : totCn[1] === '婴儿' ? 'infant' : 'adult';
           const amt = parseFloat(totCn[2].replace(/,/g, ''));
           if (amt >= 50 && amt < 2000000) {
-            const cnt = tk === 'infant' ? pax.filter(p => p.forcedType === 'INFANT').length
-              : tk === 'child' ? pax.filter(p => p.forcedType === 'CHILD').length
-              : pax.filter(p => p.forcedType !== 'INFANT' && p.forcedType !== 'CHILD').length;
-            const per = +(amt / Math.max(1, cnt)).toFixed(2);
             if (!parsedFareByType) parsedFareByType = {};
-            parsedFareByType[tk] = per;
-            _d(trimmed, '💰 FARE', `TOTAL ${totCn[1]} ${amt} ÷ ${Math.max(1, cnt)} = ${per}/人`);
+            parsedFareByType[tk] = amt;
+            _d(trimmed, '💰 FARE', `TOTAL ${totCn[1]} = ¥${amt}/人`);
           }
           continue;
         }
@@ -22643,19 +22641,20 @@ function buildCardHTML(o, idx) {
           if (!groups[type]) return;
           const { price, count } = groups[type];
           const countStr = count > 1 ? ` × ${count}人` : '';
+          // 主次对调（v-CJ 用户截图指正）：代理报价是 CNY——人民币为主显，美金折算为辅注。
           const usdPerPax = rate > 0 ? `$${(price / rate).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}` : null;
-          const usdDisplay = usdPerPax
-            ? `<span style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--blue);">${usdPerPax}</span><span style="color:var(--muted); font-size:11px; margin-left:2px;">/人${countStr}</span>`
+          const cnyMain = `<span style="font-family:'JetBrains Mono',monospace; font-size:15px; font-weight:700; color:var(--ink);">¥${Number(price).toLocaleString()}</span><span style="color:var(--muted); font-size:11px; margin-left:2px;">/人${countStr} × ${discountStr}</span>`;
+          const usdAside = usdPerPax
+            ? `<span style="color:var(--blue); font-size:12px; font-weight:600; margin-left:10px;">≈ ${usdPerPax}/人</span>`
             : '';
-          const cnyFormula = `<span style="color:var(--muted); font-size:11px; margin-left:10px;">${price} × ${discountStr}</span>`;
-          html += `<div class="price-row"><span class="label">${typeLabels[type]}</span><span class="value" style="display:flex; align-items:baseline; gap:0; justify-content:flex-end;">${usdDisplay}${cnyFormula}</span></div>`;
+          html += `<div class="price-row"><span class="label">${typeLabels[type]}</span><span class="value" style="display:flex; align-items:baseline; gap:0; justify-content:flex-end;">${cnyMain}${usdAside}</span></div>`;
         });
 
         const totalSum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
         html += `<div class="price-row total"><span class="label">= 收入 Revenue${specialBadge}${tableYPriceBadge}</span><span class="value">¥ ${fp.toLocaleString()}</span></div>`;
         if (rate > 0) {
           const totalFareUsd = +(totalSum / rate).toFixed(2);
-          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (${totalSum} ÷ ${rate.toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalFareUsd.toFixed(2)}</span></div>`;
+          html += `<div class="price-row" style="padding-top:2px;"><span class="label" style="color:var(--blue); font-weight:600;">= 订单总金额 USD (${(+totalSum).toFixed(2)} ÷ ${rate.toFixed(4)})</span><span class="value" style="color:var(--blue); font-weight:700;">$ ${totalFareUsd.toFixed(2)}</span></div>`;
         }
       } else {
         if (o.customRate && o.usd) {
