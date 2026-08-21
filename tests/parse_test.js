@@ -167,4 +167,23 @@ TOTAL USD 9,323.19
 const c2 = parseSingleBooking(CN2);
 eq('C1 中文分行两段+航班号+悬挂变更', [(c2.segs||[]).length, c2.segs[0].flight, c2.segs[0].arrTime, c2.segs[1].flight, c2.segs[1].date], [2, 'UA869', '18:55+1', 'UA34', '13OCT']);
 eq('C2 TOTAL USD+单人+清零', [c2.rmb, c2.usd, (c2.unrecognizedLines||[]).length], [+(9323.19*7.2).toFixed(2), 9323.19, 0]);
+// 婴儿名单+双日期 DOCS+TOTAL 分型
+const GS = String.raw`1.YU/LIQIN 2.SUN/BINGBING 3.ZHOU/YU 4.LIU/RENRAN（婴儿）
+ 5.  UA198  P   TH03SEP  LAXPVG DK4   1315   1745+1 789  0   ----
+ 6.  UA810  R   SU15NOV  MNLSFO DK4   2325   2000   77W  0   ----
+ 7.  UA580  B   SU15NOV  SFOLAX DK4   2120   2255   738  0   ----
+护照信息
+CN/EP8310307/CN/27DEC63/F/22JUL35/YU/LIQIN/P1
+CN/EN7495183/CN/15SEP60/F/12DEC34/SUN/BINGBING/P2
+CN/EJ4427430/CN/07NOV86/M/17MAR32/ZHOU/YU/P3
+婴儿
+US/A82599381/US/26JUL26/19AUG31/LIU/RENRAN/P1
+
+
+TOTAL  成人 CNY 20591
+TOTAL 婴儿 CNY 2176
+`;
+const g1 = parseSingleBooking(GS);
+eq('G1 四乘客型别与婴儿双日期', (g1.pax||[]).map(p=>[p.name,p.forcedType||null,p.dob,p.passportExpiry||null]), [['YU/LIQIN',null,'27DEC63','22JUL35'],['SUN/BINGBING',null,'15SEP60','12DEC34'],['ZHOU/YU',null,'07NOV86','17MAR32'],['LIU/RENRAN','INFANT','26JUL26','19AUG31']]);
+eq('G2 三段+TOTAL分型每人化+清零', [(g1.segs||[]).length, g1.rmb, (g1.fareByType||{}).adult, (g1.fareByType||{}).infant, JSON.stringify(g1.paxPrices), (g1.unrecognizedLines||[]).length], [3, 6863.67, 6863.67, 2176, JSON.stringify([6863.67,6863.67,6863.67,2176]), 0]);
 process.exit(fails ? 1 : 0);

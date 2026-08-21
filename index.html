@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.20-CG\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.21-CH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.20-CG</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CH</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9657,6 +9657,7 @@ function parseSingleBooking(raw) {
   let _uaEnPend = null;       // UA 英文官网：航段头暂存（日期时刻行在后，含粘连形态）
   let _uaDateChangePend = false;  // 变更警告先于航班号落座时悬挂，落座时消费 +1
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
+  let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
@@ -10753,6 +10754,21 @@ function parseSingleBooking(raw) {
           }
           continue;
         }
+        const totCn = trimmed.match(/^TOTAL\s+(成人|大人|儿童|小孩|小儿|婴儿)\s+(?:CNY|RMB|¥)\s*([\d,]+(?:\.\d+)?)\s*$/i);
+        if (totCn) {
+          const tk = (totCn[1] === '儿童' || totCn[1] === '小孩' || totCn[1] === '小儿') ? 'child' : totCn[1] === '婴儿' ? 'infant' : 'adult';
+          const amt = parseFloat(totCn[2].replace(/,/g, ''));
+          if (amt >= 50 && amt < 2000000) {
+            const cnt = tk === 'infant' ? pax.filter(p => p.forcedType === 'INFANT').length
+              : tk === 'child' ? pax.filter(p => p.forcedType === 'CHILD').length
+              : pax.filter(p => p.forcedType !== 'INFANT' && p.forcedType !== 'CHILD').length;
+            const per = +(amt / Math.max(1, cnt)).toFixed(2);
+            if (!parsedFareByType) parsedFareByType = {};
+            parsedFareByType[tk] = per;
+            _d(trimmed, '💰 FARE', `TOTAL ${totCn[1]} ${amt} ÷ ${Math.max(1, cnt)} = ${per}/人`);
+          }
+          continue;
+        }
         const totUsd = trimmed.match(/^TOTAL\s+USD\s+([\d,]+(?:\.\d+)?)\s*$/i);
         if (totUsd) {
           const amt = parseFloat(totUsd[1].replace(/,/g, ''));
@@ -10791,6 +10807,24 @@ function parseSingleBooking(raw) {
         }
         if (/^(Revise this trip$|Show details$|Nonstop$|\d+ stops?$|\d+[\d,]*\s*kg CO2?₂?$|\d+ (adults?|travelers?)\b)/i.test(trimmed)) {
           continue;
+        }
+      }
+      // ── TOTAL 分类型金额: "TOTAL 成人 CNY 20591"（总额 ÷ 该类型人数 = 每人价入 fareByType）──
+      {
+        const tct = trimmed.match(/^TOTAL\s+(成人|大人|儿童|小孩|小儿|婴儿)\s+(?:CNY|RMB|¥)\s*([\d,]+(?:\.\d+)?)\s*$/i);
+        if (tct) {
+          const amt = parseFloat(tct[2].replace(/,/g, ''));
+          if (amt >= 50 && amt < 2000000) {
+            const k = tct[1] === '婴儿' ? 'infant' : (tct[1] === '儿童' || tct[1] === '小孩' || tct[1] === '小儿') ? 'child' : 'adult';
+            const cnt = k === 'infant' ? pax.filter(p => p.forcedType === 'INFANT').length
+                      : k === 'child' ? pax.filter(p => p.forcedType === 'CHILD').length
+                      : pax.filter(p => p.forcedType !== 'INFANT' && p.forcedType !== 'CHILD').length;
+            const per = +(amt / Math.max(1, cnt)).toFixed(2);
+            if (!parsedFareByType) parsedFareByType = {};
+            parsedFareByType[k] = per;
+            _d(trimmed, '💰 FARE', `TOTAL ${tct[1]} ${amt} ÷${Math.max(1, cnt)} = ${per}/人`);
+            continue;
+          }
         }
       }
       // ── 乘法算式运价: "普通经济1PC 3807*0.9*3" (+ 可选下行 "=10278.9000") ──
@@ -11297,6 +11331,34 @@ function parseSingleBooking(raw) {
     }
 
     // Bare P/ document line (no SSR prefix):
+    if (/^护照信息$/.test(trimmed)) { continue; }
+    {
+      const dtag = trimmed.match(/^(婴儿|儿童|小孩|小儿|成人|大人)\s*$/);
+      if (dtag) { _docTypePend = dtag[1]; continue; }
+    }
+    // ── 双日期无性别 DOCS（婴儿护照常见）: "US/A82599381/US/26JUL26/19AUG31/LIU/RENRAN/P1" ──
+    {
+      const dd = trimmed.match(/^(?:P[-\/])?([A-Z]{2,3})[-\/][A-Z0-9]{5,}[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d*)?\s*$/i);
+      if (dd) {
+        const _p2 = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
+        const name = (dd[4].trim() + '/' + dd[5].trim()).toUpperCase().replace(/\s+/g, ' ');
+        const dob = _p2(dd[2].toUpperCase());
+        const expiry = _p2(dd[3].toUpperCase());
+        const ft = _docTypePend === '婴儿' ? 'INFANT' : (_docTypePend === '儿童' || _docTypePend === '小孩' || _docTypePend === '小儿') ? 'CHILD' : null;
+        _docTypePend = null;
+        const ex = pax.find(p => p.name === name);
+        if (ex) {
+          if (!ex.dob) ex.dob = dob;
+          if (!ex.passportExpiry) ex.passportExpiry = expiry;
+          if (ft && !ex.forcedType) ex.forcedType = ft;
+        } else {
+          pax.push({ name, gender: '', dob, passportExpiry: expiry, ...(ft ? { forcedType: ft } : {}) });
+        }
+        _d(trimmed, '✅ PAX', `双日期 DOCS ${name}${ft ? ' ' + ft : ''}`);
+        continue;
+      }
+    }
+    if (/^护照信息$/.test(trimmed)) { _d(trimmed, '✅ PAX', '护照信息标签'); continue; }
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
@@ -11560,7 +11622,7 @@ function parseSingleBooking(raw) {
       }
       return false;
     };
-    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5])/g;
+    const nameRe = /(?:^|\s)(?:\d+[\.\s]+)?([A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+(?:\s+[A-Z]+)*?)(?=\s+\d+[\.\s]|\s*$|\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF)\b|\s+[\u4e00-\u9fa5]|\s*[（(])/g;
     // ── 乘机人：P/CN/... SSR-style inline: "乘机人：P/CN/EJ3722218/CN/12JAN01/F/30JUL30/SUN/LUMENG/P1"
     const paxInlineSSR = trimmed.match(/^(?:乘机人|旅客)[：:\s]+P\/[A-Z]{2}\/[A-Z0-9]+\/[A-Z]{2}\/(\d{2}[A-Z]{3}\d{2,4})\/([MF])\/\d{2}[A-Z]{3}\d{2,4}\/([A-Z]+)\/([A-Z]+)/i);
     if (paxInlineSSR) {
@@ -11632,9 +11694,22 @@ function parseSingleBooking(raw) {
       for (const nm of nameMatches) {
         let name = nm[1].trim().replace(/\/\s+/, '/').replace(/\s+(MR|MRS|MS|MSTR|MISS|DR|CHD|INF)$/i, '').trim();
         if (name.length >= 4 && name.includes('/') && !isMetaName(name) && !pax.find(p => p.name === name)) {
-          // 女婴/男婴 or bare 婴 → forcedType INFANT
-          const isInfant = /男婴|女婴|婴/.test(trimmed);
-          pax.push({ name, gender: lineGender, dob: lineDob, ...(isInfant ? { forcedType: 'INFANT' } : {}) });
+          // 类型判定逐名制：只有紧跟在该名字后的（婴儿）/（儿童）尾注才标该名；
+          // 行级"男婴/女婴"仅单人行生效（v-CH：整行 /婴/ 曾把名单行全员错标 INFANT）
+          const _tail = trimmed.slice((nm.index || 0) + nm[0].length);
+          const _tagM = _tail.match(/^\s*[（(]\s*(婴儿|婴|儿童|小孩|小儿)\s*[)）]/);
+          const isInfant = _tagM ? /婴/.test(_tagM[1]) : (nameMatches.length === 1 && /男婴|女婴/.test(trimmed));
+          const isChildTag = _tagM ? !/婴/.test(_tagM[1]) : false;
+          pax.push({ name, gender: lineGender, dob: lineDob, ...(isInfant ? { forcedType: 'INFANT' } : isChildTag ? { forcedType: 'CHILD' } : {}) });
+          foundAny = true;
+        }
+      }
+      // 括号标注补扫：nameRe 不认全角括号尾（如 "LIU/RENRAN（婴儿）"），单独捕获入列
+      for (const bm of trimmed.matchAll(/([A-Z]{2,})\s*\/\s*([A-Z]+(?:\s+[A-Z]+)*)\s*[（(]\s*(婴儿?|儿童|小孩|INF(?:ANT)?|CHD|CHILD)\s*[)）]/gi)) {
+        const nm2 = (bm[1] + '/' + bm[2]).toUpperCase().replace(/\s+/g, ' ').trim();
+        const ft2 = /婴|INF/i.test(bm[3]) ? 'INFANT' : 'CHILD';
+        if (nm2.length >= 4 && !isMetaName(nm2) && !pax.find(p => p.name === nm2)) {
+          pax.push({ name: nm2, gender: '', dob: '', forcedType: ft2 });
           foundAny = true;
         }
       }
