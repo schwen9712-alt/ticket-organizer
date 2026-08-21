@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.21-CH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.21-CI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CH</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CI</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9624,7 +9624,10 @@ function parseSingleBooking(raw) {
       .replace(/\s+(?=[A-Z]{2,}\/[A-Z]{2,}(?:\s+[A-Z]+)?\s+[男女])/g, '\n')          // before "NAME/NAME 女"
       .replace(/\s+(?=(?:大人|成人|儿童|小儿|婴儿)\s*\d{3,6}(?:\s|$))/g, '\n')        // before "成人25260"
       .replace(/\s+(?=(?:公务|商务|头等|经济|超经|超级经济)\s*舱?\s*\d{3,6}\s*\+)/g, '\n') // before "公务25260+…"
-      .replace(/\s+(?=TOTAL\s)/gi, '\n');                                            // before TOTAL
+      .replace(/\s+(?=TOTAL\s)/gi, '\n')                                            // before TOTAL
+      .replace(/\s+(?=\d{1,2}\.\s+[A-Z]{2}\d{2,4}\s+[A-Z]\s+(?:MO|TU|WE|TH|FR|SA|SU)\d{2}[A-Z]{3}\s)/g, '\n')  // before Sabre seg "5.  UA198  P   TH03SEP"（粘连流拆段，v-CI）
+      .replace(/\s+(?=护照信息)/g, '\n')                                             // before 护照信息 标签
+      .replace(/(^|\s)(婴儿|儿童|小孩)\s+(?=[A-Z]{2,3}[\/-][A-Z0-9]{5,}[\/-][A-Z]{2,3}[\/-]\d)/g, '$1\n$2\n');  // 独行类型标签与其 DOCS 拆行
   }
   const lines = raw.split(/\r?\n/);
   const pax = [];
