@@ -183,14 +183,18 @@ US/A82599381/US/26JUL26/19AUG31/LIU/RENRAN/P1
 TOTAL  成人 CNY 20591
 TOTAL 婴儿 CNY 2176
 `;
-const g1 = parseSingleBooking(GS);
+const _gb = splitIntoBookings(GS);
+eq('G0 分单不裂(多行版)', _gb.length, 1);
+const g1 = parseSingleBooking(_gb[0]);
 eq('G1 四乘客型别与婴儿双日期', (g1.pax||[]).map(p=>[p.name,p.forcedType||null,p.dob,p.passportExpiry||null]), [['YU/LIQIN',null,'27DEC63','22JUL35'],['SUN/BINGBING',null,'15SEP60','12DEC34'],['ZHOU/YU',null,'07NOV86','17MAR32'],['LIU/RENRAN','INFANT','26JUL26','19AUG31']]);
 eq('G2 三段+TOTAL每人价直存+清零', [(g1.segs||[]).length, g1.rmb, (g1.fareByType||{}).adult, (g1.fareByType||{}).infant, JSON.stringify(g1.paxPrices), (g1.unrecognizedLines||[]).length], [3, 20591, 20591, 2176, JSON.stringify([20591,20591,20591,2176]), 0]);
 // 单行粘连版（微信压行）
 const GS2 = String.raw`1.YU/LIQIN 2.SUN/BINGBING 3.ZHOU/YU 4.LIU/RENRAN（婴儿）  5.  UA198  P   TH03SEP  LAXPVG DK4   1315   1745+1 789  0   ----  6.  UA810  R   SU15NOV  MNLSFO DK4   2325   2000   77W  0   ----  7.  UA580  B   SU15NOV  SFOLAX DK4   2120   2255   738  0   ---- 护照信息 CN/EP8310307/CN/27DEC63/F/22JUL35/YU/LIQIN/P1 CN/EN7495183/CN/15SEP60/F/12DEC34/SUN/BINGBING/P2 CN/EJ4427430/CN/07NOV86/M/17MAR32/ZHOU/YU/P3 婴儿 US/A82599381/US/26JUL26/19AUG31/LIU/RENRAN/P1
 TOTAL  成人 CNY 20591 TOTAL 婴儿 CNY 2176
 `;
-const g2r = parseSingleBooking(GS2);
+const _gb2 = splitIntoBookings(GS2);
+eq('G0b 分单不裂(粘连版)', _gb2.length, 1);
+const g2r = parseSingleBooking(_gb2[0]);
 eq('G3 单行粘连版等价多行版', [(g2r.segs||[]).length, (g2r.pax||[]).length, g2r.rmb, JSON.stringify(g2r.fareByType), (g2r.unrecognizedLines||[]).length], [3, 4, 20591, JSON.stringify({adult:20591,infant:2176}), 0]);
 // Sabre FARE/TAX/TOTAL 运价块 + 分组头 + NM 粘连名单
 const HS = String.raw`1.  UA889  P   MO24AUG  PEKSFO DK1   1725   1420   777  0   ----
@@ -217,7 +221,9 @@ SSR DOCS UA HK1 P/CN/EJ8049802/CN/30DEC91/M/05FEB33/WANG/ZEYU/P3
 NM1WANG/RUOCHU
 SSR DOCS UA HK1 P/CN/H23818828/CN/03MAR25/F/08APR30/WANG/RUOCHU/P1
 `;
-const h1 = parseSingleBooking(HS);
+const _hb = splitIntoBookings(HS);
+eq('H0 分单不裂(======运价块)', _hb.length, 1);
+const h1 = parseSingleBooking(_hb[0]);
 eq('H1 四段混航司+运价块每人', [(h1.segs||[]).length, h1.segs[3].flight, h1.rmb, JSON.stringify(h1.fareByType)], [4, 'NH963', 42682, JSON.stringify({adult:42682,infant:4298})]);
 eq('H2 四客铺价+清零', [(h1.pax||[]).length, JSON.stringify(h1.paxPrices), (h1.unrecognizedLines||[]).length], [4, JSON.stringify([42682,42682,42682,4298]), 0]);
 // 运价块再压行变形（段号粘FARE/TAX+TOTAL+类型词一锅粥/名单巨行）
@@ -233,6 +239,10 @@ TAX CNY 76AY CNY 0CN CNY 492XT TOTAL CNY 4298 婴儿
 
 3个大人 NM1LONG/QI MS1SUN/XIAOMAN MS1WANG/ZEYU MR SSR DOCS UA HK1 P/CN/EN5034604/CN/02JUN70/F/29SEP34/LONG/QI/P1 SSR DOCS UA HK1 P/CN/EJ7034219/CN/17DEC94/F/11JAN33/SUN/XIAOMAN/P2 SSR DOCS UA HK1 P/CN/EJ8049802/CN/30DEC91/M/05FEB33/WANG/ZEYU/P3 1个婴儿 NM1WANG/RUOCHU SSR DOCS UA HK1 P/CN/H23818828/CN/03MAR25/F/08APR30/WANG/RUOCHU/P1
 `;
-const h3 = parseSingleBooking(HS2);
+const _hb2 = splitIntoBookings(HS2);
+eq('H0b 分单不裂(行内======)', _hb2.length, 1);
+const h3 = parseSingleBooking(_hb2[0]);
 eq('H3 再压行变形等价', [(h3.segs||[]).length, (h3.pax||[]).length, h3.rmb, JSON.stringify(h3.fareByType), (h3.unrecognizedLines||[]).length], [4, 4, 42682, JSON.stringify({adult:42682,infant:4298}), 0]);
+// 分单器多单场景不误伤
+eq('S1 多单-----分隔正常切分', splitIntoBookings(GS + '\n-----\n' + HS).length, 2);
 process.exit(fails ? 1 : 0);

@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.22-CM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.22-CN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.22-CM</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.22-CN</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9364,34 +9364,35 @@ function splitIntoBookings(raw) {
   // its own line). Common when the whole booking is pasted as one line/blob.
   // Require 4+ chars to avoid matching "+1"-style annotations or "---" in notes.
   const hasInlineSeparator = !hasSeparator && /[^\S\r\n][=]{4,}[^\S\r\n]/.test(raw);
-  if (hasInlineSeparator) {
-    const chunks = raw.split(/[^\S\r\n][=]{4,}[^\S\r\n]/).filter(x => x.trim());
-    if (chunks.length >= 2) return chunks.filter(x => x.trim());
-  }
-  if (hasSeparator) {
-    const chunks = raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
-    // Merge chunks: if a chunk has no confirmed segment (DK/HK) but has fare/pax,
-    // merge it with the next chunk that does have segments
-    // Only count DK/HK/GK as confirmed segment if NOT in an SSR/OSI line
-    const hasConfirmedSeg = (c) => c.split(/\r?\n/).some(line => {
-      const t = line.trim();
-      if (/^(?:SSR|OSI|OSS|RMK|OPT)\b/i.test(t)) return false;
-      return /\bDK\d|\bHK\d|\bGK\d/i.test(t);
-    });
+  // v-CN 共享合并器：无确认段的块不成孤儿单（Sabre 运价块 ====== 后的价块+名单场景），
+  // 先尝试并入下一块，末尾剩余前向并入最后一个有段的单。两条分隔路径共用。
+  const _hasConfirmedSeg = (c) => c.split(/\r?\n/).some(line => {
+    let t = line.trim();
+    if (/^(?:SSR|OSI|OSS|RMK|OPT)\b/i.test(t)) return false;
+    t = t.replace(/SSR\s+DOCS\b[\s\S]*$/i, '');   // 粘连流：行中 SSR DOCS 尾巴（含其 HK1）剥除后再测段
+    return /\bDK\d|\bHK\d|\bGK\d/i.test(t);
+  });
+  const _mergeChunks = (chunks) => {
     const merged = [];
     let carry = '';
     for (const chunk of chunks) {
-      if (carry) {
-        merged.push(carry + '\n' + chunk);
-        carry = '';
-      } else if (!hasConfirmedSeg(chunk)) {
-        carry = chunk;  // hold over to merge with next chunk
-      } else {
-        merged.push(chunk);
-      }
+      if (carry) { merged.push(carry + '\n' + chunk); carry = ''; }
+      else if (!_hasConfirmedSeg(chunk)) { carry = chunk; }
+      else { merged.push(chunk); }
     }
-    if (carry) merged.push(carry); // leftover with no following chunk
+    if (carry) {
+      if (merged.length) merged[merged.length - 1] += '\n' + carry;
+      else merged.push(carry);
+    }
     return merged.filter(x => x.trim());
+  };
+  if (hasInlineSeparator) {
+    const chunks = raw.split(/[^\S\r\n][=]{4,}[^\S\r\n]/).filter(x => x.trim());
+    if (chunks.length >= 2) return _mergeChunks(chunks);
+  }
+  if (hasSeparator) {
+    const chunks = raw.split(/\r?\n\s*[=\-_*]{3,}\s*(?=\r?\n|$)/).filter(x => x.trim());
+    return _mergeChunks(chunks);
   }
 
   // Strong split: "第X单" markers (Chinese order numbers like 第1单, 第十五单, 第15单).
