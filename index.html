@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.21-CK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.22-CL\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.21-CK</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.22-CL</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -11360,6 +11360,20 @@ function parseSingleBooking(raw) {
       }
     }
     if (/^护照信息$/.test(trimmed)) { _d(trimmed, '✅ PAX', '护照信息标签'); continue; }
+    if (/^\d+个(大人|成人|儿童|小孩|婴儿)\s*$/.test(trimmed)) { _d(trimmed, '✅ PAX', '人数分组头'); continue; }
+    // NM 粘连名单: "NM1LONG/QI MS1SUN/XIAOMAN MS1WANG/ZEYU MR"（称谓与下一序号粘连）
+    if (/^NM\d/.test(trimmed)) {
+      let nmAny = false;
+      for (const m of trimmed.matchAll(/\d([A-Z]{2,})\/([A-Z]+(?:\s+[A-Z]+)*?)(?=\s|$|\d)/g)) {
+        const nm = (m[1] + '/' + m[2]).toUpperCase().replace(/\s+(MR|MRS|MS|MSTR|MISS|DR)$/i, '').trim();
+        // isMetaName 声明在后（TDZ），NM 行结构已强特异无需元词过滤
+        if (nm.length >= 4 && !pax.find(p => p.name === nm)) {
+          pax.push({ name: nm, gender: '', dob: '' });
+        }
+        nmAny = true;
+      }
+      if (nmAny) { _d(trimmed, '✅ PAX', 'NM 名单行'); continue; }
+    }
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
