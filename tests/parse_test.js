@@ -220,4 +220,19 @@ SSR DOCS UA HK1 P/CN/H23818828/CN/03MAR25/F/08APR30/WANG/RUOCHU/P1
 const h1 = parseSingleBooking(HS);
 eq('H1 四段混航司+运价块每人', [(h1.segs||[]).length, h1.segs[3].flight, h1.rmb, JSON.stringify(h1.fareByType)], [4, 'NH963', 42682, JSON.stringify({adult:42682,infant:4298})]);
 eq('H2 四客铺价+清零', [(h1.pax||[]).length, JSON.stringify(h1.paxPrices), (h1.unrecognizedLines||[]).length], [4, JSON.stringify([42682,42682,42682,4298]), 0]);
+// 运价块再压行变形（段号粘FARE/TAX+TOTAL+类型词一锅粥/名单巨行）
+const HS2 = String.raw`1. UA889 P MO24AUG PEKSFO DK1 1725 1420 777 0 ----
+2. UA1141 P MO24AUG SFOEWR DK1 2235 0706+1 777 0 ----
+3. UA131 P WE02SEP EWRHND DK1 1030 1335+1 777 0 ----
+4. NH963 P TH03SEP HNDPEK DK1 1715 2015 788 0 E 3 3 
+5. 
+6. 
+7. FARE CNY 37280
+TAX CNY 76AY CNY 90CN CNY 5236XT TOTAL CNY 42682 大人 ====================== FARE CNY 3730
+TAX CNY 76AY CNY 0CN CNY 492XT TOTAL CNY 4298 婴儿
+
+3个大人 NM1LONG/QI MS1SUN/XIAOMAN MS1WANG/ZEYU MR SSR DOCS UA HK1 P/CN/EN5034604/CN/02JUN70/F/29SEP34/LONG/QI/P1 SSR DOCS UA HK1 P/CN/EJ7034219/CN/17DEC94/F/11JAN33/SUN/XIAOMAN/P2 SSR DOCS UA HK1 P/CN/EJ8049802/CN/30DEC91/M/05FEB33/WANG/ZEYU/P3 1个婴儿 NM1WANG/RUOCHU SSR DOCS UA HK1 P/CN/H23818828/CN/03MAR25/F/08APR30/WANG/RUOCHU/P1
+`;
+const h3 = parseSingleBooking(HS2);
+eq('H3 再压行变形等价', [(h3.segs||[]).length, (h3.pax||[]).length, h3.rmb, JSON.stringify(h3.fareByType), (h3.unrecognizedLines||[]).length], [4, 4, 42682, JSON.stringify({adult:42682,infant:4298}), 0]);
 process.exit(fails ? 1 : 0);
