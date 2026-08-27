@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.27-CP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.27-CQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.27-CP</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.27-CQ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5838,9 +5838,9 @@ const STATE = {
       'Y': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'G': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'B': 'Economy'
     },
     'DL': {
-      'F': 'First', 'P': 'First',
+      'F': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
-      'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
+      'P': 'Premium', 'G': 'Premium', 'A': 'Premium', 'S': 'Premium',   // DL Premium Select = P/A/G（v-CQ 用户纠正：P 非头等）
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
     },
     'NH': {
@@ -5942,9 +5942,9 @@ const DEFAULT_SETTINGS = {
       'Y': 'Economy', 'H': 'Economy', 'K': 'Economy', 'M': 'Economy', 'L': 'Economy', 'V': 'Economy', 'G': 'Economy', 'S': 'Economy', 'N': 'Economy', 'Q': 'Economy', 'O': 'Economy', 'B': 'Economy'
     },
     'DL': {
-      'F': 'First', 'P': 'First',
+      'F': 'First',
       'J': 'Business', 'C': 'Business', 'D': 'Business', 'I': 'Business', 'Z': 'Business',
-      'G': 'Premium', 'A': 'Premium', 'S': 'Premium',
+      'P': 'Premium', 'G': 'Premium', 'A': 'Premium', 'S': 'Premium',   // DL Premium Select = P/A/G（v-CQ 用户纠正：P 非头等）
       'Y': 'Economy', 'B': 'Economy', 'M': 'Economy', 'H': 'Economy', 'Q': 'Economy', 'K': 'Economy', 'L': 'Economy', 'U': 'Economy', 'T': 'Economy', 'X': 'Economy', 'V': 'Economy', 'E': 'Economy', 'N': 'Economy', 'W': 'Economy'
     },
     'NH': {
@@ -7053,6 +7053,10 @@ async function loadSettings() {
   if ((settings.fareClassMigrationVersion || 0) < FARE_CLASS_MIGRATION_VERSION) {
     if (settings.fareClassByAirline && settings.fareClassByAirline['UA']) {
       // Fix UA T (was Premium → Economy)
+      // v-CQ 迁移：DL P 旧值 First → Premium（Premium Select 超经，用户纠正）
+      if (settings.fareClassByAirline['DL'] && settings.fareClassByAirline['DL']['P'] === 'First') {
+        settings.fareClassByAirline['DL']['P'] = 'Premium';
+      }
       if (settings.fareClassByAirline['UA']['T'] === 'Premium') {
         settings.fareClassByAirline['UA']['T'] = 'Economy';
       }
@@ -22938,14 +22942,26 @@ function buildClientCopy(o, mode) {
 // whole trip at a glance. No RMB prices, no PNR/discount internals — just
 // flights, cabin, dates, times, and an approximate USD price.
 // ─────────────────────────────────────────────────────────────────────────────
-function _cabinFullName(cls) {
+function _cabinFullName(cls, airline) {
   const c = (cls || '').toUpperCase().trim();
   if (!c) return '';
+  // 航司感知（v-CQ）：同一字母各航司舱等不同（DL P=超经 / UA P=Polaris 商务）——
+  // 有航司先查精确表，粗表仅作末级兜底。
+  const al = (airline || '').toUpperCase().trim();
+  if (al) {
+    const en = (settings.fareClassByAirline && settings.fareClassByAirline[al] && settings.fareClassByAirline[al][c])
+      || (typeof STATE !== 'undefined' && STATE.fareClassByAirline && STATE.fareClassByAirline[al] && STATE.fareClassByAirline[al][c])
+      || (typeof STATE !== 'undefined' && STATE.classMap && STATE.classMap[c]) || null;
+    if (en === 'First') return 'FIRST';
+    if (en === 'Business') return 'BUSINESS';
+    if (en === 'Premium') return 'PREMIUM ECO';
+    if (en === 'Economy') return 'ECONOMY';
+  }
   const FIRST    = ['F','A','P'];
   const BUSINESS = ['J','C','D','I','Z','R'];
   if (FIRST.includes(c))    return 'FIRST';
   if (BUSINESS.includes(c)) return 'BUSINESS';
-  return 'ECONOMY';  // most other booking classes are economy buckets
+  return 'ECONOMY';
 }
 
 function _orderCabinWord(o) {
@@ -22984,7 +23000,7 @@ function buildItineraryCopy(o) {
     const num = String(i + 1).padStart(2, ' ');
     const flight = (s.flight || '').toUpperCase().trim().padEnd(7, ' ');
     const cls = (s.cls || '').toUpperCase().trim();
-    const cabinWord = orderCabin || _cabinFullName(cls);
+    const cabinWord = orderCabin || _cabinFullName(cls, o.airline || (s.flight || '').slice(0, 2));
     const cabinTag = cabinWord ? `${cabinWord}${cls ? '-' + cls : ''}` : (cls || '');
     const date = (s.date || '').toUpperCase().trim();
     const from = (s.from || '').toUpperCase().trim();
