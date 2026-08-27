@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.27-CO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.27-CP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.27-CO</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.27-CP</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15843,6 +15843,42 @@ function _fareCheckCalc(rmb, rate, usd) {
   const diffPct = +((diff / usd) * 100).toFixed(1);
   return { cnUsd, diff, diffPct };
 }
+function _fareQuoteText(rate, usd, pax, disc) {
+  rate = Number(rate); usd = Number(usd); pax = Math.max(1, parseInt(pax, 10) || 1);
+  if (!(usd > 0) || !(rate > 0)) return null;
+  const f2 = (n) => (+n).toFixed(2);
+  const totalUsd = f2(usd * pax);
+  const rmbPer = +(usd * rate).toFixed(2);
+  const rmbTotal = f2(rmbPer * pax);
+  let txt = `【重新报价】`;
+  txt += `\n美国运价：$${f2(usd)}/人` + (pax > 1 ? ` × ${pax}人 = $${totalUsd}` : '');
+  txt += `\n人民币价：¥${f2(rmbPer)}/人` + (pax > 1 ? ` × ${pax}人 = ¥${rmbTotal}` : '') + `（汇率 ${rate}）`;
+  disc = Number(disc);
+  if (disc > 0 && disc < 100) {
+    const setPer = +(rmbPer * disc / 100).toFixed(2);
+    txt += `\n结算价（${disc}%）：¥${f2(setPer)}/人` + (pax > 1 ? ` × ${pax}人 = ¥${f2(setPer * pax)}` : '');
+  }
+  return txt;
+}
+function _fareQuoteCopy() {
+  const rate = parseFloat((document.getElementById('fcRate') || {}).value);
+  const usd = parseFloat((document.getElementById('fcUsd') || {}).value);
+  const pax = parseInt((document.getElementById('fcPax') || {}).value, 10) || 1;
+  const disc = parseFloat((document.getElementById('fcDisc') || {}).value);
+  const txt = _fareQuoteText(rate, usd, pax, disc);
+  if (!txt) { toast('请先填「美国运价 $」再复制报价'); return; }
+  const done = () => toast('✓ 报价已复制，可直接发代理');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt).then(done).catch(() => { _fareQuoteFallbackCopy(txt); done(); });
+  } else { _fareQuoteFallbackCopy(txt); done(); }
+}
+function _fareQuoteFallbackCopy(txt) {
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.cssText = 'position:fixed; opacity:0;';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+}
 function _fareCheckRender() {
   const rmb = parseFloat((document.getElementById('fcRmb') || {}).value);
   const rate = parseFloat((document.getElementById('fcRate') || {}).value);
@@ -15861,7 +15897,8 @@ function _fareCheckRender() {
   out.innerHTML = `<div style="font-size:12px; color:var(--muted);">折算美金（每人）</div>
     <div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800; color:var(--ink);">$${r.cnUsd.toLocaleString('en-US')}</div>${cmp}`;
 }
-function openFareCheck(prefillRmb) {
+function openFareCheck(prefillRmb, ctx) {
+  ctx = ctx || {};
   const old = document.getElementById('fareCheckOverlay');
   if (old) old.remove();
   const rate = (typeof settings !== 'undefined' && settings.rate > 0) ? settings.rate : 7.2;
@@ -15877,7 +15914,12 @@ function openFareCheck(prefillRmb) {
         <label style="font-size:11px; font-weight:700;">汇率 USD/CNY<input id="fcRate" type="number" step="0.0001" value="${rate}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
       </div>
       <label style="font-size:11px; font-weight:700; display:block; margin-top:10px;">美国运价 $（你查到的）<input id="fcUsd" type="number" step="0.01" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()" placeholder="如 1180.20"></label>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+        <label style="font-size:11px; font-weight:700;">人数<input id="fcPax" type="number" min="1" step="1" value="${Math.max(1, parseInt(ctx.pax, 10) || 1)}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
+        <label style="font-size:11px; font-weight:700;">结算折扣 %（可空）<input id="fcDisc" type="number" min="1" max="99" step="1" value="${ctx.disc || ''}" style="width:100%; margin-top:3px;" placeholder="如 90" oninput="_fareCheckRender()"></label>
+      </div>
       <div id="fcOut" style="margin-top:14px; padding:12px; background:var(--bg); border-radius:var(--r-md);"></div>
+      <button class="btn small" style="margin-top:10px; width:100%;" onclick="_fareQuoteCopy()" title="生成含 总USD/人均USD/人民币价/结算价 的报价文本，直接发代理">📋 复制报价（发代理）</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -17636,7 +17678,7 @@ function renderPendingList() {
         if (o.rmb) {
           priceEl.style.cursor = 'pointer';
           priceEl.title = '点击核价：折算美金 vs 美国运价';
-          priceEl.addEventListener('click', (e) => { e.stopPropagation(); openFareCheck(o.rmb); });
+          priceEl.addEventListener('click', (e) => { e.stopPropagation(); openFareCheck(o.rmb, { pax: (o.passengers || []).length || 1, disc: o.discount || null }); });
         }
         summarySpan.appendChild(paxEl);
         summarySpan.appendChild(midEl);
