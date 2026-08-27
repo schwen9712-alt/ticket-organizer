@@ -245,4 +245,26 @@ const h3 = parseSingleBooking(_hb2[0]);
 eq('H3 再压行变形等价', [(h3.segs||[]).length, (h3.pax||[]).length, h3.rmb, JSON.stringify(h3.fareByType), (h3.unrecognizedLines||[]).length], [4, 4, 42682, JSON.stringify({adult:42682,infant:4298}), 0]);
 // 分单器多单场景不误伤
 eq('S1 多单-----分隔正常切分', splitIntoBookings(GS + '\n-----\n' + HS).length, 2);
+// Delta/Chase 列式布局
+const IS = String.raw`Lima (LIM) > New York (FK), New York (LGA) > Orlando (MCO)
+1 traveler
+Flight 1: Sun, Oct 25, 2026, Delta One Classic
+12:00 pmDelta Air LinesLIMDL 6068 Operated by /Latam Airlines PeruFlight 2: Mon, Oct 26, 2026, Delta One Classic8:10 amDelta Air LinesLGA
+DL 1511 Operated by Delta Air Lines Inc
+8h10m
+Non-stop
+2h 55m
+Non-stop
+367,857 pts or $3,678.57
+Includes taxes/fees
+Remove flight
+9:10 pm
+JFKMCO
+11:05 am
+`;
+const _ib = splitIntoBookings(IS);
+eq('I0 分单不裂', _ib.length, 1);
+const i1 = parseSingleBooking(_ib[0]);
+eq('I1 列式两段拼装', [(i1.segs||[]).length, i1.segs[0].flight, i1.segs[0].from, i1.segs[0].to, i1.segs[0].arrTime, i1.segs[1].flight, i1.segs[1].from, i1.segs[1].to], [2, 'DL6068', 'LIM', 'JFK', '21:10', 'DL1511', 'LGA', 'MCO']);
+eq('I2 金额舱位清零', [i1.usd, i1.rmb, i1.cabin, (i1.unrecognizedLines||[]).length], [3678.57, +(3678.57*7.2).toFixed(2), '商务舱', 0]);
 process.exit(fails ? 1 : 0);
