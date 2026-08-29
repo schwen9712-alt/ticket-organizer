@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.29-CR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.29-CT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.29-CR</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.29-CT</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -22416,6 +22416,27 @@ function resetCurrent() {
 // in STATE.fareClassByAirline[airline], then to the generic STATE.classMap.
 // When an order has mixed cabin segments (e.g. Z+Y), returns the HIGHEST-ranked
 // cabin so customer-facing cabin matches the premium portion of the trip.
+// ⛔ 受制裁航点（v-CT 用户指令）：美国渠道（Chase 等）无法出票的辖区主要机场——录单强阻拦
+const _SANCTIONED_APTS = {
+  'SVO':'俄罗斯','DME':'俄罗斯','VKO':'俄罗斯','LED':'俄罗斯','AER':'俄罗斯','KZN':'俄罗斯','OVB':'俄罗斯','SVX':'俄罗斯','KRR':'俄罗斯','UFA':'俄罗斯','ROV':'俄罗斯','KUF':'俄罗斯','VVO':'俄罗斯','KHV':'俄罗斯','IKT':'俄罗斯','GOJ':'俄罗斯','CEK':'俄罗斯','OMS':'俄罗斯','TJM':'俄罗斯','MRV':'俄罗斯',
+  'HAV':'古巴','VRA':'古巴','SNU':'古巴','HOG':'古巴','CMW':'古巴','SCU':'古巴','CYO':'古巴',
+  'CCS':'委内瑞拉','MAR':'委内瑞拉','VLN':'委内瑞拉','BLA':'委内瑞拉','PZO':'委内瑞拉','PMV':'委内瑞拉',
+  'IKA':'伊朗','THR':'伊朗','MHD':'伊朗','SYZ':'伊朗','IFN':'伊朗','TBZ':'伊朗','KIH':'伊朗',
+  'FNJ':'朝鲜','DAM':'叙利亚','ALP':'叙利亚','LTK':'叙利亚','MSQ':'白俄罗斯'
+};
+function _sanctionHits(segments) {
+  const hits = [];
+  const seen = new Set();
+  for (const s of (segments || [])) {
+    for (const code of [(s.from || '').toUpperCase().trim(), (s.to || '').toUpperCase().trim()]) {
+      if (code && _SANCTIONED_APTS[code] && !seen.has(code)) {
+        seen.add(code);
+        hits.push({ code, country: _SANCTIONED_APTS[code] });
+      }
+    }
+  }
+  return hits;
+}
 const CABIN_RANK = { 'First': 4, 'Business': 3, 'Premium': 2, 'Economy': 1 };
 const CABIN_EN_TO_ZH = { 'First': '头等舱', 'Business': '商务舱', 'Premium': '超级经济舱', 'Economy': '经济舱' };
 
@@ -22437,6 +22458,17 @@ function inferCabinFromSegments(airline, segs) {
     }
   }
   return bestEn ? (CABIN_EN_TO_ZH[bestEn] || null) : null;
+}
+
+// 舱位实时推导（v-CS 用户指令：出模板一律按航司舱位表现算）——
+// 存量 o.cabin 是解析时代的快照（CQ 前的错标会永久污染模板），仅作无段兜底。
+function _liveCabinZh(o) {
+  try {
+    const al = o.airline || (((o.segments || [])[0] || {}).flight || '').slice(0, 2);
+    const live = inferCabinFromSegments(al, o.segments || []);
+    if (live) return live;
+  } catch (e) {}
+  return (o.cabin || '').trim();
 }
 
 // Detect if an order has mixed cabin classes across segments.
@@ -22482,7 +22514,7 @@ function buildCardHTML(o, idx) {
   if (o.agent) tags.push(`<span class="tag">代理 ${escapeHtml(o.agent)}</span>`);
   if (o.branch) tags.push(`<span class="tag">${escapeHtml(o.branch)}${o.client ? escapeHtml(o.client) : ''}</span>`);
   if (o.airline) tags.push(`<span class="tag airline-tag">${escapeHtml(o.airline)}</span>`);
-  if (o.cabin) tags.push(`<span class="tag">${escapeHtml(o.cabin)}</span>`);
+  { const _lc = _liveCabinZh(o); if (_lc) tags.push(`<span class="tag">${escapeHtml(_lc)}</span>`); }
 
   // Detect mixed-cabin booking (different cabin classes across segments).
   // Looks at each segment's class code and checks if they map to different cabins.
@@ -22913,7 +22945,7 @@ function buildClientCopy(o, mode) {
   } else if (o.agent) {
     headParts.push(o.agent);
   }
-  if (o.cabin) headParts.push(o.cabin);
+  { const _lc = _liveCabinZh(o); if (_lc) headParts.push(_lc); }
   if (headParts.length) lines.push(headParts.join('-'));
 
   // Line 2: {date} {airline} {route}
@@ -23021,13 +23053,13 @@ function buildItineraryCopy(o) {
   lines.push(`TRIP: ${tripType}`);
   lines.push('');
 
-  const orderCabin = _orderCabinWord(o);
+  const orderCabin = _orderCabinWord({ cabin: _liveCabinZh(o) });
 
   segs.forEach((s, i) => {
     const num = String(i + 1).padStart(2, ' ');
     const flight = (s.flight || '').toUpperCase().trim().padEnd(7, ' ');
     const cls = (s.cls || '').toUpperCase().trim();
-    const cabinWord = orderCabin || _cabinFullName(cls, o.airline || (s.flight || '').slice(0, 2));
+    const cabinWord = _cabinFullName(cls, o.airline || (s.flight || '').slice(0, 2)) || orderCabin;
     const cabinTag = cabinWord ? `${cabinWord}${cls ? '-' + cls : ''}` : (cls || '');
     const date = (s.date || '').toUpperCase().trim();
     const from = (s.from || '').toUpperCase().trim();
@@ -23107,7 +23139,7 @@ function buildInternalCopy(o) {
     // Line 1: 表G-代理-舱位-操作员
     const head = ['表G'];
     if (o.agent) head.push(o.agent);
-    if (o.cabin) head.push(o.cabin);
+    { const _lc = _liveCabinZh(o); if (_lc) head.push(_lc); }
     if (o.operator) head.push(o.operator);
     lines.push(head.join('-'));
 
@@ -24558,6 +24590,15 @@ async function restoreTicketed(id) {
     cardholderFee: entry.cardholderFee,
     rate: entry.rate
   });
+  {
+    const _sh = _sanctionHits(o.segments || []);
+    if (_sh.length) {
+      const msg = _sh.map(h => `${h.code}（${h.country}）`).join('、');
+      // 强阻拦场景使用 alert（同步阻断语义正当，toast 可被忽略——BS 降级立法之豁免例）
+      alert(`⛔ 无法录入此单\n\n行程含受制裁航点：${msg}\n美国渠道（Chase 等）无法为该目的地出票。\n请直接回复代理：此行程无法承接。`);
+      return;
+    }
+  }
   STATE.orders.push(o);
   STATE.currentIdx = STATE.orders.length - 1;
   loadCurrToDOM();
@@ -29007,12 +29048,15 @@ async function mergeImportData(event) {
       (o.segments && o.segments.some(s => (s.from && s.from.length === 3) || (s.to && s.to.length === 3)))
     );
     const newOrdersAdded = [];
+    let _sancRejected = 0;
     incomingOrders.forEach(o => {
       if (!existingKeys.has(orderKey(o))) {
+        if (_sanctionHits(o.segments || []).length) { _sancRejected++; return; }
         STATE.orders.push(newOrder(o));
         newOrdersAdded.push(o);
       }
     });
+    if (_sancRejected) toast(`⛔ ${_sancRejected} 单含受制裁航点（俄/古巴/委内瑞拉等），已拒收——美国渠道无法出票`);
 
     // Merge ticketed
     const ticketedIds = new Set((settings.ticketed || []).map(t => t.id));
