@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.27-CQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.29-CR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.27-CQ</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.29-CR</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10314,6 +10314,7 @@ function parseSingleBooking(raw) {
     '米兰':'MXP','马尔彭萨':'MXP','米兰马尔彭萨':'MXP','米兰利纳特':'LIN',
     '伦敦':'LHR','希思罗':'LHR','盖特威克':'LGW','斯坦斯特德':'STN',
     '巴黎':'CDG','戴高乐':'CDG','奥利':'ORY','法兰克福':'FRA','阿姆斯特丹':'AMS',
+    '苏黎世':'ZRH','日内瓦':'GVA','维也纳':'VIE',
     '芝加哥':'ORD','奥黑尔':'ORD','休斯顿':'IAH','达拉斯':'DFW','亚特兰大':'ATL',
     '迈阿密':'MIA','西雅图':'SEA','波士顿':'BOS','丹佛':'DEN','拉斯维加斯':'LAS',
     '费城':'PHL','匹兹堡':'PIT','夏洛特':'CLT','奥兰多':'MCO','坦帕':'TPA',
@@ -10702,6 +10703,32 @@ function parseSingleBooking(raw) {
       if (/至/.test(trimmed) && /(次经停|直飞)/.test(trimmed) && /时长/.test(trimmed)) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
+      }
+      // ── 中文城市航段: "1. UA134  12月20日  纽约纽瓦克—苏黎世 1825 0820+1" ──
+      {
+        const zc = trimmed.match(/^(\d{1,2})\.\s*([A-Z]{2}\d{2,4})\s+(\d{1,2})月(\d{1,2})日\s+(.+?)\s*[—–\-]\s*(.+?)\s+(\d{3,4})\s+(\d{3,4}(?:\+\d)?)\s*$/);
+        if (zc) {
+          const _cnCity = (s) => {
+            const k = String(s || '').replace(/\s+/g, '').trim();
+            if (CN_CITY_IATA[k]) return CN_CITY_IATA[k];
+            const keys = Object.keys(CN_CITY_IATA).sort((a, b) => b.length - a.length);
+            for (const key of keys) if (k.includes(key)) return CN_CITY_IATA[key];
+            return null;
+          };
+          const cf = _cnCity(zc[5]), ct = _cnCity(zc[6]);
+          const mi = parseInt(zc[3], 10) - 1;
+          if (cf && ct && mi >= 0 && mi < 12) {
+            segs.push({
+              from: cf, to: ct,
+              date: String(parseInt(zc[4], 10)).padStart(2, '0') + _MN3[mi],
+              flight: zc[2].toUpperCase(), cls: '',
+              depTime: zc[7], arrTime: zc[8]
+            });
+            if (!airline) airline = zc[2].slice(0, 2).toUpperCase();
+            _d(trimmed, '✅ SEG', `中文城市段 ${cf}→${ct}`);
+            continue;
+          }
+        }
       }
       // 中文详情分行版：头行独立（"旧金山SFO至香港(HKG)HKG"），日期时刻在下一行
       const uhSolo = trimmed.match(/^([\u4e00-\u9fa5]+)\(?([A-Z]{3})\)?[A-Z]{0,3}至([\u4e00-\u9fa5]*)\(?([A-Z]{3})\)?[A-Z]{0,3}\s*$/);

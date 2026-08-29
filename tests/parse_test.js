@@ -267,4 +267,14 @@ eq('I0 分单不裂', _ib.length, 1);
 const i1 = parseSingleBooking(_ib[0]);
 eq('I1 列式两段拼装', [(i1.segs||[]).length, i1.segs[0].flight, i1.segs[0].from, i1.segs[0].to, i1.segs[0].arrTime, i1.segs[1].flight, i1.segs[1].from, i1.segs[1].to], [2, 'DL6068', 'LIM', 'JFK', '21:10', 'DL1511', 'LGA', 'MCO']);
 eq('I2 金额舱位清零', [i1.usd, i1.rmb, i1.cabin, (i1.unrecognizedLines||[]).length], [3678.57, +(3678.57*7.2).toFixed(2), '商务舱', 0]);
+// 中文城市航段
+const JS = String.raw`1. UA134  12月20日  纽约纽瓦克—苏黎世 1825 0820+1
+2. UA9748 12月30日  苏黎世—纽约 纽瓦克 1715 2030 
+TOTAL USD 25243.15
+`;
+const _jb = splitIntoBookings(JS);
+eq('J0 分单不裂', _jb.length, 1);
+const j1 = parseSingleBooking(_jb[0]);
+eq('J1 中文城市两段', [(j1.segs||[]).length, j1.segs[0].flight, j1.segs[0].from, j1.segs[0].to, j1.segs[0].date, j1.segs[0].arrTime, j1.segs[1].from, j1.segs[1].to], [2, 'UA134', 'EWR', 'ZRH', '20DEC', '0820+1', 'ZRH', 'EWR']);
+eq('J2 金额清零', [j1.usd, j1.rmb, (j1.unrecognizedLines||[]).length], [25243.15, +(25243.15*7.2).toFixed(2), 0]);
 process.exit(fails ? 1 : 0);
