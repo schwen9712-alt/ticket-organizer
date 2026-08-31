@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.29-CT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.31-CU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.29-CT</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.31-CU</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -12239,7 +12239,7 @@ function parseSingleBooking(raw) {
       }
     }
 
-    const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿)/i);
+    const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿|大|小)(?![\u4e00-\u9fa5])/i);
     const inlineInfMatch = !fareTypeMatch && trimmed.match(/\bINF\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     const inlineCnnMatch = !fareTypeMatch && !inlineInfMatch && trimmed.match(/\bCNN\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     // GDS adult fare line: "02 SKW7RJYS+*   13585 CNY" (no CNN/INF/CHD code → adult)
@@ -12251,7 +12251,7 @@ function parseSingleBooking(raw) {
     // The fare TYPE may come from a PRECEDING line (大人运价...) via _lastFareType,
     // OR be appended on the SAME line: "TOTAL CNY 17365 成人运价" / "TOTAL CNY 16845 儿童运价".
     const totalCnyMatch = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch && !inlineAdultFare
-      && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})(?:\.\d+)?\s*(成人|大人|儿童|小儿|婴儿)?/i);
+      && trimmed.match(/^TOTAL\s+(?:CNY|RMB|人民币)\s+(\d{3,6})(?:\.\d+)?\s*(成人|大人|儿童|小儿|婴儿|大|小)?(?![\u4e00-\u9fa5])/i);
 
     // GDS FARE line: "FARE  USD 1370.00  EQUIV CNY 9350" — treat as adult fare, wait for TOTAL
     const gdsfareLine = !fareTypeMatch && !totalCnyMatch
@@ -12273,8 +12273,8 @@ function parseSingleBooking(raw) {
         // Inline type word (same line) wins over the carried-over _lastFareType
         const inlineKind = totalCnyMatch[2];
         const kind = inlineKind
-          ? ((inlineKind === '大人' || inlineKind === '成人') ? 'ADULT'
-            : (inlineKind === '儿童' || inlineKind === '小儿') ? 'CHILD' : 'INFANT')
+          ? ((inlineKind === '大人' || inlineKind === '成人' || inlineKind === '大') ? 'ADULT'
+            : (inlineKind === '儿童' || inlineKind === '小儿' || inlineKind === '小') ? 'CHILD' : 'INFANT')
           : _lastFareType;
         if (!parsedFareByType) parsedFareByType = {};
         if (kind === 'ADULT') { parsedFareByType.adult = amt; if (!rmb) rmb = amt; }
@@ -12291,8 +12291,8 @@ function parseSingleBooking(raw) {
         : inlineCnnMatch ? 'CHILD'
         : 'ADULT';
       // Normalize fareKind to ADULT/CHILD/INFANT for tracking
-      const normKind = (fareKind === '大人' || fareKind === '成人') ? 'ADULT'
-        : (fareKind === '儿童' || fareKind === '小儿') ? 'CHILD'
+      const normKind = (fareKind === '大人' || fareKind === '成人' || fareKind === '大') ? 'ADULT'
+        : (fareKind === '儿童' || fareKind === '小儿' || fareKind === '小') ? 'CHILD'
         : fareKind === '婴儿' ? 'INFANT' : fareKind;
       // Track type — TOTAL CNY line (coming later) takes priority over EQUIV CNY
       _lastFareType = normKind;

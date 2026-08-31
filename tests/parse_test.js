@@ -277,4 +277,26 @@ eq('J0 分单不裂', _jb.length, 1);
 const j1 = parseSingleBooking(_jb[0]);
 eq('J1 中文城市两段', [(j1.segs||[]).length, j1.segs[0].flight, j1.segs[0].from, j1.segs[0].to, j1.segs[0].date, j1.segs[0].arrTime, j1.segs[1].from, j1.segs[1].to], [2, 'UA134', 'EWR', 'ZRH', '20DEC', '0820+1', 'ZRH', 'EWR']);
 eq('J2 金额清零', [j1.usd, j1.rmb, (j1.unrecognizedLines||[]).length], [25243.15, +(25243.15*7.2).toFixed(2), 0]);
+// AA 代码共享 + JPY EQUIV 运价块 + 大/小单字标签
+const KS = String.raw`第2单 商务9折
+1. *AA8439 C   SU03JAN  KIXLAX DK1   1800 1120   M 0  R E 1 B  OP-JL60
+大
+SSR DOCS 航司 HK1 P/USA/567850673/USA/20NOV88/M/29JAN30/HOU/QIAN/P1
+小
+SSR DOCS 航司 HK1 P/USA/A12260348/USA/22DEC22/M/10MAR28/HOU/LENNOX/P1
+SSR DOCS 航司 HK1 P/USA/A46136069/USA/07SEP19/F/18AUG29/HOU/LEXI/P1
+大   
+FARE  JPY 870000   EQUIV CNY 36570                                              
+TAX   CNY 14OI   CNY 140SW   CNY 2510 XT                                        
+TOTAL CNY 39234
+小
+FARE  JPY 652500   EQUIV CNY 27430                                              
+TAX   CNY 14OI   CNY 70SW   CNY 2510 XT                                         
+TOTAL CNY 30024
+`;
+const _kb = splitIntoBookings(KS);
+eq('V0 分单不裂', _kb.length, 1);
+const k1 = parseSingleBooking(_kb[0]);
+eq('V1 代码共享段+头行提取', [(k1.segs||[]).length, k1.segs[0].flight, k1.segs[0].cls, k1.cabin, k1.discount], [1, 'AA8439', 'C', '商务舱', 90]);
+eq('V2 大/小定型+铺价+清零', [JSON.stringify(k1.fareByType), JSON.stringify(k1.paxPrices), k1.rmb, (k1.unrecognizedLines||[]).length], [JSON.stringify({adult:39234,child:30024}), JSON.stringify([39234,30024,30024]), 39234, 0]);
 process.exit(fails ? 1 : 0);
