@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.08.31-CU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.08.31-CV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.31-CU</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.08.31-CV</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -7348,17 +7348,13 @@ function isUSOrigin(order) {
 function matchDiscountRule(agentOrOrder, airline, cabin) {
   const rules = (settings.discountRules || []);
 
-  // ─── 表 Y override ─────────────────────────────────────────────────────
-  // 表 Y always returns exactly 90% — the customer pays 90% of standard price
-  // in exchange for top priority ticketing. This overrides any other rule
-  // (including agent-specific discounts that might be even lower).
-  if (typeof agentOrOrder === 'object' && agentOrOrder !== null
-      && agentOrOrder.isTableY
-      && (agentOrOrder.tableLabel || '').toUpperCase() === 'A') {
-    return 90;
-  }
+  // ─── 改革（v-CV）：取消表 Y 特殊性——表 A/表 Y 一律默认 90 ───────────────
+  // discountRules 细则仍优先（代理特例可覆盖）；表 G（卡主渠道）不参与默认折扣。
+  const _tl = (typeof agentOrOrder === 'object' && agentOrOrder !== null)
+    ? (agentOrOrder.tableLabel || '').toUpperCase().trim() : '';
+  const _DEFAULT_DISC = _tl === 'G' ? null : 90;
 
-  if (rules.length === 0) return null;
+  if (rules.length === 0) return _DEFAULT_DISC;
 
   // Build context from input
   let ctx;
@@ -7420,7 +7416,7 @@ function matchDiscountRule(agentOrOrder, airline, cabin) {
       best = r;
     }
   }
-  return best ? best.discount : null;
+  return best ? best.discount : _DEFAULT_DISC;
 }
 
 // Build severity-colored age badge for a pending order based on time since creation.
@@ -8638,7 +8634,7 @@ function computeFinalPrice(o) {
   if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
     const sum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
     if (sum <= 0) return null;
-    return Math.round(sum * (o.discount / 100));
+    return Math.round(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o)));
   }
   if (o.basePrice == null) return null;
   const pax = (o.passengers && o.passengers.length) || 1;
@@ -13651,7 +13647,7 @@ async function parsePNR() {
     // If we have per-pax prices, compute rmb as sum-of-paxPrices × discount
     if (o.paxPrices && o.paxPrices.length > 0 && o.discount != null && !primary.customRate) {
       const sum = o.paxPrices.reduce((a, b) => a + b, 0);
-      o.rmb = +(sum * (o.discount / 100)).toFixed(2);
+      o.rmb = +(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o))).toFixed(2);
       if (settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
     }
     // Re-match discount rule with full order context
@@ -13729,7 +13725,7 @@ async function parsePNR() {
       // Recompute rmb with reordered prices
       if (o.discount != null) {
         const sum = o.paxPrices.reduce((a, b) => a + b, 0);
-        o.rmb = +(sum * (o.discount / 100)).toFixed(2);
+        o.rmb = +(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o))).toFixed(2);
         // Only recompute usd if we don't have an original USD fare
         if (!primary.usd && settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
       }
@@ -19280,7 +19276,7 @@ function doSplitOrder(idx) {
     if (o2.discount != null) {
       if (Array.isArray(o2.paxPrices) && o2.paxPrices.length > 0) {
         const sum = o2.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
-        o2.rmb = +(sum * (o2.discount / 100)).toFixed(2);
+        o2.rmb = +(((sum - _infantSum(o2)) * (o2.discount / 100) + _infantSum(o2))).toFixed(2);
       } else if (o2.basePrice != null) {
         const paxCount = o2.passengers.length || 1;
         o2.rmb = +(o2.basePrice * (o2.discount / 100) * paxCount).toFixed(2);
@@ -19333,7 +19329,7 @@ function doSplitOrder(idx) {
   if (o.discount != null) {
     if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
       const sum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
-      o.rmb = +(sum * (o.discount / 100)).toFixed(2);
+      o.rmb = +(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o))).toFixed(2);
     } else if (o.basePrice != null) {
       const pc = o.passengers.length || 1;
       o.rmb = +(o.basePrice * (o.discount / 100) * pc).toFixed(2);
@@ -19569,7 +19565,7 @@ function doReparse(idx) {
   // If paxPrices is set, recompute rmb = Σ(prices) × discount (overrides single-price math)
   if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0 && o.discount != null) {
     const sum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
-    o.rmb = +(sum * (o.discount / 100)).toFixed(2);
+    o.rmb = +(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o))).toFixed(2);
     if (settings.rate > 0) o.usd = +(o.rmb / settings.rate).toFixed(2);
   }
 
@@ -22424,6 +22420,22 @@ const _SANCTIONED_APTS = {
   'IKA':'伊朗','THR':'伊朗','MHD':'伊朗','SYZ':'伊朗','IFN':'伊朗','TBZ':'伊朗','KIH':'伊朗',
   'FNJ':'朝鲜','DAM':'叙利亚','ALP':'叙利亚','LTK':'叙利亚','MSQ':'白俄罗斯'
 };
+// 改革（v-CV）：折扣只作用于成人/儿童，婴儿票无折扣按全运价向代理收取
+function _isInfantPax(o, i) {
+  const p = ((o && o.passengers) || [])[i] || {};
+  if (p.forcedType === 'INFANT') return true;
+  const prices = (o && o.paxPrices) || [];
+  return !!(o && o.fareByType && o.fareByType.infant != null && prices[i] != null
+    && Math.abs(Number(prices[i]) - Number(o.fareByType.infant)) < 0.01);
+}
+function _infantSum(o) {
+  const prices = (o && o.paxPrices) || [];
+  const pax = (o && o.passengers) || [];
+  if (!prices.length || prices.length !== pax.length) return 0;
+  let s = 0;
+  for (let i = 0; i < prices.length; i++) if (_isInfantPax(o, i)) s += Number(prices[i]) || 0;
+  return s;
+}
 function _sanctionHits(segments) {
   const hits = [];
   const seen = new Set();
@@ -22984,7 +22996,7 @@ function buildClientCopy(o, mode) {
     const fp = computeFinalPrice(o);
     if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
       // Multi-pax with different prices: "9600 × 87% + 8658 × 87% = ¥15,884"
-      const terms = o.paxPrices.map(p => `${p} × ${o.discount}%`);
+      const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? `${p}(婴儿全价)` : `${p} × ${o.discount}%`);
       lines.push(`PRICE: ${terms.join(' + ')} = ¥${fp.toLocaleString()}`);
     } else {
       const pax = o.passengers.length || 1;
@@ -23176,7 +23188,7 @@ function buildInternalCopy(o) {
     if (o.discount != null && (o.basePrice != null || (Array.isArray(o.paxPrices) && o.paxPrices.length > 0))) {
       const fp = computeFinalPrice(o);
       if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
-        const terms = o.paxPrices.map(p => `${p}×${o.discount}%`);
+        const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? `${p}(婴儿全价)` : `${p}×${o.discount}%`);
         lines.push(`PRICE: ${terms.join(' + ')} = ¥${fp.toLocaleString()}`);
       } else {
         const pax = o.passengers.length || 1;
