@@ -34,7 +34,7 @@ globalThis._parseDebugMode = false; globalThis._parseDebugLog = [];
 globalThis.isUSOrigin = () => false;
 globalThis._paxDobIssues = () => []; globalThis._isSeatTight = () => false;
 eval(parserSrc);
-for (const n of ['newOrder','_isInfantPax','_infantSum','matchDiscountRule','computeFinalPrice','calculateAgeAtFlight']) eval(grab(n));
+for (const n of ['newOrder','_isInfantPax','_infantSum','matchDiscountRule','computeFinalPrice','calculateAgeAtFlight','_reparseInto']) eval(grab(n));
 
 function buildOrder(raw, ctx) {
   const chunk = splitIntoBookings(raw)[0];
@@ -115,6 +115,17 @@ TOTAL 婴儿 CNY 2176`;
 {
   const { o } = buildOrder(G, {});
   eq('E8 婴儿单 fp=成人×3×90%+婴儿全价', computeFinalPrice(o), Math.round(20591 * 3 * 0.9 + 2176));
+}
+// 旧错单（线上截图形态：basePrice=21120 裸票面、无分档价、5 人同价）→ 🔄 重新解析 → 正确
+{
+  const oldOrder = newOrder({ agent: '梁', tableLabel: 'A', basePrice: 21120, paxPrices: null, discount: 90, rawPnr: N,
+    passengers: [{ name: 'LI/LIQIN' }, { name: 'XIANG/YUYI' }, { name: 'XIANG/HANTING' }, { name: 'ZHAO/HANCHEN' }, { name: 'ZHAO/YUTAO' }],
+    segments: [{ from: 'ICN', to: 'EWR', date: '13SEP', flight: 'UA286' }], pnr: 'ABC123' });
+  oldOrder.rmb = computeFinalPrice(oldOrder);
+  eq('E9 旧单错误现状复现 21120×90%×5', oldOrder.rmb, Math.round(21120 * 0.9 * 5));
+  _reparseInto(oldOrder, parseSingleBooking(splitIntoBookings(N)[0]));
+  eq('E10 重解析后 basePrice/分档/售价', [oldOrder.basePrice, oldOrder.paxPrices, oldOrder.rmb, oldOrder.pnr, (oldOrder.passengers||[]).length, oldOrder.passengers[2].dob],
+     [24596, [24596, 24596, 2597, 2597, 24596], Math.round(24596 * 3 * 0.9 + 2597 * 2), 'ABC123', 5, '05JAN25']);
 }
 console.log(fails ? `\n✗ e2e 失败 ${fails}` : '\n✓ e2e 全绿');
 process.exit(fails ? 1 : 0);
