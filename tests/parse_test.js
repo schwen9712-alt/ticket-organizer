@@ -11,7 +11,7 @@ const MN2 = _MN3; const _CN_CABIN = {}; const POINTS_TYPES = {}; const toast = (
 const CN_CITY_IATA = { '北京首都': 'PEK', '洛杉矶': 'LAX' };
 let _parseDebugMode = false; let _parseDebugLog = [];
 // parser.js 由跑测者从 index.html 抽取（锚定法）：
-//   hs=$(grep -n '^function _ordKey' index.html | cut -d: -f1)
+//   hs=$(grep -n '^function _nameKey' index.html | cut -d: -f1)   # v-CW 起解析区首函数为 _nameKey
 //   end=$(grep -n 'seatCount: _seatCountN };' index.html | tail -1 | cut -d: -f1)
 //   sed -n "${hs},$((end+1))p" index.html > /tmp/parser.js
 eval(fs.readFileSync(process.env.PARSER_JS || '/tmp/parser.js', 'utf8'));
@@ -299,4 +299,31 @@ eq('V0 分单不裂', _kb.length, 1);
 const k1 = parseSingleBooking(_kb[0]);
 eq('V1 代码共享段+头行提取', [(k1.segs||[]).length, k1.segs[0].flight, k1.segs[0].cls, k1.cabin, k1.discount], [1, 'AA8439', 'C', '商务舱', 90]);
 eq('V2 大/小定型+铺价+清零', [JSON.stringify(k1.fareByType), JSON.stringify(k1.paxPrices), k1.rmb, (k1.unrecognizedLines||[]).length], [JSON.stringify({adult:39234,child:30024}), JSON.stringify([39234,30024,30024]), 39234, 0]);
+// 名单/护照名写法不一致（空格）去重合并
+const LS = String.raw`1.JIANG/JIAN QING 2.YAN/XIAO FENG
+ 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W  0 E  2 I
+ 4.  UA857  G   TU13OCT  SFOPVG HK2   1300   1725+1 77W  0 E  I 2
+护照：
+ER7683152/CN/30NOV67/M/14APR36/JIANG/JIANQING/P1
+ER9927893/CHN/11NOV65/F/27MAY36/YAN/XIAOFENG/P2
+`;
+const _lb = splitIntoBookings(LS);
+eq('X0 分单不裂', _lb.length, 1);
+const l1 = parseSingleBooking(_lb[0]);
+eq('X1 两人不重复+资料合并', [(l1.pax||[]).length, l1.pax[0].name, l1.pax[0].dob, l1.pax[0].gender, l1.pax[1].name, l1.pax[1].dob], [2, 'JIANG/JIAN QING', '30NOV67', 'MALE', 'YAN/XIAO FENG', '11NOV65']);
+eq('X2 两段+清零', [(l1.segs||[]).length, l1.segs[1].arrTime, (l1.unrecognizedLines||[]).length], [2, '1725+1', 0]);
+// 交叉对抗矩阵（v-CX 主动质检固化）
+{
+  const seg = " 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W  0 E  2 I\n";
+  const a3 = parseSingleBooking(splitIntoBookings("1.JIANG/JIAN-QING\n" + seg + "护照：\nER7683152/CN/30NOV67/M/14APR36/JIANG/JIANQING/P1")[0]);
+  eq('Y1 连字符名合并+效期', [(a3.pax||[]).length, a3.pax[0].dob, a3.pax[0].passportExpiry], [1, '30NOV67', '14APR36']);
+  const a4 = parseSingleBooking(splitIntoBookings("1.LI/WEI 2.LI/WEI MING\n" + seg + "护照：\nER1111111/CN/30NOV67/M/14APR36/LI/WEI/P1\nER2222222/CN/11NOV65/F/27MAY36/LI/WEIMING/P2")[0]);
+  eq('Y2 同姓不同名不误合并', (a4.pax||[]).length, 2);
+  const a5 = parseSingleBooking(splitIntoBookings("乘机人：JIANGJIANQING\n" + seg + "护照：\nER7683152/CN/30NOV67/M/14APR36/JIANG/JIANQING/P1")[0]);
+  eq('Y3 无斜杠手打名升级证件名', [(a5.pax||[]).length, a5.pax[0].name], [1, 'JIANG/JIANQING']);
+  const e1 = parseSingleBooking(splitIntoBookings("1.ZHANG/SAN\n" + seg + "TOTAL CNY 39234\n大人\n小计 39234")[0]);
+  eq('Y4 小计行不当儿童价', !!(e1.fareByType||{}).child, false);
+  const f1 = parseSingleBooking(splitIntoBookings("1.ZHANG/SAN 2.LI/SI  1. *AA8439 C   SU03JAN  KIXLAX DK1   1800 1120   M 0  2. *AA8440 C   SU05JAN  LAXKIX DK1   1800 1120   M 0")[0]);
+  eq('Y5 代码共享*段粘连拆段', (f1.segs||[]).length, 2);
+}
 process.exit(fails ? 1 : 0);
