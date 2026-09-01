@@ -3009,10 +3009,10 @@ html[data-lang="en"] .zh {
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.01-CX\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.01-CY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-CX</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-CY</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -15915,6 +15915,18 @@ function _fareQuoteCopy() {
     navigator.clipboard.writeText(txt).then(done).catch(() => { _fareQuoteFallbackCopy(txt); done(); });
   } else { _fareQuoteFallbackCopy(txt); done(); }
 }
+function _fareChasePts() {
+  const pts = parseFloat((document.getElementById('fcPts') || {}).value);
+  const cpp = parseFloat((document.getElementById('fcCpp') || {}).value);
+  const usdEl = document.getElementById('fcUsd');
+  if (!usdEl) return;
+  if (pts > 0 && cpp > 0) {
+    const pax = Math.max(1, parseInt((document.getElementById('fcPax') || {}).value, 10) || 1);
+    usdEl.value = (pts * cpp / 100 / pax).toFixed(2);   // pts 为整单，折成每人 USD
+    if (typeof settings !== 'undefined') settings.chaseCpp = cpp;
+  }
+  _fareCheckRender();
+}
 function _fareQuoteFallbackCopy(txt) {
   const ta = document.createElement('textarea');
   ta.value = txt; ta.style.cssText = 'position:fixed; opacity:0;';
@@ -15950,13 +15962,18 @@ function openFareCheck(prefillRmb, ctx) {
   ov.className = 'verify-modal-overlay';
   ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
   ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:400px;">
-    <div class="verify-modal-header"><h3>⚖ 快速运价核对 <span style="font-size:11px; color:var(--muted); font-weight:400;">每人口径</span></h3><button onclick="document.getElementById('fareCheckOverlay').remove()" class="close-btn">×</button></div>
+    <div class="verify-modal-header"><h3>⚖ 快速运价核对${ctx.chase ? ' · 💳 CHASE TRAVEL' : ''} <span style="font-size:11px; color:var(--muted); font-weight:400;">每人口径</span></h3><button onclick="document.getElementById('fareCheckOverlay').remove()" class="close-btn">×</button></div>
     <div class="verify-modal-body" style="padding:14px 16px;">
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
         <label style="font-size:11px; font-weight:700;">代理人民币价 ¥<input id="fcRmb" type="number" step="0.01" value="${prefillRmb ? Number(prefillRmb) : ''}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
         <label style="font-size:11px; font-weight:700;">汇率 USD/CNY<input id="fcRate" type="number" step="0.0001" value="${rate}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
       </div>
       <label style="font-size:11px; font-weight:700; display:block; margin-top:10px;">美国运价 $（你查到的）<input id="fcUsd" type="number" step="0.01" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()" placeholder="如 1180.20"></label>
+      ${ctx.chase ? `<div style="display:grid; grid-template-columns:1.4fr 1fr; gap:10px; margin-top:8px; padding:8px 10px; background:#eaf3ff; border-radius:var(--r-md);">
+        <label style="font-size:11px; font-weight:700; color:#0050aa;">💳 Chase Travel 积分 pts<input id="fcPts" type="number" step="1" style="width:100%; margin-top:3px;" placeholder="如 367857" oninput="_fareChasePts()"></label>
+        <label style="font-size:11px; font-weight:700; color:#0050aa;">兑换率 ¢/pt<input id="fcCpp" type="number" step="0.05" value="${(typeof settings !== 'undefined' && settings.chaseCpp) || 1.5}" style="width:100%; margin-top:3px;" oninput="_fareChasePts()"></label>
+        <div style="grid-column:1 / -1; font-size:10px; color:#0050aa;">输入 pts 自动折成美国运价（每人）——Sapphire Reserve 1.5¢ · Preferred 1.25¢</div>
+      </div>` : ''}
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
         <label style="font-size:11px; font-weight:700;">人数<input id="fcPax" type="number" min="1" step="1" value="${Math.max(1, parseInt(ctx.pax, 10) || 1)}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
         <label style="font-size:11px; font-weight:700;">结算折扣 %（可空）<input id="fcDisc" type="number" min="1" max="99" step="1" value="${ctx.disc || ''}" style="width:100%; margin-top:3px;" placeholder="如 90" oninput="_fareCheckRender()"></label>
@@ -25392,7 +25409,7 @@ function renderChasePanel() {
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         ${ch ? `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:10px;color:#0050aa;background:#ddeaff;padding:2px 8px;border-radius:3px;cursor:pointer;" title="点击重新分配">${escapeHtml(ch.name)}</span>` : `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:10px;color:var(--red);background:#fde8e8;padding:2px 8px;border-radius:3px;cursor:pointer;border:1px dashed var(--red);" title="点击分配卡主">＋ 分配</span>`}
-        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${ch ? '#0050aa' : 'var(--ink)'};">${usd ? '$' + Math.round(usd).toLocaleString() : '—'}</span>
+        <span onclick="event.stopPropagation();openFareCheck(${o.rmb || 0}, { pax: ${(o.passengers || []).length || 1}, disc: ${o.discount || 'null'}, chase: true })" style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${ch ? '#0050aa' : 'var(--ink)'};cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;" title="⚖ 核价：对照 Chase Travel 页面价（支持积分 pts 折算）">${usd ? '$' + Math.round(usd).toLocaleString() : '—'}</span>
       </div>`;
     grid.appendChild(row);
   });
