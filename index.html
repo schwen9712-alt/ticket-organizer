@@ -3025,10 +3025,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.01-DB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.01-DC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DB</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DC</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -12827,9 +12827,10 @@ function parseSingleBooking(raw) {
   // If 大人：/儿童：lines set _lastFareType but no TOTAL CNY followed, use EQUIV CNY as fallback
   if (_equivFareAmt && _lastFareType) {
     if (!parsedFareByType) parsedFareByType = {};
-    if (_equivFareType === 'ADULT') { parsedFareByType.adult = _equivFareAmt; if (!rmb) rmb = _equivFareAmt; }
-    else if (_equivFareType === 'CHILD') parsedFareByType.child = _equivFareAmt;
-    else if (_equivFareType === 'INFANT') parsedFareByType.infant = _equivFareAmt;
+    // v-DC：EQUIV CNY 是"无 TOTAL 行"的备用值——已有 TOTAL 档位值时绝不覆盖（曾把 24596 顶成 21120 致售价错）
+    if (_equivFareType === 'ADULT') { if (parsedFareByType.adult == null) parsedFareByType.adult = _equivFareAmt; if (!rmb) rmb = parsedFareByType.adult; }
+    else if (_equivFareType === 'CHILD') { if (parsedFareByType.child == null) parsedFareByType.child = _equivFareAmt; }
+    else if (_equivFareType === 'INFANT') { if (parsedFareByType.infant == null) parsedFareByType.infant = _equivFareAmt; }
   }
 
   if (parsedFareByType && Object.keys(parsedFareByType).length > 0 && pax.length > 0 && parsedPaxPrices === undefined) {
@@ -13736,7 +13737,7 @@ async function parsePNR() {
         o.discount = fullCtxRule;
         if (o.paxPrices && o.paxPrices.length > 0) {
           const sum = o.paxPrices.reduce((a, b) => a + b, 0);
-          o.rmb = +(sum * (fullCtxRule / 100)).toFixed(2);
+          o.rmb = +(((sum - _infantSum(o)) * (fullCtxRule / 100) + _infantSum(o))).toFixed(2);   // v-DC 婴儿全价豁免（CV 漏改处）
           o.usd = +(o.rmb / settings.rate).toFixed(2);
         } else if (o.basePrice) {
           const paxCount = o.passengers.length || 1;
