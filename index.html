@@ -3025,10 +3025,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.01-DD\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.01-DE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DD</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DE</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9704,6 +9704,7 @@ function parseSingleBooking(raw) {
   let _uaDateChangePend = false;  // 变更警告先于航班号落座时悬挂，落座时消费 +1
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
+  let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
   let _equivFareType = undefined;
@@ -11466,8 +11467,14 @@ function parseSingleBooking(raw) {
         let _nx = '', _pv = '';
         for (let k = _li + 1; k < expandedLines.length && k <= _li + 3; k++) { const t = (expandedLines[k] || '').trim(); if (t) { _nx = t; break; } }
         for (let k = _li - 1; k >= 0 && k >= _li - 3; k--) { const t = (expandedLines[k] || '').trim(); if (t) { _pv = t; break; } }
-        // 歧义消解：上一非空行是 TOTAL（后置类型词，属上块）优先，不做前置定型
-        if (!/^TOTAL\b/i.test(_pv) && /^(FARE|SEL|TAX|TOTAL)\b/i.test(_nx)) {
+        // v-DE 消歧：分隔线被预处理吞掉后 "TOTAL↓类型词↓FARE" 前置/后置形态完全相同——
+        // 以报文风格判定：第一个类型词若出现在任何 TOTAL 之前 → 前置模式；在 TOTAL 之后 → 后置模式；一经确立全篇锁定。
+        const _nxIsFare = /^(FARE|SEL|TAX|TOTAL)\b/i.test(_nx);
+        if (!_fareTypeMode) {
+          if (/^TOTAL\b/i.test(_pv)) _fareTypeMode = 'post';
+          else if (_nxIsFare) _fareTypeMode = 'pre';
+        }
+        if (_fareTypeMode === 'pre' && _nxIsFare) {
           _lastFareType = dtag[1] === '婴儿' ? 'INFANT' : (dtag[1] === '儿童' || dtag[1] === '小孩' || dtag[1] === '小儿') ? 'CHILD' : 'ADULT';
           _d(trimmed, '💰 FARE', '运价前置类型 → ' + _lastFareType);
           continue;
@@ -16081,6 +16088,23 @@ function _reparseInto(o, p) {
   }
   return o;
 }
+// 🧪 解析诊断：复制该单存储原文 + 当前解析结果（排障铁证，一键发给开发）
+function diagOrder(idx) {
+  const o = STATE.orders[idx];
+  if (!o) return;
+  const ver = (document.querySelector('.ver-badge, [class*="version"]') || {}).textContent || '';
+  let parsed = null;
+  try {
+    const chunk = o.rawPnr ? (splitIntoBookings(o.rawPnr)[0] || o.rawPnr) : '';
+    const p = chunk ? parseSingleBooking(chunk) : null;
+    if (p) parsed = { segs: (p.segs || []).map(s => `${s.flight} ${s.from}${s.to} ${s.date} ${s.depTime}-${s.arrTime}`), pax: (p.pax || []).map(x => [x.name, x.dob || '', x.forcedType || '']), rmb: p.rmb, usd: p.usd, paxPrices: p.paxPrices, fareByType: p.fareByType, discount: p.discount, cabin: p.cabin, unrec: p.unrecognizedLines || [] };
+  } catch (e) { parsed = { error: String(e && e.message || e) }; }
+  const stored = { basePrice: o.basePrice, rmb: o.rmb, usd: o.usd, discount: o.discount, paxPrices: o.paxPrices, fareByType: o.fareByType, pax: (o.passengers || []).length, segs: (o.segments || []).length, tableLabel: o.tableLabel, agent: o.agent };
+  const txt = '【解析诊断】' + (ver ? ' ' + ver.trim() : '') + '\n== 存储字段 ==\n' + JSON.stringify(stored) + '\n== 当前解析 ==\n' + JSON.stringify(parsed) + '\n== 原文 rawPnr ==\n' + (o.rawPnr || '（无）');
+  const done = () => toast('✓ 诊断信息已复制，发给开发即可定位');
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => { _fareQuoteFallbackCopy(txt); done(); });
+  else { _fareQuoteFallbackCopy(txt); done(); }
+}
 function reparseOrder(idx) {
   const o = STATE.orders[idx];
   if (!o) return;
@@ -18241,6 +18265,7 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="toggleNoAvailability(${idx}); closeOrderMenu()" title="标记暂时无位（价格/座位消失，等待重新刷到）" style="${o.noAvailability ? doneStyle : ''}">${o.noAvailability ? '⏸ 暂时无位' : '⏸ 无位'}</button>
       <button class="btn ghost small" onclick="openAgentSwitch(${idx}); closeOrderMenu()" title="选错代理无需删单重录：一键切换并自动移入新代理分组">🔁 切换代理</button>
       <button class="btn ghost small" onclick="reparseOrder(${idx}); closeOrderMenu()" title="解析器升级后旧单数据不会自动变——按最新规则重跑原文，刷新乘客/航段/分档价/售价，票号卡主状态不动">🔄 重新解析</button>
+      <button class="btn ghost small" onclick="diagOrder(${idx}); closeOrderMenu()" title="解析不对时点这个：复制该单原文+解析结果，发给开发一击定位">🧪 解析诊断</button>
       <button class="btn ghost small" onclick="toggleNoSplit(${idx}); closeOrderMenu()" title="标记/解除禁止拆单（代理不允许拆开出票；-T 前的存量单可在此补旗）" style="${o.noSplit ? doneStyle : ''}">${o.noSplit ? '⛔ 已禁拆' : '⛔ 禁拆'}</button>
       <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
       <button class="btn ghost small" onclick="blacklistOrderPax(${idx}); closeOrderMenu()" title="把此单乘客加入在线开票黑名单（下次录入到同名会强提醒）">⛔ 加入黑名单</button>

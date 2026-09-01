@@ -381,4 +381,7 @@ eq('AB1 前置类型词定型+五客分档铺价', [(n1.pax||[]).length, n1.rmb,
 // 48 个月口径：起飞 13SEP（2026）时 05JAN23 生 = 3 岁 8 个月 → 婴儿价
 const n48 = parseSingleBooking(splitIntoBookings(NS.replace('05JAN25/M/07JUL30/XIANG/HANTING', '05JAN23/M/07JUL30/XIANG/HANTING'))[0]);
 eq('AB2 未满48月配婴儿价', n48.paxPrices[2], 2597);
+// v-DE：无 SEL 行（线上旧单原文形态）——类型词模式锁定消歧，不依赖 SEL 兜底
+const nNoSel = parseSingleBooking(splitIntoBookings(NS.replace(/SEL [^\n]*\n/, '').replace(/=+\n/, ''))[0]);
+eq('AB3 无SEL无分隔线仍分档', [nNoSel.rmb, JSON.stringify(nNoSel.fareByType), JSON.stringify(nNoSel.paxPrices)], [24596, JSON.stringify({adult:24596,infant:2597}), JSON.stringify([24596,24596,2597,2597,24596])]);
 process.exit(fails ? 1 : 0);
