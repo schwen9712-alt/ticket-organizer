@@ -326,4 +326,31 @@ eq('X2 两段+清零', [(l1.segs||[]).length, l1.segs[1].arrTime, (l1.unrecogniz
   const f1 = parseSingleBooking(splitIntoBookings("1.ZHANG/SAN 2.LI/SI  1. *AA8439 C   SU03JAN  KIXLAX DK1   1800 1120   M 0  2. *AA8440 C   SU05JAN  LAXKIX DK1   1800 1120   M 0")[0]);
   eq('Y5 代码共享*段粘连拆段', (f1.segs||[]).length, 2);
 }
+// 全局对抗矩阵（v-CZ 固化：解析边界）
+{
+  const P = (raw) => { const b = splitIntoBookings(raw); return parseSingleBooking(b[0] || ""); };
+  eq('Z1 空输入不炸', Array.isArray(P("").segs), true);
+  eq('Z2 三种分隔混用切2单', splitIntoBookings("第1单\n1.A/B\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n-----\n第2单\n1.C/D\n 3.  UA857  G   TU13OCT  SFOPVG HK2   1300   1725+1 77W\n======\nTOTAL CNY 100").length, 2);
+  const s5 = "1.JIANG/JIANQING\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n";
+  eq('Z3 重复粘贴幂等', (P(s5 + s5).pax||[]).length, 1);
+  eq('Z4 超大金额不入库', !(P("1.A/B\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nTOTAL CNY 99999999").rmb > 2000000), true);
+  const t0 = Date.now(); P("1.A/B\n" + " 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n".repeat(3000));
+  eq('Z5 3000行<2s', Date.now() - t0 < 2000, true);
+}
+// Sabre 显示格式 + SSR 六位数字生日变体
+const MS = String.raw`1.  UA2019 B1  TH01OCT  TPALAX DK1   1244 1456    SEAME ----
+ 2.  UA820  R1  TH01OCT  LAXHKG DK1   2345 0540+2    SEAME ----
+ 
+FSI/UA/PREC
+S UA  2019B01OCT TPA1244 1456LAX0X    7M8          #DJCDZYBMEUHQVWSTLKGN#CP
+S UA   820R01OCT LAX2345+0540HKG0S    789          #DJCDZOARYBMEUHQVWSTLKG#CP
+01 RLX4ISBU                     10230 CNY                    INCL TAX  　XSFSQ01
+ 
+SSR DOCS UA HK1 P/USA/A39321637/USA/761015/M/CHANG/WEYLU
+`;
+const _mb = splitIntoBookings(MS);
+eq('AA0 分单不裂', _mb.length, 1);
+const m1 = parseSingleBooking(_mb[0]);
+eq('AA1 六位生日变体乘客', [(m1.pax||[]).length, m1.pax[0].name, m1.pax[0].dob, m1.pax[0].gender], [1, 'CHANG/WEYLU', '15OCT76', 'MALE']);
+eq('AA2 段/金额/系统行静默', [(m1.segs||[]).length, m1.segs[1].arrTime, m1.rmb, (m1.unrecognizedLines||[]).length], [2, '0540+2', 10230, 0]);
 process.exit(fails ? 1 : 0);
