@@ -3025,10 +3025,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.01-DA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.01-DB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DA</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10684,7 +10684,9 @@ function parseSingleBooking(raw) {
   // First/Last 英文标签乘客：预扫描（含跨行生日），命中行在主循环中跳过
   const _flRes = _parseFirstLastPax(expandedLines);
   _flRes.pax.forEach(fp => { if (!pax.find(p => p.name === fp.name)) pax.push(fp); });
+  let _li = -1;   // v-DB 行索引（前瞻用）
   for (const line of expandedLines) {
+    _li++;
     if (_flRes.consumed.has(line)) { _d(line, '✅ PAX', 'First/Last 乘客'); continue; }
     // Strip leading non-ASCII junk characters but preserve currency symbols (¥ $ ￥ €)
     const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
@@ -11459,7 +11461,28 @@ function parseSingleBooking(raw) {
     if (/^护照信息$/.test(trimmed)) { continue; }
     {
       const dtag = trimmed.match(/^(婴儿|儿童|小孩|小儿|成人|大人)\s*$/);
-      if (dtag) { _docTypePend = dtag[1]; continue; }
+      if (dtag) {
+        // v-DB：类型词在运价块【前】（下一非空行为 FARE/SEL/TAX/TOTAL）→ 定型后续 TOTAL，而非护照前置标签
+        let _nx = '', _pv = '';
+        for (let k = _li + 1; k < expandedLines.length && k <= _li + 3; k++) { const t = (expandedLines[k] || '').trim(); if (t) { _nx = t; break; } }
+        for (let k = _li - 1; k >= 0 && k >= _li - 3; k--) { const t = (expandedLines[k] || '').trim(); if (t) { _pv = t; break; } }
+        // 歧义消解：上一非空行是 TOTAL（后置类型词，属上块）优先，不做前置定型
+        if (!/^TOTAL\b/i.test(_pv) && /^(FARE|SEL|TAX|TOTAL)\b/i.test(_nx)) {
+          _lastFareType = dtag[1] === '婴儿' ? 'INFANT' : (dtag[1] === '儿童' || dtag[1] === '小孩' || dtag[1] === '小儿') ? 'CHILD' : 'ADULT';
+          _d(trimmed, '💰 FARE', '运价前置类型 → ' + _lastFareType);
+          continue;
+        }
+        _docTypePend = dtag[1]; continue;
+      }
+      // SEL 票价基础行（IN=婴儿 / CH=儿童 fare basis 标识）：定型信号 + 静默
+      {
+        const sel = trimmed.match(/^SEL\s+\S+\s+(IN|INF|CH|CNN|ADT)?\s*NVB/i);
+        if (sel) {
+          if (sel[1] && !_lastFareType) _lastFareType = /^IN/i.test(sel[1]) ? 'INFANT' : /^C/i.test(sel[1]) ? 'CHILD' : 'ADULT';
+          _d(trimmed, '💰 FARE', 'SEL 票价基础行');
+          continue;
+        }
+      }
     }
     // ── 双日期无性别 DOCS（婴儿护照常见）: "US/A82599381/US/26JUL26/19AUG31/LIU/RENRAN/P1" ──
     {
@@ -11801,7 +11824,7 @@ function parseSingleBooking(raw) {
         if (!isNaN(_by)) {
           const fullYr = _by <= ((new Date().getFullYear() % 100) + 1) ? 2000 + _by : 1900 + _by;
           const ageY = new Date().getFullYear() - fullYr;
-          if (ageY <= 2) isInfant = true;
+          if (ageY < 4) isInfant = true;   // v-DB 48 个月口径（用户业务规则）
         }
       }
       // Only commit if we actually got a name AND (dob OR no other branch will
@@ -12818,8 +12841,12 @@ function parseSingleBooking(raw) {
       const fm = String(firstSegDate).toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})?$/);
       if (!dm || !fm) return null;
       const dobY = dm[3].length===4 ? parseInt(dm[3]) : (parseInt(dm[3])<30 ? 2000+parseInt(dm[3]) : 1900+parseInt(dm[3]));
-      const flY = fm[3] ? parseInt(fm[3]) : (new Date().getFullYear());
       const flM = MONTH_MAP2[fm[2]]; const flD = parseInt(fm[1]);
+      let flY = fm[3] ? parseInt(fm[3]) : (new Date().getFullYear());
+      if (!fm[3]) {   // v-DB：无年份段日期按"最近未来"推断（起飞日语义）
+        const _now = new Date(); const _nowM = MONTH_MAP2[_MN3[_now.getMonth()]];
+        if (flM < _nowM || (flM === _nowM && flD < _now.getDate())) flY++;
+      }
       const dobM = MONTH_MAP2[dm[2]]; const dobD = parseInt(dm[1]);
       let age = flY - dobY;
       if (flM < dobM || (flM === dobM && flD < dobD)) age--;
@@ -12830,8 +12857,8 @@ function parseSingleBooking(raw) {
       if (p.forcedType === 'INFANT') return parsedFareByType.infant || parsedFareByType.adult || null;
       const age = getAgeAtFlight(p.dob);
       if (age === null) return parsedFareByType.adult || null;
-      if (age < 2) return parsedFareByType.infant || parsedFareByType.adult || null;
-      if (age < 12) return parsedFareByType.child || parsedFareByType.adult || null; // airline standard: 2-11 = child
+      if (age < 4) return parsedFareByType.infant || parsedFareByType.child || parsedFareByType.adult || null;   // v-DB 48 个月口径；婴儿档无价回落儿童价
+      if (age < 12) return parsedFareByType.child || parsedFareByType.adult || null;
       return parsedFareByType.adult || null;
     });
     // Only use as paxPrices if at least one price differs (otherwise single basePrice is cleaner)
@@ -13765,7 +13792,7 @@ async function parsePNR() {
         if (!p.dob || !firstDate) return { i, rank: 0 };
         const age = calculateAgeAtFlight(p.dob, firstDate);
         if (age == null) return { i, rank: 0 };
-        if (age < 2) return { i, rank: 3 };
+        if (age < 4) return { i, rank: 3 };   // v-DB 48 个月口径
         if (age < 12) return { i, rank: 2 };
         return { i, rank: 0 };
       });
@@ -15394,7 +15421,7 @@ function _orderHasInfant(o) {
   return (o.passengers || []).some(p => {
     if (!p) return false;
     if (p.forcedType === 'INFANT') return true;
-    if (p.dob && d0) { const a = calculateAgeAtFlight(p.dob, d0); return a != null && a < 2; }
+    if (p.dob && d0) { const a = calculateAgeAtFlight(p.dob, d0); return a != null && a < 4; }   // v-DB 48 个月口径
     return false;
   });
 }
@@ -15414,7 +15441,7 @@ function _buySplitPlan(o, usdTotal) {
     if (p.forcedType === 'CHILD') return 'C';
     if (p.dob && d0) {
       const a = calculateAgeAtFlight(p.dob, d0);
-      if (a != null) { if (a < 2) return 'I'; if (a < 12) return 'C'; }
+      if (a != null) { if (a < 4) return 'I'; if (a < 12) return 'C'; }   // v-DB 48 个月口径
     }
     return 'A';
   };
@@ -22494,7 +22521,12 @@ function _isInfantPax(o, i) {
   const p = ((o && o.passengers) || [])[i] || {};
   if (p.forcedType === 'INFANT') return true;
   if (p.forcedType === 'CHILD') return false;
-  // dob 兜底：DDMMMYY 解析，未满 2 岁视为婴儿（自包含月表）
+  // v-DB 48 个月口径：按航班起飞日算年龄（首段日期），未满 4 岁 = 婴儿；无段日期时以今天兜底
+  const _d0 = (((o && o.segments) || [])[0] || {}).date;
+  if (p.dob && _d0 && typeof calculateAgeAtFlight === 'function') {
+    const _a = calculateAgeAtFlight(p.dob, _d0);
+    if (_a != null) return _a < 4;
+  }
   const m = String(p.dob || '').toUpperCase().match(/^(\d{1,2})([A-Z]{3})(\d{2,4})$/);
   if (m) {
     const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
@@ -22503,7 +22535,7 @@ function _isInfantPax(o, i) {
       let y = parseInt(m[3], 10);
       if (m[3].length === 2) { const cy = new Date().getFullYear() % 100; y = y <= cy ? 2000 + y : 1900 + y; }
       const age = (Date.now() - new Date(y, mi, parseInt(m[1], 10)).getTime()) / (365.25 * 864e5);
-      if (age >= 0 && age < 2) return true;
+      if (age >= 0 && age < 4) return true;
     }
   }
   const prices = (o && o.paxPrices) || [];

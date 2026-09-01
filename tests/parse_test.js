@@ -353,4 +353,32 @@ eq('AA0 分单不裂', _mb.length, 1);
 const m1 = parseSingleBooking(_mb[0]);
 eq('AA1 六位生日变体乘客', [(m1.pax||[]).length, m1.pax[0].name, m1.pax[0].dob, m1.pax[0].gender], [1, 'CHANG/WEYLU', '15OCT76', 'MALE']);
 eq('AA2 段/金额/系统行静默', [(m1.segs||[]).length, m1.segs[1].arrTime, m1.rmb, (m1.unrecognizedLines||[]).length], [2, '0540+2', 10230, 0]);
+// KRW EQUIV 运价块（类型词在块前）+ 48 个月婴儿口径
+const NS = String.raw`1.  UA286  P   SU13SEP  ICNEWR DK1   1715   1800   789  0   ----
+ 2.  UA285  P   MO21SEP  EWRICN DK1   1035   1520+1 789 
+成人
+FARE  KRW     4300000 EQUIV  CNY  21120
+TAX   CNY      38AY CNY     118BP CNY  3320XT
+TOTAL CNY   24596
+=============================
+婴儿
+SEL PFK000VP        IN                 NVB14SEP26 NVA13MAR27 1PC
+FARE  KRW     430000 EQUIV  CNY  2120
+TAX   CNY      38AY CNY     158US CNY  281XT
+TOTAL CNY    2597
+
+
+SSR DOCS UA HK1 P/CN/EM1280219/CN/02NOV72/F/24MAR34/LI/LIQIN/P1
+SSR DOCS UA HK1 P/CN/EJ6412705/CN/15JUL98/F/24OCT32/XIANG/YUYI/P2
+SSR DOCS UA HK1 P/CN/EQ1269971/CN/05JAN25/M/07JUL30/XIANG/HANTING/P3
+SSR DOCS UA HK1 P/CN/EQ1269913/CN/05JAN25/M/07JUL30/ZHAO/HANCHEN/P4
+SSR DOCS UA HK1 P/CN/EH0140122/CN/08JUN99/M/21AUG29/ZHAO/YUTAO/P5
+`;
+const _nb = splitIntoBookings(NS);
+eq('AB0 分单不裂', _nb.length, 1);
+const n1 = parseSingleBooking(_nb[0]);
+eq('AB1 前置类型词定型+五客分档铺价', [(n1.pax||[]).length, n1.rmb, JSON.stringify(n1.fareByType), JSON.stringify(n1.paxPrices), (n1.unrecognizedLines||[]).length], [5, 24596, JSON.stringify({adult:24596,infant:2597}), JSON.stringify([24596,24596,2597,2597,24596]), 0]);
+// 48 个月口径：起飞 13SEP（2026）时 05JAN23 生 = 3 岁 8 个月 → 婴儿价
+const n48 = parseSingleBooking(splitIntoBookings(NS.replace('05JAN25/M/07JUL30/XIANG/HANTING', '05JAN23/M/07JUL30/XIANG/HANTING'))[0]);
+eq('AB2 未满48月配婴儿价', n48.paxPrices[2], 2597);
 process.exit(fails ? 1 : 0);
