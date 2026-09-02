@@ -387,4 +387,23 @@ eq('AB3 无SEL无分隔线仍分档', [nNoSel.rmb, JSON.stringify(nNoSel.fareByT
 // 裸 P/ 证件行尾斜杠变体
 const ad1 = parseSingleBooking('P/CN/EJ7464953/CN/23FEB76/F/06MAR33/ZHANG/XIU/');
 eq('AD1 尾斜杠证件行', [(ad1.pax||[]).length, ad1.pax[0].name, ad1.pax[0].dob, ad1.pax[0].gender, ad1.pax[0].passportExpiry, (ad1.unrecognizedLines||[]).length], [1, 'ZHANG/XIU', '23FEB76', 'FEMALE', '06MAR33', 0]);
+// 简表名单 + 基础经济产品保留
+const OS = String.raw`1.  UA772  G   MO12OCT  PEKLAX DK9   1200   0920   789  0 E  3 B
+ 2.  UA888  G   MO19OCT  SFOPEK DK9   1035   1525+1 777  0 E  I 3
+CUI/QIANQIAN     F    28MAR84
+ZHANG/ANDING    M     26MAR73
+ZHANG/SHUAIBO     M    20FEB92
+ZHANG/KAIYAN    F    07JUN01
+ZHANG/ZHIMIN     M   08FEB69
+ZHANG/HONGLI     F     21OCT77
+LI/YAKE    M     24NOV80
+LI/QUANLONG    M    06APR93
+LI/HONGJU     F   16APR67
+WANG/ANQI     F    05NOV93
+基础经济7236*0.92*10                                                                 
+      =66571.2000
+`;
+const o1 = parseSingleBooking(splitIntoBookings(OS)[0]);
+eq('AF1 简表十客干净', [(o1.pax||[]).length, o1.pax[0].name, o1.pax[0].gender, o1.pax[0].dob, o1.pax[9].name], [10, 'CUI/QIANQIAN', 'FEMALE', '28MAR84', 'WANG/ANQI']);
+eq('AF2 基础经济产品+算式', [o1.cabin, o1.rmb, o1.discount, (o1.paxPrices||[]).length, (o1.unrecognizedLines||[]).length], ['基础经济舱', 7236, 92, 10, 0]);
 process.exit(fails ? 1 : 0);
