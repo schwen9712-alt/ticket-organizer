@@ -384,4 +384,7 @@ eq('AB2 未满48月配婴儿价', n48.paxPrices[2], 2597);
 // v-DE：无 SEL 行（线上旧单原文形态）——类型词模式锁定消歧，不依赖 SEL 兜底
 const nNoSel = parseSingleBooking(splitIntoBookings(NS.replace(/SEL [^\n]*\n/, '').replace(/=+\n/, ''))[0]);
 eq('AB3 无SEL无分隔线仍分档', [nNoSel.rmb, JSON.stringify(nNoSel.fareByType), JSON.stringify(nNoSel.paxPrices)], [24596, JSON.stringify({adult:24596,infant:2597}), JSON.stringify([24596,24596,2597,2597,24596])]);
+// 裸 P/ 证件行尾斜杠变体
+const ad1 = parseSingleBooking('P/CN/EJ7464953/CN/23FEB76/F/06MAR33/ZHANG/XIU/');
+eq('AD1 尾斜杠证件行', [(ad1.pax||[]).length, ad1.pax[0].name, ad1.pax[0].dob, ad1.pax[0].gender, ad1.pax[0].passportExpiry, (ad1.unrecognizedLines||[]).length], [1, 'ZHANG/XIU', '23FEB76', 'FEMALE', '06MAR33', 0]);
 process.exit(fails ? 1 : 0);

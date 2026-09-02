@@ -3004,6 +3004,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
 .hint { line-height: 1.55; }
 .ch-badge { max-width: 84px; }                                  /* 字号提升后略放宽卡主徽章 */
 @media (max-width: 640px) { .btn.small { min-height: 34px; } .tool-btn { min-height: 38px; } }   /* 触屏热区 */
+.airline-usd-row, .ticket-card, .fc-out, td, .amount, [class*="price"], [class*="usd"] { font-variant-numeric: tabular-nums; }   /* 金额列等宽数字，扫读不跳 */
+::selection { background: rgba(94,106,210,0.22); }
+@media print {
+  .toolbar, .tabs-wrap, button, .btn, textarea, #parseInput, .verify-modal-overlay, .airline-usd-grid { display: none !important; }
+  body { background: #fff !important; }
+  .ticket-card { box-shadow: none !important; border: 1px solid #bbb; page-break-inside: avoid; }
+}
 </style>
 <!-- SheetJS (xlsx) for multi-sheet Excel export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -3025,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.01-DF\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.02-DH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.01-DF</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.02-DH</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3105,6 +3112,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
   }
   window.addEventListener('load', updateFade);
   window.addEventListener('resize', updateFade);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const ovs = document.querySelectorAll('.verify-modal-overlay');
+    if (ovs.length) { ovs[ovs.length - 1].remove(); e.stopPropagation(); }
+  });
   document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tabsNav')?.addEventListener('scroll', updateFade);
     updateFade();
@@ -3543,6 +3555,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
       <button class="btn ghost" onclick="markAllTicketed()">✓ 全部标为已出票</button>
       <button class="btn ghost" onclick="collapseAllOrders(true)">▶ 全部收起</button>
       <button class="btn ghost" onclick="collapseAllOrders(false)">▼ 全部展开</button>
+      <button class="btn ghost" onclick="reparseAllOrders()" title="解析器升级后：全部待出票单按最新规则重跑原文（票号卡主状态不动）">🔄 全部重解析</button>
       <button class="btn ghost" onclick="resetAll()">🗑 清空全部</button>
     </div>
   </div>
@@ -11532,7 +11545,7 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
+    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?\/?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
     if (bareDocMatch) {
       const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
       const dob = _pad2b(bareDocMatch[1].toUpperCase());
@@ -16110,6 +16123,28 @@ function diagOrder(idx) {
   const done = () => toast('✓ 诊断信息已复制，发给开发即可定位');
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => { _fareQuoteFallbackCopy(txt); done(); });
   else { _fareQuoteFallbackCopy(txt); done(); }
+}
+// 🔄 批量重新解析：解析器升级后，待出票池全部旧单一键按最新规则刷新
+function reparseAllOrders() {
+  const targets = STATE.orders.map((o, i) => [o, i]).filter(([o]) => o && o.rawPnr);
+  if (!targets.length) { toast('没有可重新解析的单（均无原文）'); return; }
+  if (!confirm(`将按最新解析规则重跑 ${targets.length} 张待出票单的原文：\n· 只刷新乘客资料/航段/分档价/售价\n· 票号、卡主、出票状态、备注一律不动\n· 手工改过折扣的单折扣不动\n\n确定继续？`)) return;
+  let changed = 0;
+  for (const [o] of targets) {
+    const before = o.rmb;
+    try {
+      const chunk = splitIntoBookings(o.rawPnr)[0] || o.rawPnr;
+      const p = parseSingleBooking(chunk);
+      if (p && ((p.segs || []).length || (p.pax || []).length)) {
+        _reparseInto(o, p);
+        if (o.rmb !== before) changed++;
+      }
+    } catch (e) {}
+    o._lastEdit = Date.now();
+  }
+  persistOrdersNow();
+  renderPendingList();
+  toast(`✓ ${targets.length} 单已按最新规则重新解析，其中 ${changed} 单价格有变化${changed ? '——请抽查确认' : ''}`);
 }
 function reparseOrder(idx) {
   const o = STATE.orders[idx];
