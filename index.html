@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.02-DI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.03-DJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.02-DI</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.03-DJ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -11446,9 +11446,13 @@ function parseSingleBooking(raw) {
       let existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
         // 同姓模糊匹配：名前缀包含或编辑距离≤1（DOCS 录入误差，如 FUQIN vs FUQIU）
+        // v-DJ 守卫（用户纠正：ZHANG/YONG 与 ZHANG/YING 夫妻被吞成一人）：
+        // 模糊合并必须有旁证——对方尚无生日、或生日完全一致；性别已知且不同则一律拒绝。
         existing = pax.find(p => {
           const pp = String(p.name).split('/');
           if (pp.length < 2 || pp[0] !== surname) return false;
+          if (p.dob && dob && p.dob !== dob) return false;
+          if (p.gender && gender && p.gender !== gender) return false;
           const a = pp[1].replace(/\s+/g, ''), b = given.replace(/\s+/g, '');
           if (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a))) return true;
           if (a.length === b.length) { let d = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) d++; return d <= 1; }

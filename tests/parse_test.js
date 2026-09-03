@@ -406,4 +406,17 @@ WANG/ANQI     F    05NOV93
 const o1 = parseSingleBooking(splitIntoBookings(OS)[0]);
 eq('AF1 简表十客干净', [(o1.pax||[]).length, o1.pax[0].name, o1.pax[0].gender, o1.pax[0].dob, o1.pax[9].name], [10, 'CUI/QIANQIAN', 'FEMALE', '28MAR84', 'WANG/ANQI']);
 eq('AF2 基础经济产品+算式', [o1.cabin, o1.rmb, o1.discount, (o1.paxPrices||[]).length, (o1.unrecognizedLines||[]).length], ['基础经济舱', 7236, 92, 10, 0]);
+// 同姓近名不误合并（模糊合并需旁证）
+const PS = String.raw`1.  AS882  O   SA21NOV  PPTHNL GK1   2330   0525+1 332  0 E  1 2               
+2.  AS810  O   SU22NOV  HNLLAX GK1   0805   1528   332  0 E  1 6   
+01 OLFIODMT            2750 CNY   
+SSR DOCS AS HK1 P/CHN/EJ4528031/CHN/30MAY74/M/30MAR31/ZHANG/YONG/P1
+SSR DOCS AS HK1 P/CHN/EG0628603/CHN/24MAY74/F/02MAY29/ZHANG/YING/P2
+`;
+const p1 = parseSingleBooking(splitIntoBookings(PS)[0]);
+eq('AG1 ZHANG/YONG 与 ZHANG/YING 两人', [(p1.pax||[]).length, p1.pax[0].name, p1.pax[1].name, p1.pax[1].gender, p1.rmb, (p1.unrecognizedLines||[]).length], [2, 'ZHANG/YONG', 'ZHANG/YING', 'FEMALE', 2750, 0]);
+const p2 = parseSingleBooking(splitIntoBookings("1.WANG/FUQIN\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/E1/CN/01JAN80/M/01JAN30/WANG/FUQIU/P1")[0]);
+eq('AG2 录入误差容错仍合并(名单无资料)', [(p2.pax||[]).length, p2.pax[0].dob], [1, '01JAN80']);
+const p3 = parseSingleBooking(splitIntoBookings(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/E1/CN/01JAN80/M/01JAN30/LI/MING/P1\nSSR DOCS UA HK1 P/CN/E2/CN/05MAY85/F/01JAN30/LI/MINGHUA/P2")[0]);
+eq('AG3 前缀近名不同生日两人', (p3.pax||[]).length, 2);
 process.exit(fails ? 1 : 0);
