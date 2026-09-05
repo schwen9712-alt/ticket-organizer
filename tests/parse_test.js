@@ -419,4 +419,14 @@ const p2 = parseSingleBooking(splitIntoBookings("1.WANG/FUQIN\n 3.  UA858  T   F
 eq('AG2 录入误差容错仍合并(名单无资料)', [(p2.pax||[]).length, p2.pax[0].dob], [1, '01JAN80']);
 const p3 = parseSingleBooking(splitIntoBookings(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/E1/CN/01JAN80/M/01JAN30/LI/MING/P1\nSSR DOCS UA HK1 P/CN/E2/CN/05MAY85/F/01JAN30/LI/MINGHUA/P2")[0]);
 eq('AG3 前缀近名不同生日两人', (p3.pax||[]).length, 2);
+// 护照机读区 MRZ（单行拼接 / 两行标准 / 与名单合并）
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const h1 = P("CHNLI<<ZIXUAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EM70636978CHN0606169M3406050MA00NHNDNAPJA098");
+  eq('AH1 MRZ 单行拼接', [(h1.pax||[]).length, h1.pax[0].name, h1.pax[0].dob, h1.pax[0].gender, h1.pax[0].passportExpiry, (h1.unrecognizedLines||[]).length], [1, 'LI/ZIXUAN', '16JUN06', 'MALE', '05JUN34', 0]);
+  const h2 = P("P<CHNWANG<<XIAO<MING<<<<<<<<<<<<<<<<<<<<<<<<<<<\nE123456789CHN8503157F3001012<<<<<<<<<<<<<<04");
+  eq('AH2 MRZ 两行标准', [(h2.pax||[]).length, h2.pax[0].name, h2.pax[0].dob, h2.pax[0].gender], [1, 'WANG/XIAO MING', '15MAR85', 'FEMALE']);
+  const h3 = P("1.LI/ZIXUAN\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nCHNLI<<ZIXUAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EM70636978CHN0606169M3406050MA00NHNDNAPJA098");
+  eq('AH3 MRZ 与名单合并不重复', [(h3.pax||[]).length, h3.pax[0].dob], [1, '16JUN06']);
+}
 process.exit(fails ? 1 : 0);

@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.03-DJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.05-DK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.03-DJ</span>
+            title="构建版本号 · 点击查看部署校验说明">✓ v26.09.05-DK</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9717,6 +9717,7 @@ function parseSingleBooking(raw) {
   let _uaDateChangePend = false;  // 变更警告先于航班号落座时悬挂，落座时消费 +1
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
+  let _mrzPend = null;        // v-DK 护照机读区（MRZ）姓名行悬挂，等第二行
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -11532,6 +11533,44 @@ function parseSingleBooking(raw) {
     }
     if (/^护照信息$/.test(trimmed)) { _d(trimmed, '✅ PAX', '护照信息标签'); continue; }
     if (/^FSI\//.test(trimmed) || /^S\s+[A-Z]{2}\s+\d{1,4}[A-Z]\d{2}[A-Z]{3}\s/.test(trimmed)) { _d(trimmed, '✅ SEG', 'Sabre 系统行静默'); continue; }
+    // ── 护照机读区 MRZ（TD3）：行1 "P<CHNLI<<ZIXUAN<<<…" 行2 "EM70636978CHN0606169M3406050…"（可拼成一行）──
+    {
+      const mrzLine2 = /([A-Z0-9<]{9})(\d)([A-Z]{3})(\d{2})(\d{2})(\d{2})(\d)([MF<])(\d{2})(\d{2})(\d{2})(\d)/;
+      const mrzLine1 = /^(?:P[<A-Z]?)?([A-Z]{3})([A-Z]+)<<([A-Z]+(?:<[A-Z]+)*)<*/;
+      const compact = trimmed.replace(/\s+/g, '');
+      const m1 = compact.match(mrzLine1);
+      const m2 = compact.match(mrzLine2);
+      const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      const yy2 = (yy, future) => { const y = parseInt(yy, 10); const cy = new Date().getFullYear() % 100; return future ? (y >= cy - 1 ? 2000 + y : 2100 + y) : (y <= cy ? 2000 + y : 1900 + y); };
+      const toD = (yy, mm, dd, future) => { const mi = parseInt(mm, 10) - 1; return (mi >= 0 && mi < 12) ? dd + MN[mi] + String(yy2(yy, future)).slice(-2) : ''; };
+      if (m1 && m2 && m1.index === 0) {
+        const name = (m1[2] + '/' + m1[3].replace(/</g, ' ')).toUpperCase().replace(/\s+/g, ' ').trim();
+        const dob = toD(m2[4], m2[5], m2[6], false), expiry = toD(m2[9], m2[10], m2[11], true);
+        const gender = m2[8] === 'M' ? 'MALE' : m2[8] === 'F' ? 'FEMALE' : '';
+        if (dob) {
+          const ex = pax.find(p => _sameName(p.name, name));
+          if (!ex) { const rec = { name, dob }; if (gender) rec.gender = gender; if (expiry) rec.passportExpiry = expiry; pax.push(rec); }
+          else { if (!ex.dob) ex.dob = dob; if (gender && !ex.gender) ex.gender = gender; if (expiry && !ex.passportExpiry) ex.passportExpiry = expiry; }
+          _mrzPend = null;
+          _d(trimmed, '✅ PAX', `MRZ 单行 ${name} ${dob}`);
+          continue;
+        }
+      }
+      if (m1 && !m2 && /<<</.test(compact)) { _mrzPend = { name: (m1[2] + '/' + m1[3].replace(/</g, ' ')).toUpperCase().replace(/\s+/g, ' ').trim() }; _d(trimmed, '✅ PAX', 'MRZ 姓名行悬挂'); continue; }
+      if (!m1 && m2 && m2.index === 0 && _mrzPend) {
+        const name = _mrzPend.name;
+        const dob = toD(m2[4], m2[5], m2[6], false), expiry = toD(m2[9], m2[10], m2[11], true);
+        const gender = m2[8] === 'M' ? 'MALE' : m2[8] === 'F' ? 'FEMALE' : '';
+        if (dob) {
+          const ex = pax.find(p => _sameName(p.name, name));
+          if (!ex) { const rec = { name, dob }; if (gender) rec.gender = gender; if (expiry) rec.passportExpiry = expiry; pax.push(rec); }
+          else { if (!ex.dob) ex.dob = dob; if (gender && !ex.gender) ex.gender = gender; if (expiry && !ex.passportExpiry) ex.passportExpiry = expiry; }
+          _mrzPend = null;
+          _d(trimmed, '✅ PAX', `MRZ 两行 ${name} ${dob}`);
+          continue;
+        }
+      }
+    }
     if (/^\d+个(大人|成人|儿童|小孩|婴儿)\s*$/.test(trimmed)) { _d(trimmed, '✅ PAX', '人数分组头'); continue; }
     // NM 粘连名单: "NM1LONG/QI MS1SUN/XIAOMAN MS1WANG/ZEYU MR"（称谓与下一序号粘连）
     if (/^NM\d/.test(trimmed)) {
