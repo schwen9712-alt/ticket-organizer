@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.06-DM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.06-DN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.06-DM</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.06-DN</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3171,7 +3171,7 @@ LI/JIAN 男 17MAY83
 =======
 SUN/KAILAI MS 女 28SEP08
 1.  AA4290 N   SA25JUL   CIDDFW DK1   0728   0948
-01 NLW8QMN(            7707 CNY"></textarea>
+01 NLW8QMN(            7707 CNY&#10;⚡ 速记格式：9月07日 AF 公务舱 HKG-CDG-LHR ↵ TOTAL CNY 12312（乘客/航班号可后补）"></textarea>
     <div class="btn-row" style="align-items:center; flex-wrap:wrap;">
       <button class="btn" onclick="parsePNR()">⚡ 解析 Parse</button>
       <button class="btn ghost" onclick="clearRaw()">清空</button>
@@ -10793,6 +10793,24 @@ function parseSingleBooking(raw) {
       if (/至/.test(trimmed) && /(次经停|直飞)/.test(trimmed) && /时长/.test(trimmed)) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
+      }
+      // ── ⚡ 快速录入格式（v-DN）: "9月07日 AF 公务舱 HKG-CDG-LHR" → 链式拆段，航班号/乘客后补 ──
+      {
+        const qk = trimmed.match(/^(\d{1,2})月(\d{1,2})日\s+([A-Z]{2})\s+(基础经济舱?|超级经济舱?|超经|经济舱?|商务舱?|公务舱?|头等舱?)\s+([A-Z]{3}(?:\s*[-—–→>]\s*[A-Z]{3})+)\s*$/i);
+        if (qk) {
+          const mi = parseInt(qk[1], 10) - 1;
+          const codes = qk[5].toUpperCase().split(/\s*[-—–→>]\s*/).filter(Boolean);
+          if (mi >= 0 && mi < 12 && codes.length >= 2) {
+            const date = String(parseInt(qk[2], 10)).padStart(2, '0') + _MN3[mi];
+            const al = qk[3].toUpperCase();
+            for (let k = 0; k + 1 < codes.length; k++) segs.push({ from: codes[k], to: codes[k + 1], date, flight: '', cls: '', depTime: '', arrTime: '' });
+            if (!airline) airline = al;
+            const cw = qk[4];
+            parsedCabin = /基础/.test(cw) ? '基础经济舱' : /超/.test(cw) ? '超级经济舱' : /商务|公务/.test(cw) ? '商务舱' : /头等/.test(cw) ? '头等舱' : '经济舱';
+            _d(trimmed, '✅ SEG', `快速录入 ${al} ${codes.join('→')} ${parsedCabin}`);
+            continue;
+          }
+        }
       }
       // ── 中文城市航段: "1. UA134  12月20日  纽约纽瓦克—苏黎世 1825 0820+1" ──
       {
