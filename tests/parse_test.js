@@ -429,4 +429,23 @@ eq('AG3 前缀近名不同生日两人', (p3.pax||[]).length, 2);
   const h3 = P("1.LI/ZIXUAN\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nCHNLI<<ZIXUAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<EM70636978CHN0606169M3406050MA00NHNDNAPJA098");
   eq('AH3 MRZ 与名单合并不重复', [(h3.pax||[]).length, h3.pax[0].dob], [1, '16JUN06']);
 }
+// 护照资料页 OCR 块
+const QS = String.raw`叶珂
+YE,KEJING
+性别/Sex
+国籍Nan
+05 SEP 201916 5月/MAY 2022
+女/F出生地点/Place ofbinb
+中国/CHINESE
+广东/GUANGDONG签发地点/Placeois
+15 5月/MAY 2027
+重庆/CHONGQING签发机关/Authority
+签名Bearcr's signat
+中华人民共和国国家移民管理局National Immigration Administration.PRC
+无签名/NO SIGNATURE
+`;
+const q1 = parseSingleBooking(splitIntoBookings(QS)[0] || QS);
+eq('AI1 护照 OCR 抽取', [(q1.pax||[]).length, q1.pax[0].name, q1.pax[0].dob, q1.pax[0].gender, q1.pax[0].passportExpiry, (q1.unrecognizedLines||[]).length], [1, 'YE/KEJING', '05SEP19', 'FEMALE', '15MAY27', 0]);
+const q2 = parseSingleBooking(splitIntoBookings("1.YE/KEJING\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n" + QS)[0]);
+eq('AI2 PNR+OCR 合并不重复且清零', [(q2.pax||[]).length, q2.pax[0].dob, (q2.segs||[]).length, (q2.unrecognizedLines||[]).length], [1, '05SEP19', 1, 0]);
 process.exit(fails ? 1 : 0);
