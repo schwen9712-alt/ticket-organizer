@@ -448,4 +448,25 @@ const q1 = parseSingleBooking(splitIntoBookings(QS)[0] || QS);
 eq('AI1 护照 OCR 抽取', [(q1.pax||[]).length, q1.pax[0].name, q1.pax[0].dob, q1.pax[0].gender, q1.pax[0].passportExpiry, (q1.unrecognizedLines||[]).length], [1, 'YE/KEJING', '05SEP19', 'FEMALE', '15MAY27', 0]);
 const q2 = parseSingleBooking(splitIntoBookings("1.YE/KEJING\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n" + QS)[0]);
 eq('AI2 PNR+OCR 合并不重复且清零', [(q2.pax||[]).length, q2.pax[0].dob, (q2.segs||[]).length, (q2.unrecognizedLines||[]).length], [1, '05SEP19', 1, 0]);
+// ⚡ 快速录入格式
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const j1 = P("9月07日 AF 公务舱 HKG-CDG-LHR\n\nTOTAL CNY 12312");
+  eq('AJ1 速记链式拆段', [JSON.stringify((j1.segs||[]).map(s=>[s.from,s.to,s.date])), j1.airline, j1.cabin, j1.rmb, (j1.unrecognizedLines||[]).length], [JSON.stringify([['HKG','CDG','07SEP'],['CDG','LHR','07SEP']]), 'AF', '商务舱', 12312, 0]);
+  const j2 = P("12月1日 UA 经济 LAX→PVG\nTOTAL CNY 5000\n1.ZHANG/SAN 2.LI/SI");
+  eq('AJ2 速记变体(箭头/后补名单)', [(j2.segs||[]).length, j2.cabin, (j2.pax||[]).length, (j2.unrecognizedLines||[]).length], [1, '经济舱', 2, 0]);
+}
+// 美国境内行程婴儿免费 + 证件行不触发分单
+const RS = String.raw`1.  UA1074 W   FR18SEP  BOSSFO DK1   1134 1457    SEAME  B 3
+ 01 WAA7AHDN                     2750 CNY        
+  P/CN/ER1356414/CN/01AUG97/M/WANG/WENBO/P1
+  P/CN/EP8170377/CN/01JUN97/F/LI/WENWEN/P2
+  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3  婴儿
+`;
+const _rb = splitIntoBookings(RS);
+eq('AK0 证件行不裂单', _rb.length, 1);
+const kk1 = parseSingleBooking(_rb[0]);
+eq('AK1 三人+婴儿免费铺价', [(kk1.pax||[]).length, kk1.pax[2].forcedType, JSON.stringify(kk1.fareByType), JSON.stringify(kk1.paxPrices), kk1.rmb, (kk1.unrecognizedLines||[]).length], [3, 'INFANT', JSON.stringify({adult:2750,infant:0}), JSON.stringify([2750,2750,0]), 2750, 0]);
+const kk2 = parseSingleBooking(splitIntoBookings(RS.replace('BOSSFO', 'BOSPVG'))[0]);
+eq('AK2 国际线不免费', kk2.fareByType.infant, undefined);
 process.exit(fails ? 1 : 0);

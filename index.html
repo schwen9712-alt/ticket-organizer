@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.06-DN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.07-DO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.06-DN</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.07-DO</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9322,7 +9322,8 @@ const _MCT_TABLE = {
   TPE: [0, 0, 0, 50], PVG: [0, 0, 0, 120], PEK: [0, 0, 0, 120], SIN: [0, 0, 0, 55],
   KUL: [0, 0, 0, 60], BKK: [0, 0, 0, 75], DOH: [0, 0, 0, 60], DXB: [0, 0, 0, 75]
 };
-const _US_APTS = new Set(['SFO','LAX','ORD','EWR','JFK','DFW','SEA','IAH','DEN','ATL','BOS','MIA','SAN','LAS','PHX','SLC','MCO','FLL','TPA','AUS','MSP','DTW','CLT','PHL','IAD','DCA','BWI','SJC','OAK','PDX','HNL','SNA','SMF','STL','MDW','HOU','ANC','RDU','BNA','MSY']);
+const _US_APTS = new Set(['SFO','LAX','ORD','EWR','JFK','DFW','SEA','IAH','DEN','ATL','BOS','MIA','SAN','LAS','PHX','SLC','MCO','FLL','TPA','AUS','MSP','DTW','CLT','PHL','IAD','DCA','BWI','SJC','OAK','PDX','HNL','SNA','SMF','STL','MDW','HOU','ANC','RDU','BNA','MSY',
+  'LGA','PBI','RSW','SJU','OGG','KOA','LIH','ITO','CLE','CMH','CVG','IND','JAX','MCI','MKE','PIT','SAT','ABQ','OKC','OMA','BUF','BDL','PVD','RIC','ORF','SDF','MEM','BHM','TUL','ELP','TUS','ONT','BUR','LGB','PSP','DAL','SRQ','ROC','SYR','ALB','MHT','PWM','BTV','GEG','BOI','RNO','FAT','SBA','STT','STX','GUM']);   // v-DO 扩充（美国境内行程判定）
 function _mctCheck(prevSeg, seg, layMin) {
   if (layMin == null || !prevSeg || !seg) return null;
   const apt = String(prevSeg.to || '').toUpperCase();
@@ -9488,6 +9489,7 @@ function splitIntoBookings(raw) {
     const t = s.trim();
     if (!t.includes('/')) return false;
     if (/^(?:名字|姓名)[：:\s]/i.test(t)) return false;
+    if (/^\s*P\/[A-Z]{2,3}\//i.test(t) || /\/[MF]\//.test(t) || /\/P\d+\s*(?:[\u4e00-\u9fa5]+)?\s*$/.test(t)) return false;   // v-DO 证件行（P/CN/…/P2）不是姓名行，勿触发「新名字=新单」
     if (/[男女]/.test(t) && (/\d{4}年/.test(t) || /\d{1,2}[A-Z]{3}\d{2,4}/.test(t))) return false;
     // Allow compound surnames and first names with spaces
     return /^(?:\d+[\.\s]+)?[A-Z][A-Z\s]*\/\s?[A-Za-z]+/.test(t);
@@ -13000,7 +13002,16 @@ function parseSingleBooking(raw) {
       if (flM < dobM || (flM === dobM && flD < dobD)) age--;
       return age >= 0 ? age : null;
     };
+    // v-DO 用户规则：美国航司的美国境内行程，怀抱婴儿（起飞日未满 2 岁）票免费
+    const _US_CARRIERS = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
+    const _usDomestic = segs.length > 0 && _US_CARRIERS.has(String(airline || '').toUpperCase())
+      && segs.every(s => _US_APTS.has(String(s.from || '').toUpperCase()) && _US_APTS.has(String(s.to || '').toUpperCase()));
+    let _freeInfant = false;
     const fareList = pax.map(p => {
+      if (_usDomestic) {
+        const a0 = getAgeAtFlight(p.dob);
+        if ((a0 !== null && a0 < 2) || (a0 === null && p.forcedType === 'INFANT')) { _freeInfant = true; return 0; }
+      }
       // forcedType takes priority (婴儿：prefix)
       if (p.forcedType === 'INFANT') return parsedFareByType.infant || parsedFareByType.adult || null;
       const age = getAgeAtFlight(p.dob);
@@ -13011,8 +13022,9 @@ function parseSingleBooking(raw) {
     });
     // Only use as paxPrices if at least one price differs (otherwise single basePrice is cleaner)
     const hasDiff = fareList.some((f, i) => f !== fareList[0] && f != null);
+    if (_freeInfant) parsedFareByType.infant = 0;   // 分档运价行显示「婴儿 ¥0」
     if (hasDiff) {
-      parsedPaxPrices = fareList.map(f => f || rmb || 0);
+      parsedPaxPrices = fareList.map(f => (f != null ? f : (rmb || 0)));   // 0（免费婴儿）保留，勿被 || 顶成成人价
       // Use adult fare as base rmb (not infant fare), for proper USD conversion
       rmb = parsedFareByType.adult || parsedPaxPrices[0];
     } else if (fareList[0]) {
@@ -23365,7 +23377,7 @@ function buildClientCopy(o, mode) {
     const fp = computeFinalPrice(o);
     if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
       // Multi-pax with different prices: "9600 × 87% + 8658 × 87% = ¥15,884"
-      const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? `${p}(婴儿全价)` : `${p} × ${o.discount}%`);
+      const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? (Number(p) === 0 ? `0(婴儿免费)` : `${p}(婴儿全价)`) : `${p} × ${o.discount}%`);
       lines.push(`PRICE: ${terms.join(' + ')} = ¥${fp.toLocaleString()}`);
     } else {
       const pax = o.passengers.length || 1;
@@ -23558,7 +23570,7 @@ function buildInternalCopy(o) {
     if (o.discount != null && (o.basePrice != null || (Array.isArray(o.paxPrices) && o.paxPrices.length > 0))) {
       const fp = computeFinalPrice(o);
       if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
-        const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? `${p}(婴儿全价)` : `${p}×${o.discount}%`);
+        const terms = o.paxPrices.map((p, i) => _isInfantPax(o, i) ? (Number(p) === 0 ? `0(婴儿免费)` : `${p}(婴儿全价)`) : `${p}×${o.discount}%`);
         lines.push(`PRICE: ${terms.join(' + ')} = ¥${fp.toLocaleString()}`);
       } else {
         const pax = o.passengers.length || 1;

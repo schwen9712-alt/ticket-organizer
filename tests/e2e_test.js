@@ -127,5 +127,17 @@ TOTAL 婴儿 CNY 2176`;
   eq('E10 重解析后 basePrice/分档/售价', [oldOrder.basePrice, oldOrder.paxPrices, oldOrder.rmb, oldOrder.pnr, (oldOrder.passengers||[]).length, oldOrder.passengers[2].dob],
      [24596, [24596, 24596, 2597, 2597, 24596], Math.round(24596 * 3 * 0.9 + 2597 * 2), 'ABC123', 5, '05JAN25']);
 }
+// 美国境内婴儿免费：收入 = 成人×2×90% + 0
+const R = `1.  UA1074 W   FR18SEP  BOSSFO DK1   1134 1457    SEAME  B 3
+ 01 WAA7AHDN                     2750 CNY        
+  P/CN/ER1356414/CN/01AUG97/M/WANG/WENBO/P1
+  P/CN/EP8170377/CN/01JUN97/F/LI/WENWEN/P2
+  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3  婴儿
+`;
+{
+  const { o } = buildOrder(R, {});
+  eq('E11 美国境内婴儿免费落库', [o.paxPrices, o.fareByType.infant], [[2750, 2750, 0], 0]);
+  eq('E12 免费婴儿最终价', computeFinalPrice(o), Math.round(2750 * 2 * 0.9));
+}
 console.log(fails ? `\n✗ e2e 失败 ${fails}` : '\n✓ e2e 全绿');
 process.exit(fails ? 1 : 0);
