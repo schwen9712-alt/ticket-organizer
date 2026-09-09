@@ -482,4 +482,23 @@ eq('AK2 国际线不免费', kk2.fareByType.infant, undefined);
   const l4 = P("乘机人： 1.MIAO/XIAOKANG 2.MIAO/YIXIN CHD");
   eq('AL4 乘机人列表形态回归', [(l4.pax||[]).length, l4.pax[1].forcedType], [2, 'CHILD']);
 }
+// SSR DOCS 重复性别变体 + 舱位：I+I+X+X 逐段舱位
+const SS = String.raw`乘机人： 1.YAN/XIAOYING 2.QIN/JINZHE
+1. DL1388  09月29日  罗利 - 底特律  05:34  07:16 
+2. DL389  09月29日  底特律 - 上海浦东  11:55  15:25+1 
+3. DL068  11月11日  台北桃园 - 西雅图  10:55  05:35 
+4. DL489  11月11日  西雅图 - 罗利  15:59  23:55
+SSR DOCS DL HK1 P/CN/ER6245546/CN/03SEP55/F/23MAR36/F/YAN/XIAOYING/P1
+SSR DOCS DL HK1 P/CN/ER6245545/CN/10JUL51/M/23MAR36/M/QIN/JINZHE/P2 
+舱位：I+I+X+X
+01 INX0ZNDZ+*          4400.53 USD
+`;
+const s1 = parseSingleBooking(splitIntoBookings(SS)[0]);
+eq('AM1 重复性别变体 生日性别效期', [(s1.pax||[]).length, s1.pax[0].dob, s1.pax[0].gender, s1.pax[0].passportExpiry, s1.pax[1].dob, s1.pax[1].gender], [2, '03SEP55', 'FEMALE', '23MAR36', '10JUL51', 'MALE']);
+eq('AM2 逐段舱位+USD+清零', [JSON.stringify((s1.segs||[]).map(s=>s.cls)), s1.usd, (s1.segs||[]).length, (s1.unrecognizedLines||[]).length], [JSON.stringify(['I','I','X','X']), 4400.53, 4, 0]);
+// 舱位：单字母赋全段
+{
+  const n1 = parseSingleBooking(splitIntoBookings("1. DL1388  09月29日  罗利 - 底特律  05:34  07:16\n2. DL389  09月29日  底特律 - 上海浦东  11:55  15:25+1\n舱位：J")[0]);
+  eq('AN1 舱位单字母赋全段', JSON.stringify((n1.segs||[]).map(s=>s.cls)), JSON.stringify(['J','J']));
+}
 process.exit(fails ? 1 : 0);

@@ -1,3 +1,43 @@
+## 2026-09-09 — 🗑 代理门户全面取消（用户决策：在中国行不通） · v26.09.09-DV
+
+用户决策：代理自助门户路线放弃。整体切除：①主站「📥 代理收件箱」模块（openAgentInbox/render/accept/reject 四函数与轮询定时器）；②Firebase 桥（专供 agent-orders 的 `<script type="module">`：firebase-app/auth/firestore 三个外部 SDK 引入随之消失——首屏少三个外部请求）；③入口按钮与架构说明行；④仓库文件 agent.html、firestore.rules 删除（Firestore 已无任何用途；控制台项目可自行停用）。保留：JSON 导入合并路径的制裁拒收计数（与门户无关）。删除 7,640 字符，残留引用零。审计常量更新：语法失败块（module 脚本误报）由 2 降为 1。
+
+**测试**：parse 99 · e2e 12 · report 10 · consistency ✓ · UI 静态审计零死引用。
+
+**改动位置**：收件箱模块整段；Firebase module 块；工具条按钮；架构图注释；仓库两文件删除。
+
+**回滚**：.backups/ 上一版（含完整门户代码）。**上线自检**：工具条无 📥 按钮；浏览器 Network 面板不再请求 gstatic firebasejs。**仓库操作**：GitHub Desktop 中会看到 agent.html、firestore.rules 两个删除，一并提交。
+---
+## 2026-09-09 — 🔬 第七轮审计：门户契约 / 存储键 / 舱位分支 · v26.09.09-DU
+
+三个接缝审计：①**代理门户契约**——agent.html 提交 `{agent, raw, note, status, ownerUid, at}`（原文而非结构化单），主站收件箱「接受」把原文塞回粘贴框走正常解析主入口，**制裁硬拦覆盖到位**；CT 时拦的 `incomingOrders` 路径实为 JSON 导入合并（同样保留）。②**localStorage 键**——只写不读 0；`to-ofac-confirmed` 只读不写为一次性迁移逻辑（读旧键迁入后删除），合理。③**舱位分支**——`舱位[：:]` 前缀仅逐段分支使用，与中文舱位词扫描不打架；修正单字母（`舱位：J`）语义为整单舱位赋全段（含悬挂补赋路径）。报表测试补混舱样本（DL I/X）：报表舱位取最高档商务舱、USD 单按汇率折算人民币。**流程修正**：发货链四门槛改为直跑（此前报表测试经管道过滤输出，退出码被吞，失败断言曾未能拦住打包）。
+
+**测试**：AN 1 + RP9/RP10 · parse 99 · e2e 12 · report 10 · consistency ✓ + 四审计。
+
+**改动位置**：舱位序列单字母；report_test STATE 桩+S 样本。
+
+**回滚**：.backups/ 上一版。**上线自检**：贴两段行程 + `舱位：J` → 两段舱位均 J。
+---
+## 2026-09-09 — 解析器：SSR DOCS 重复性别变体 + 舱位：I+I+X+X 逐段舱位 · v26.09.09-DT
+
+用户报"乘客生日性别无法识别"。样本 DOCS 为非标变体：性别字段在效期后**重复出现**（`…/03SEP55/F/23MAR36/F/YAN/XIAOYING/P1`），既有正则在第二个性别处断掉整行落未识别。修：SSR 与裸 P/ 两处正则效期后允许可选 `[MF]/`。同单另收编 `舱位：I+I+X+X`——逐段舱位字母按段序赋 cls（段在后时悬挂、组装前补赋），DL I=Delta One 商务/X=经济 → 混舱提示自动生效。其余既通：中文城市段带冒号时刻（罗利/底特律/台北桃园/西雅图/上海浦东）、`01 INX0ZNDZ+* 4400.53 USD` 运价行。
+
+**测试**：AM 组 2 断言 parse 98 · e2e 12 · report 8 · consistency ✓ + 四审计。
+
+**改动位置**：ssrMatch/bareDoc 正则；舱位序列分支；_cabinSeqPend。
+
+**回滚**：.backups/ 上一版。**上线自检**：贴本样本——两客各带生日性别效期，四段舱位 I/I/X/X，$4,400.53。
+---
+## 2026-09-09 — 🔬 第六轮：报表模板纳入端到端 + 交付物纠错 + 回顶浮钮 · v26.09.09-DS
+
+审计三层（i18n 键、乘客名裸插、空态/CSS）均干净：无缺键（176 个"死键"多为动态拼接引用，不删）；裸插名字 14 处全在纯文本模板且解析器只放行 A–Z，无 HTML 破坏可能。产出：**①对外交付物纳入机器验证**——新建 `tests/report_test.js`：原文→建单→`buildInternalCopy`/`buildClientCopy` 真函数文本断言（婴儿全价标注/婴儿免费标注/合计 ¥71,603 与 ¥4,950/舱位词/基础经济产品词），依赖自动发现（ReferenceError→grab→重试，状态机配平抽取跳过字符串与注释内花括号）；**②纠错**——DI 版承诺"代理商报表见 BASIC ECONOMY"实为仅英文行程模板有，中文代理商报表/内部复制的行程行现补标 `BASIC ECONOMY`（用户要求"行程里写上"）；**③回到顶部浮钮**——列表滚动 >600px 右下角显示。发货链自此四道门槛：parse / e2e / report / consistency。
+
+**测试**：report 8 断言 ✓ · parse 96 · e2e 12 · consistency ✓ · 四审计。
+
+**改动位置**：报表行程行 BASIC 标注；backToTop；tests/report_test.js 新增（九文件包）。
+
+**回滚**：.backups/ 上一版。**上线自检**：开基础经济单复制代理商报表——行程行末尾见 BASIC ECONOMY；列表滚到底见 ↑ 浮钮。
+---
 ## 2026-09-09 — 🔬 第五轮整备：未审区域（截图/双表/toast/暗色/门户/规则） · v26.09.09-DR
 
 专审前四轮未覆盖区域。**发现与处置**：①**美国机场双表漂移**——渲染区 US_AIRPORTS 189 港、解析区 _US_APTS 仅 91 港，"美国境内婴儿免费"判定用小表，约 100 个美国机场（BOI/GEG 等）不认 → 两表合并为 191 港严格一致，新增 `tests/consistency_audit.js`（US 双表 + 舱位双表 fareClassByAirline 一致性断言）入发货链防再漂移；②**toast 时长**——24 条长文案仅显 2.2s 读不完 → 按字数自适应（≈65ms/字，上限 9s）；③**截图存储**——base64 JPEG 存 o.screenshots 压 localStorage 配额（22 处读写，迁 IndexedDB 属中等工程），现状已有四道缓解（1200px/JPEG80%、每单≤6 张、快照裁 2 张、配额溢出捕获），**记 PENDING 不动**；④**Firebase**——主订单不上云（仅代理通道 agent-orders），firestore.rules 已是生产级（通道限 auth、兜底全拒），非测试模式；⑤**暗色模式**——body.dark-mode 自带背景覆盖，与舒适层 --paper 不冲突；⑥**agent.html**——ES module import 语法，静态检查误报，无问题。

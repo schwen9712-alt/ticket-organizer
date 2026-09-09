@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.09-DR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.09-DV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.09-DR</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.09-DV</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3073,7 +3073,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     </button>
     <button id="errDot" onclick="openErrLog()" title="运行错误日志" class="tool-btn" style="display:none; color:var(--red); border-color:var(--red); font-size:11px; font-weight:800; align-items:center;">⚠</button>
     <button onclick="openSnapPanel()" title="本地快照：IndexedDB 每日自动兜底，可随时恢复" class="tool-btn">🛟</button>
-    <button onclick="openAgentInbox()" title="代理收件箱：代理端 agent.html 提交的订单在此接收入库" class="tool-btn">📥</button>
     <button onclick="storageCleanup()" title="释放本地空间：截图保最新2张 · 出票记录裁400 · 清隔离键" class="tool-btn">🧹</button>
     <button onclick="showDayWrap()" title="收工小结 — 今日成绩单与明日预览" style="margin-left:6px; padding:6px 10px; background:transparent; border:1px solid var(--line); border-radius:var(--r-md); cursor:pointer; font-size:15px; color:var(--muted); transition:all 0.15s; line-height:1;" onmouseover="this.style.background='rgba(12,27,42,0.06)'; this.style.color='var(--ink)'" onmouseout="this.style.background='transparent'; this.style.color='var(--muted)'">🌙</button>
     <button id="settingsGearBtn" onclick="
@@ -3129,6 +3128,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     } catch (e) {}
   }
   setTimeout(_checkLatestVersion, 1500);
+  // ⬆ 回到顶部浮钮（v-DS）：长列表滚动 >600px 显示
+  {
+    const btn = document.createElement('button');
+    btn.id = 'backToTop'; btn.textContent = '↑'; btn.title = '回到顶部';
+    btn.style.cssText = 'position:fixed; right:18px; bottom:22px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--card, #fff); color:var(--ink); font-size:18px; box-shadow:0 4px 14px rgba(0,0,0,0.12); cursor:pointer; display:none; z-index:900;';
+    btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.body.appendChild(btn);
+    let _ticking = false;
+    window.addEventListener('scroll', () => { if (_ticking) return; _ticking = true; requestAnimationFrame(() => { btn.style.display = window.scrollY > 600 ? 'block' : 'none'; _ticking = false; }); }, { passive: true });
+  }
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const ovs = document.querySelectorAll('.verify-modal-overlay');
@@ -5716,7 +5725,6 @@ textarea:focus {
 // ║  出票流程：openTicketingModal / confirmTicketing（三路径）                ║
 // ║  收单需求：copyBuyingList · 📤 四通道发送（Discord/TG/Slack/WA）          ║
 // ║  配账引擎：_PACK_* 折半枚举 · 快配 · 💠 选定 · 收价 bp                    ║
-// ║  📥 代理收件箱：agent-orders（Firestore 匿名 Auth · 惰性连接）            ║
 // ║  存储健康：白屏防护 · 用量仪表 · 🧹 释放 · 墓碑账本                      ║
 // ║  🌙 收工小结 · 对账/账单 · 付款单导入 · AI 功能 · 设置与 init             ║
 // ╚════════════════════════════════════════════════════════════════════════╝
@@ -9741,6 +9749,7 @@ function parseSingleBooking(raw) {
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
   let _mrzPend = null;        // v-DK 护照机读区（MRZ）姓名行悬挂，等第二行
+  let _cabinSeqPend = null;   // v-DT "舱位：I+I+X+X" 出现在段之前时悬挂，段齐后补赋
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -10800,6 +10809,20 @@ function parseSingleBooking(raw) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
       }
+      // ── 舱位：I+I+X+X（v-DT）逐段舱位字母，按段序赋 cls ──
+      {
+        const cq = trimmed.match(/^舱位[：:]\s*([A-Z](?:\s*\+\s*[A-Z])*)\s*$/i);
+        if (cq) {
+          const letters = cq[1].toUpperCase().split(/\s*\+\s*/).filter(Boolean);
+          if (segs.length) {
+            if (letters.length === 1) segs.forEach(s => { if (!s.cls) s.cls = letters[0]; });   // v-DU 单字母=整单舱位，赋全段
+            else letters.forEach((c, k) => { if (segs[k] && !segs[k].cls) segs[k].cls = c; });
+          }
+          else _cabinSeqPend = letters;
+          _d(trimmed, '✅ SEG', `逐段舱位 ${letters.join('+')}`);
+          continue;
+        }
+      }
       // ── ⚡ 快速录入格式（v-DN）: "9月07日 AF 公务舱 HKG-CDG-LHR" → 链式拆段，航班号/乘客后补 ──
       {
         const qk = trimmed.match(/^(\d{1,2})月(\d{1,2})日\s+([A-Z]{2})\s+(基础经济舱?|超级经济舱?|超经|经济舱?|商务舱?|公务舱?|头等舱?)\s+([A-Z]{3}(?:\s*[-—–→>]\s*[A-Z]{3})+)\s*$/i);
@@ -11496,7 +11519,7 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
+    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 效期后可选重复性别
     // v-DA 变体：六位数字生日 YYMMDD、无效期、无 P 尾（"P/USA/A39321637/USA/761015/M/CHANG/WEYLU"）
     if (!ssrMatch) {
       const m6 = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]{2,3}\/[A-Z0-9]{5,}\/[A-Z]{2,3}\/(\d{2})(\d{2})(\d{2})\/([MF])\/(?:(\d{2})(\d{2})(\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d*)?\s*$/i);
@@ -11675,7 +11698,7 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?\/?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
+    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?(?:[MF][-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?\/?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);
     if (bareDocMatch) {
       const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
       const dob = _pad2b(bareDocMatch[1].toUpperCase());
@@ -13021,6 +13044,7 @@ function parseSingleBooking(raw) {
       if (flM < dobM || (flM === dobM && flD < dobD)) age--;
       return age >= 0 ? age : null;
     };
+    if (_cabinSeqPend && segs.length) { if (_cabinSeqPend.length === 1) segs.forEach(s => { if (!s.cls) s.cls = _cabinSeqPend[0]; }); else _cabinSeqPend.forEach((c, k) => { if (segs[k] && !segs[k].cls) segs[k].cls = c; }); _cabinSeqPend = null; }
     // v-DO 用户规则：美国航司的美国境内行程，怀抱婴儿（起飞日未满 2 岁）票免费
     const _US_CARRIERS = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
     const _usDomestic = segs.length > 0 && _US_CARRIERS.has(String(airline || '').toUpperCase())
@@ -16385,105 +16409,6 @@ function _showOrderChangeAnalysis(agent, added, strongArr, missing) {
     </div>
   </div>`;
   document.body.appendChild(ov);
-}
-
-// ══ 📥 代理收件箱：agent.html 提交 → 接收入库（走 parsePNR 全管道）════════
-// 数据通道：Firestore agent-orders（匿名 Auth 隔离，firestore.rules 管权限）。
-// 管理端需把本设备 UID 加入 Firebase 控制台 admin/config 的 uids 数组。
-let _agentInboxTimer = null;
-function openAgentInbox() {
-  _renderAgentInbox('connecting');
-  window._agentInboxOnReady = () => { _agentInboxLoad(); };
-  window._agentInboxOnError = (e) => { _renderAgentInbox('error', null, e); };
-  if (window._fbx && window._fbx.ready) _agentInboxLoad();
-  else if (typeof window._fbxConnect === 'function') window._fbxConnect();
-  else _renderAgentInbox('error', null, { code: 'no-bridge' });
-  clearInterval(_agentInboxTimer);
-  _agentInboxTimer = setInterval(() => {
-    if (document.getElementById('agentInboxOverlay') && window._fbx && window._fbx.ready) _agentInboxLoad(true);
-    if (!document.getElementById('agentInboxOverlay')) clearInterval(_agentInboxTimer);
-  }, 60000);
-}
-async function _agentInboxLoad(silent) {
-  const F = window._fbx;
-  if (!F || !F.ready) return;
-  try {
-    const snap = await F.getDocs(F.query(F.collection(F.db, 'agent-orders'), F.where('status', '==', 'pending')));
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    rows.sort((a, b) => (a.at || 0) - (b.at || 0));
-    _renderAgentInbox('ok', rows);
-  } catch (e) {
-    if (!silent) _renderAgentInbox('error', null, e);
-  }
-}
-function _renderAgentInbox(state, rows, err) {
-  const old = document.getElementById('agentInboxOverlay');
-  if (old) old.remove();
-  const ov = document.createElement('div');
-  ov.id = 'agentInboxOverlay';
-  ov.className = 'verify-modal-overlay';
-  ov.onclick = (e) => { if (e.target === ov) { clearInterval(_agentInboxTimer); ov.remove(); } };
-  let body = '';
-  if (state === 'connecting') body = '<div style="color:var(--muted); font-size:12px;">连接 Firebase 中…（首次需 1–3 秒）</div>';
-  else if (state === 'error') {
-    const c = (err && err.code) || '';
-    body = `<div style="color:var(--warning-deep); font-size:12px;">${c === 'permission-denied' ? '权限不足：请到 Firebase 控制台把下方设备 UID 加入 admin/config 的 uids 数组，并确认 firestore.rules 已发布。' : c === 'no-bridge' ? '桥未加载：请硬刷新页面。' : '连接失败（' + escapeHtml(c || '网络异常') + '）：需可访问 Google 服务的网络。'}</div>`;
-  } else {
-    body = (rows && rows.length)
-      ? rows.map(r => `<div style="border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 12px; margin-top:8px; font-size:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-            <strong>${escapeHtml(r.agent || '未署名')}</strong>
-            <span style="color:var(--muted);">${new Date(r.at || 0).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-          ${r.note ? `<div style="color:var(--ink); margin-top:3px;">📝 ${escapeHtml(r.note)}</div>` : ''}
-          <div style="color:var(--muted); font-family:ui-monospace,monospace; font-size:11px; white-space:pre-wrap; word-break:break-all; max-height:64px; overflow:hidden; margin-top:4px;">${escapeHtml(String(r.raw || '').slice(0, 260))}</div>
-          <div style="text-align:right; margin-top:6px;">
-            <button class="btn small" onclick="acceptAgentOrder('${escapeAttr(r.id)}')">✓ 接收 → 解析录入</button>
-            <button class="btn ghost small" onclick="rejectAgentOrder('${escapeAttr(r.id)}')">✕ 拒收</button>
-          </div>
-        </div>`).join('')
-      : '<div style="color:var(--muted); font-size:12px; margin-top:8px;">没有待接收的提交</div>';
-  }
-  const uid = (window._fbx && window._fbx.uid) || '';
-  ov.innerHTML = `<div class="verify-modal" onclick="event.stopPropagation()" style="max-width:600px; max-height:84vh; overflow:auto;">
-    <div class="verify-modal-header"><h3>📥 代理收件箱</h3><button onclick="clearInterval(_agentInboxTimer); document.getElementById('agentInboxOverlay').remove()" class="close-btn">×</button></div>
-    <div class="verify-modal-body" style="padding:14px 16px;">
-      <div style="font-size:11px; color:var(--muted); margin-bottom:8px;">代理提交页：<strong>agent.html</strong>（发链接给代理即可）· 每 60 秒自动刷新${uid ? ` · 本设备 UID <span style="font-family:monospace;">${escapeHtml(uid.slice(0, 10))}…</span> <a href="javascript:void(0)" onclick="navigator.clipboard.writeText('${escapeAttr(uid)}').then(()=>toast('✓ UID 已复制，去 Firebase 控制台 admin/config 的 uids 数组里加上'))">复制</a>` : ''}</div>
-      ${body}
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-}
-async function acceptAgentOrder(id) {
-  const F = window._fbx;
-  if (!F || !F.ready) return;
-  try {
-    const snap = await F.getDocs(F.query(F.collection(F.db, 'agent-orders'), F.where('status', '==', 'pending')));
-    let target = null;
-    snap.forEach(d => { if (d.id === id) target = { id: d.id, ...d.data() }; });
-    if (!target) { toast('该条已被处理或撤回'); _agentInboxLoad(); return; }
-    const ri = document.getElementById('rawInput');
-    if (ri) ri.value = target.raw || '';
-    const af = document.getElementById('f-agent');
-    if (af && target.agent) af.value = target.agent;
-    await F.updateDoc(F.doc(F.db, 'agent-orders', id), { status: 'accepted', acceptedAt: Date.now() });
-    clearInterval(_agentInboxTimer);
-    const dlg = document.getElementById('agentInboxOverlay');
-    if (dlg) dlg.remove();
-    parsePNR();
-    toast(`✓ 已接收 ${target.agent || ''} 的提交 — 解析完成，核对后选表保存${target.note ? '（备注：' + target.note.slice(0, 40) + '）' : ''}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  } catch (e) { toast('接收失败：' + ((e && e.code) || '网络异常')); }
-}
-async function rejectAgentOrder(id) {
-  const F = window._fbx;
-  if (!F || !F.ready) return;
-  if (!confirm('拒收这条提交？代理端将显示「已拒收」。')) return;
-  try {
-    await F.updateDoc(F.doc(F.db, 'agent-orders', id), { status: 'rejected', rejectedAt: Date.now() });
-    _agentInboxLoad();
-  } catch (e) { toast('操作失败：' + ((e && e.code) || '网络异常')); }
 }
 
 // ══ 🛟 数据保险箱：IndexedDB 每日滚动快照（不占 localStorage 配额）═════════
@@ -23367,6 +23292,7 @@ function buildClientCopy(o, mode) {
   if (dateCN) line2Parts.push(dateCN);
   if (o.airline) line2Parts.push(o.airline);
   if (route) line2Parts.push(route);
+  if (/基础经济/.test(_liveCabinZh(o))) line2Parts.push('BASIC ECONOMY');   // v-DS 用户要求：行程行标注 BASIC 产品（中文报表亦然）
   if (line2Parts.length) lines.push(line2Parts.join(' '));
 
   // Line 3: PNR
@@ -29722,41 +29648,6 @@ async function mergeImportData(event) {
   }, 60000);
 })();
 
-</script>
-<script type="module">
-// 代理收件箱专用 Firebase 桥（匿名 Auth + Firestore agent-orders；主数据仍在本地）
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, query, where, getDocs, updateDoc, doc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-window._fbx = { ready: false };
-window._fbxConnect = function() {
-  if (window._fbx.ready || window._fbx.connecting) return;
-  window._fbx.connecting = true;
-  try {
-    const app = initializeApp({
-      apiKey: "AIzaSyB8i6_JRA1C5K_tRJgCMxN38ceg4WqY-Mk",
-      authDomain: "ticker-orangizer.firebaseapp.com",
-      projectId: "ticker-orangizer",
-      storageBucket: "ticker-orangizer.firebasestorage.app",
-      messagingSenderId: "358841344991",
-      appId: "1:358841344991:web:c73fd8f1a4736e3fec5a6a"
-    });
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-    onAuthStateChanged(auth, (u) => {
-      if (!u) return;
-      window._fbx = { ready: true, uid: u.uid, db, collection, query, where, getDocs, updateDoc, doc };
-      if (typeof window._agentInboxOnReady === 'function') window._agentInboxOnReady();
-    });
-    signInAnonymously(auth).catch(e => {
-      window._fbx.connecting = false;
-      if (typeof window._agentInboxOnError === 'function') window._agentInboxOnError(e);
-    });
-  } catch (e) {
-    window._fbx.connecting = false;
-    if (typeof window._agentInboxOnError === 'function') window._agentInboxOnError(e);
-  }
-};
 </script>
 </body>
 </html>
