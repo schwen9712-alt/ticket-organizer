@@ -3032,10 +3032,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.07-DO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.09-DR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.07-DO</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.09-DR</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -7362,24 +7362,17 @@ function isMeaningfulOrder(o) {
 // Common US airport IATA codes — used to detect "US-originating" itineraries for discount rules.
 // Covers major hubs, regional airports; comprehensive enough for typical ticket sales.
 const US_AIRPORTS = new Set([
-  // Major hubs
-  'JFK','LGA','EWR','BOS','PHL','IAD','DCA','BWI','MIA','FLL','MCO','TPA','JAX','RSW','PBI',
-  'ATL','CLT','RDU','BNA','MSY','IAH','HOU','DFW','DAL','AUS','SAT','ELP','OKC','TUL',
-  'MEM','SDF','CVG','IND','CMH','CLE','DTW','MKE','MSP','ORD','MDW','STL','MCI','OMA','DSM',
-  'DEN','PHX','ABQ','TUS','SLC','LAS','RNO','LAX','SFO','SAN','SJC','OAK','BUR','LGB','ONT','SNA','SMF','PSP',
-  'SEA','PDX','ANC','JNU','FAI','HNL','OGG','KOA','LIH','ITO',
-  // Secondary / regional
-  'PIT','ROC','BUF','SYR','ALB','BDL','PVD','PWM','MHT','BGR','BTV',
-  'ORF','ORH','ORH','AVL','GSO','CHS','SAV','DAB','SRQ','PNS','TLH','GNV','ECP','MLB','VPS',
-  'BHM','HSV','MOB','JAN','LIT','XNA','SGF','MEM','CHA','TYS',
-  'CAK','TOL','FWA','EVV','LEX','PAH','GRR','LAN','TVC','MBS','AZO','DAY',
-  'MLI','CID','DSM','FSD','RAP','FAR','BIS','MSN','GRB','ATW','EAU',
-  'STL','SPI','PIA','CMI','BMI','TOL','YNG',
-  'ICT','MHK','LBB','MAF','AMA','LRD','CRP','BRO','HRL','MFE','RGV','TYR','LFT','BPT','MLU','SHV','AEX',
-  'BIL','BZN','MSO','GTF','HLN','IDA','BOI','TWF','GEG','PSC','YKM','EUG','MFR','RDM','BLI','PAE',
-  'FAT','BFL','SBP','SBA','MRY','STS','ACV','CEC','RDD','CIC','MOD','MCE','VIS','IYK',
-  'ELP','LAS','ABQ','ROW','CRP','SAF','FAR','GCC','PHF','PSE','SJU','BQN','STT','STX'
-]);
+  'ABQ','ACV','AEX','ALB','AMA','ANC','ATL','ATW','AUS','AVL','AZO','BDL','BFL','BGR','BHM','BIL','BIS','BLI','BMI','BNA',
+  'BOI','BOS','BPT','BQN','BRO','BTV','BUF','BUR','BWI','BZN','CAK','CEC','CHA','CHS','CIC','CID','CLE','CLT','CMH','CMI',
+  'CRP','CVG','DAB','DAL','DAY','DCA','DEN','DFW','DSM','DTW','EAU','ECP','ELP','EUG','EVV','EWR','FAI','FAR','FAT','FLL',
+  'FSD','FWA','GCC','GEG','GNV','GRB','GRR','GSO','GTF','GUM','HLN','HNL','HOU','HRL','HSV','IAD','IAH','ICT','IDA','IND',
+  'ITO','IYK','JAN','JAX','JFK','JNU','KOA','LAN','LAS','LAX','LBB','LEX','LFT','LGA','LGB','LIH','LIT','LRD','MAF','MBS',
+  'MCE','MCI','MCO','MDW','MEM','MFE','MFR','MHK','MHT','MIA','MKE','MLB','MLI','MLU','MOB','MOD','MRY','MSN','MSO','MSP',
+  'MSY','OAK','OGG','OKC','OMA','ONT','ORD','ORF','ORH','PAE','PAH','PBI','PDX','PHF','PHL','PHX','PIA','PIT','PNS','PSC',
+  'PSE','PSP','PVD','PWM','RAP','RDD','RDM','RDU','RGV','RIC','RNO','ROC','ROW','RSW','SAF','SAN','SAT','SAV','SBA','SBP',
+  'SDF','SEA','SFO','SGF','SHV','SJC','SJU','SLC','SMF','SNA','SPI','SRQ','STL','STS','STT','STX','SYR','TLH','TOL','TPA',
+  'TUL','TUS','TVC','TWF','TYR','TYS','VIS','VPS','XNA','YKM','YNG'
+]);   // v-DR 与解析区 _US_APTS 严格一致（审计断言）
 
 function isUSOrigin(order) {
   if (!order.segments || order.segments.length === 0) return false;
@@ -9322,8 +9315,18 @@ const _MCT_TABLE = {
   TPE: [0, 0, 0, 50], PVG: [0, 0, 0, 120], PEK: [0, 0, 0, 120], SIN: [0, 0, 0, 55],
   KUL: [0, 0, 0, 60], BKK: [0, 0, 0, 75], DOH: [0, 0, 0, 60], DXB: [0, 0, 0, 75]
 };
-const _US_APTS = new Set(['SFO','LAX','ORD','EWR','JFK','DFW','SEA','IAH','DEN','ATL','BOS','MIA','SAN','LAS','PHX','SLC','MCO','FLL','TPA','AUS','MSP','DTW','CLT','PHL','IAD','DCA','BWI','SJC','OAK','PDX','HNL','SNA','SMF','STL','MDW','HOU','ANC','RDU','BNA','MSY',
-  'LGA','PBI','RSW','SJU','OGG','KOA','LIH','ITO','CLE','CMH','CVG','IND','JAX','MCI','MKE','PIT','SAT','ABQ','OKC','OMA','BUF','BDL','PVD','RIC','ORF','SDF','MEM','BHM','TUL','ELP','TUS','ONT','BUR','LGB','PSP','DAL','SRQ','ROC','SYR','ALB','MHT','PWM','BTV','GEG','BOI','RNO','FAT','SBA','STT','STX','GUM']);   // v-DO 扩充（美国境内行程判定）
+const _US_APTS = new Set([
+  'ABQ','ACV','AEX','ALB','AMA','ANC','ATL','ATW','AUS','AVL','AZO','BDL','BFL','BGR','BHM','BIL','BIS','BLI','BMI','BNA',
+  'BOI','BOS','BPT','BQN','BRO','BTV','BUF','BUR','BWI','BZN','CAK','CEC','CHA','CHS','CIC','CID','CLE','CLT','CMH','CMI',
+  'CRP','CVG','DAB','DAL','DAY','DCA','DEN','DFW','DSM','DTW','EAU','ECP','ELP','EUG','EVV','EWR','FAI','FAR','FAT','FLL',
+  'FSD','FWA','GCC','GEG','GNV','GRB','GRR','GSO','GTF','GUM','HLN','HNL','HOU','HRL','HSV','IAD','IAH','ICT','IDA','IND',
+  'ITO','IYK','JAN','JAX','JFK','JNU','KOA','LAN','LAS','LAX','LBB','LEX','LFT','LGA','LGB','LIH','LIT','LRD','MAF','MBS',
+  'MCE','MCI','MCO','MDW','MEM','MFE','MFR','MHK','MHT','MIA','MKE','MLB','MLI','MLU','MOB','MOD','MRY','MSN','MSO','MSP',
+  'MSY','OAK','OGG','OKC','OMA','ONT','ORD','ORF','ORH','PAE','PAH','PBI','PDX','PHF','PHL','PHX','PIA','PIT','PNS','PSC',
+  'PSE','PSP','PVD','PWM','RAP','RDD','RDM','RDU','RGV','RIC','RNO','ROC','ROW','RSW','SAF','SAN','SAT','SAV','SBA','SBP',
+  'SDF','SEA','SFO','SGF','SHV','SJC','SJU','SLC','SMF','SNA','SPI','SRQ','STL','STS','STT','STX','SYR','TLH','TOL','TPA',
+  'TUL','TUS','TVC','TWF','TYR','TYS','VIS','VPS','XNA','YKM','YNG'
+]);   // v-DR 与渲染区 US_AIRPORTS 同步（191 港）——审计断言两表一致，防漂移
 function _mctCheck(prevSeg, seg, layMin) {
   if (layMin == null || !prevSeg || !seg) return null;
   const apt = String(prevSeg.to || '').toUpperCase();
@@ -10720,8 +10723,9 @@ function parseSingleBooking(raw) {
   const _flRes = _parseFirstLastPax(expandedLines);
   _flRes.pax.forEach(fp => { if (!pax.find(p => p.name === fp.name)) pax.push(fp); });
   // ── 📷 护照资料页 OCR 块（v-DM）：字段乱序/中英粘连，整块抽取后噪音行静默 ──
-  const _ocrKeys = (raw.match(/性别\/Sex|Sex|国籍|Nationality|出生地点|Place of|签发地点|签发机关|Authority|签名|signat|移民管理局|Immigration|NO SIGNATURE|护照号|Passport No/gi) || []).length;
-  const _ocrPassport = _ocrKeys >= 2;
+  // v-DP 收紧：必须命中≥1 个护照页专属词（性别/Sex、出生地点、签发、签名、移民管理局…），"国籍/护照号"在正常 DOCS 语境常见不计入
+  const _ocrStrong = (raw.match(/性别\s*\/\s*Sex|\bSex\b|出生地点|Place of\s*birth|签发地点|签发机关|Authority|签名|signat|移民管理局|Immigration|NO SIGNATURE/gi) || []).length;
+  const _ocrPassport = _ocrStrong >= 2 || (_ocrStrong >= 1 && /[MF]\s*$|女\s*\/\s*F|男\s*\/\s*M/m.test(raw) && /\d{1,2}\s*(?:\d{1,2}\s*月\s*\/\s*)?[A-Z]{3}\s*\d{4}/i.test(raw));
   if (_ocrPassport) {
     const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const nm = raw.match(/^\s*([A-Z]{2,}(?:\s[A-Z]+)*)\s*[,，]\s*([A-Z]{2,}(?:\s[A-Z]+)*)\s*$/m) || raw.match(/^\s*([A-Z]{2,})\/([A-Z]{2,}(?:\s[A-Z]+)*)\s*$/m);
@@ -10759,7 +10763,7 @@ function parseSingleBooking(raw) {
     const trimmed = line.replace(/^[^\x20-\x7E\u00A5\u0024\uFFE5\u4e00-\u9fa5]+/, '').trim();
 
     // ── 乘机人 numbered inline list: "乘机人： 1.MIAO/XIAOKANG 2.MIAO/YIXIN …" ──
-    if (/^(?:乘机人|旅客|乘客)\s*[:：]/.test(trimmed) && /\d\s*\.\s*[A-Z]{2,}\//.test(trimmed)) {
+    if (/^(?:乘机人|旅客|乘客)\s*[:：]/.test(trimmed) && /\d\s*\.\s*[A-Z]{2,}\//.test(trimmed) && !/护照(?:号码|号)?\s*[A-Z]{2,3}\//.test(trimmed)) {   // v-DP 行内带护照资料时让给证件分支
       for (const m of trimmed.matchAll(/\d+\s*\.\s*([A-Z]{2,})\s*\/\s*([A-Za-z]{2,}(?:\s+[A-Za-z]+)*)/g)) {
         let given = m[2].toUpperCase().replace(/\s+/g, ' ');
         let ft = null;
@@ -11317,6 +11321,19 @@ function parseSingleBooking(raw) {
       if (cabM && _cMap2[cabM[1]] && parsedCabin === undefined) parsedCabin = _cMap2[cabM[1]];
       continue;
     }
+    // v-DP 独立形态："1.ZHANG/SAN 护照号码 CN/E1234567/CN/01JAN80/M/01JAN30"（无"乘机人："前缀）
+    {
+      const nd2 = trimmed.match(/^(?:\d+\.\s*)?([A-Z]+(?:\s+[A-Z]+)*\/[A-Z]+(?:\s+[A-Z]+)*)\s+护照(?:号码|号)?\s*([A-Z]{2,3})\/([A-Z0-9]+)\/([A-Z]{2,3})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})/i);
+      if (nd2) {
+        const name = nd2[1].trim().toUpperCase().replace(/\s+/g, ' ');
+        const dob = nd2[5].toUpperCase(), gender = nd2[6].toUpperCase() === 'M' ? 'MALE' : 'FEMALE', expiry = nd2[7].toUpperCase();
+        const ex = pax.find(p => _sameName(p.name, name));
+        if (!ex) pax.push({ name, dob, gender, passportExpiry: expiry });
+        else { if (!ex.dob) ex.dob = dob; if (!ex.gender) ex.gender = gender; if (!ex.passportExpiry) ex.passportExpiry = expiry; }
+        _d(trimmed, '✅ PAX', `护照号码行 ${name} ${dob}`);
+        continue;
+      }
+    }
     // Also handles plain Chinese name: "乘机人：刘桂介"
     const cnPaxMatch = trimmed.match(/^(?:乘机人|旅客|乘客)[：:]\s*(.+)/);
     if (cnPaxMatch) {
@@ -11324,7 +11341,7 @@ function parseSingleBooking(raw) {
       // ── Numbered name + 护照号码 + cert: "1.DENG/YIRUI  护照号码CN/EG7029264/CN/15OCT00/F/01JUL29" ──
       // Strip a leading sequence number ("1."), pull the NAME (before 护照号码),
       // and parse the cert block (国籍/护照/国籍/DOB/性别/到期) after 护照号码.
-      const numberedDoc = raw.match(/^\d+\.\s*([A-Z]+(?:\s+[A-Z]+)*\/[A-Z]+(?:\s+[A-Z]+)*)\s+护照(?:号码|号)?\s*([A-Z]{2})\/([A-Z0-9]+)\/([A-Z]{2})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})/i);
+      const numberedDoc = raw.match(/^\d+\.\s*([A-Z]+(?:\s+[A-Z]+)*\/[A-Z]+(?:\s+[A-Z]+)*)\s+护照(?:号码|号)?\s*([A-Z]{2,3})\/([A-Z0-9]+)\/([A-Z]{2,3})\/(\d{1,2}[A-Z]{3}\d{2,4})\/([MF])\/(\d{1,2}[A-Z]{3}\d{2,4})/i);
       if (numberedDoc) {
         const name = numberedDoc[1].trim().toUpperCase().replace(/\s+/g, ' ');
         const dob = numberedDoc[5].toUpperCase();
@@ -11549,7 +11566,7 @@ function parseSingleBooking(raw) {
     // Bare P/ document line (no SSR prefix):
     if (/^护照信息$/.test(trimmed)) { continue; }
     {
-      const dtag = trimmed.match(/^(婴儿|儿童|小孩|小儿|成人|大人)\s*$/);
+      const dtag = trimmed.match(/^(婴儿|儿童|小孩|小儿|成人|大人|大|小)\s*$/);   // v-DP 单字 大/小 亦走此分支（前后瞻定型，不再盲置 _lastFareType）
       if (dtag) {
         // v-DB：类型词在运价块【前】（下一非空行为 FARE/SEL/TAX/TOTAL）→ 定型后续 TOTAL，而非护照前置标签
         let _nx = '', _pv = '';
@@ -11563,7 +11580,7 @@ function parseSingleBooking(raw) {
           else if (_nxIsFare) _fareTypeMode = 'pre';
         }
         if (_fareTypeMode === 'pre' && _nxIsFare) {
-          _lastFareType = dtag[1] === '婴儿' ? 'INFANT' : (dtag[1] === '儿童' || dtag[1] === '小孩' || dtag[1] === '小儿') ? 'CHILD' : 'ADULT';
+          _lastFareType = dtag[1] === '婴儿' ? 'INFANT' : (dtag[1] === '儿童' || dtag[1] === '小孩' || dtag[1] === '小儿' || dtag[1] === '小') ? 'CHILD' : 'ADULT';
           _d(trimmed, '💰 FARE', '运价前置类型 → ' + _lastFareType);
           continue;
         }
@@ -11587,7 +11604,7 @@ function parseSingleBooking(raw) {
         const name = (dd[4].trim() + '/' + dd[5].trim()).toUpperCase().replace(/\s+/g, ' ');
         const dob = _p2(dd[2].toUpperCase());
         const expiry = _p2(dd[3].toUpperCase());
-        const ft = _docTypePend === '婴儿' ? 'INFANT' : (_docTypePend === '儿童' || _docTypePend === '小孩' || _docTypePend === '小儿') ? 'CHILD' : null;
+        const ft = _docTypePend === '婴儿' ? 'INFANT' : (_docTypePend === '儿童' || _docTypePend === '小孩' || _docTypePend === '小儿' || _docTypePend === '小') ? 'CHILD' : null;
         _docTypePend = null;
         const ex = pax.find(p => _sameName(p.name, name));
         if (ex) {
@@ -12028,7 +12045,9 @@ function parseSingleBooking(raw) {
         }
       }
       // v-DM：名单行全是已知乘客（如先被护照 OCR/DOCS 建好）也视为已消费，不落未识别
-      if (foundAny || nameMatches.every(m => pax.find(p => _sameName(p.name, String(m[1] || '').trim())))) continue;
+      // v-DP 收紧：仅"纯名单行"（除序号/姓名/称谓外无其它内容）才跳过——名字后带证件资料的行须继续流向 DOCS 分支
+      const _pureNameLine = /^(?:\s*\d*[\.\s]*[A-Z]+(?:[\s\-]+[A-Z]+)*\/\s*[A-Z]+(?:[\s\-]+[A-Z]+)*(?:\s+(?:MR|MRS|MS|MSTR|MISS|DR|CHD|INF))?\s*)+$/i.test(trimmed);
+      if (foundAny || (_pureNameLine && nameMatches.every(m => pax.find(p => _sameName(p.name, String(m[1] || '').trim()))))) continue;
     }
     // Fallback: original single-name regex (catches lines like "1. SMITH/JOHN MR  男 15MAY80")
     const nameMatch = trimmed.match(/^(?:\d+[\.\s]+)?([A-Z]{2,}(?:\s+[A-Z]+)*\/\s*[A-Z]+(?:\s+[A-Z]+)*)/);
@@ -12458,7 +12477,7 @@ function parseSingleBooking(raw) {
       }
     }
 
-    const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿|大|小)(?![\u4e00-\u9fa5])/i);
+    const fareTypeMatch = trimmed.match(/^(?:TOTAL\s*)?(大人|成人|儿童|小儿|婴儿)(?![\u4e00-\u9fa5])/i);
     const inlineInfMatch = !fareTypeMatch && trimmed.match(/\bINF\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     const inlineCnnMatch = !fareTypeMatch && !inlineInfMatch && trimmed.match(/\bCNN\b/i) && trimmed.match(/(\d{3,6}(?:\.\d+)?)\s*(?:CNY|RMB|人民币)/i);
     // GDS adult fare line: "02 SKW7RJYS+*   13585 CNY" (no CNN/INF/CHD code → adult)
@@ -13026,7 +13045,7 @@ function parseSingleBooking(raw) {
     if (hasDiff) {
       parsedPaxPrices = fareList.map(f => (f != null ? f : (rmb || 0)));   // 0（免费婴儿）保留，勿被 || 顶成成人价
       // Use adult fare as base rmb (not infant fare), for proper USD conversion
-      rmb = parsedFareByType.adult || parsedPaxPrices[0];
+      rmb = parsedFareByType.adult || parsedPaxPrices.find(x => x > 0) || parsedPaxPrices[0];   // v-DP 免费婴儿在首位时勿取 0
     } else if (fareList[0]) {
       rmb = fareList[0];
     }
@@ -25745,7 +25764,8 @@ function renderChasePanel() {
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         ${ch ? `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:11px;color:#0050aa;background:#ddeaff;padding:2px 8px;border-radius:3px;cursor:pointer;" title="点击重新分配">${escapeHtml(ch.name)}</span>` : `<span onclick="event.stopPropagation();openCardholderDialog(${idx})" style="font-size:11px;color:var(--red);background:#fde8e8;padding:2px 8px;border-radius:3px;cursor:pointer;border:1px dashed var(--red);" title="点击分配卡主">＋ 分配</span>`}
-        <span onclick="event.stopPropagation();openFareCheck(${o.rmb || 0}, { pax: ${(o.passengers || []).length || 1}, disc: ${o.discount || 'null'}, chase: true })" style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${ch ? '#0050aa' : 'var(--ink)'};cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;" title="⚖ 核价：对照 Chase Travel 页面价（支持积分 pts 折算）">${usd ? '$' + Math.round(usd).toLocaleString() : '—'}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${ch ? '#0050aa' : 'var(--ink)'};">${usd ? '$' + Math.round(usd).toLocaleString() : '—'}</span>
+        <button onclick="event.stopPropagation();openFareCheck(${o.rmb || 0}, { pax: ${(o.passengers || []).length || 1}, disc: ${o.discount || 'null'}, chase: true })" class="btn ghost small" style="margin-left:6px; padding:2px 8px; font-size:11px; color:#0050aa; border-color:#b3d0ff;" title="⚖ 核价：对照 Chase Travel 页面价（支持积分 pts 折算）">⚖ 核价</button>
       </div>`;
     grid.appendChild(row);
   });
@@ -25861,6 +25881,10 @@ function renderChasePanel() {
           ${chName
             ? `<div style="font-size:13px;font-weight:700;color:#0050aa;display:flex;align-items:center;gap:4px;">💳 ${escapeHtml(chName)}<button onclick="openCardholderDialog(${idx});setTimeout(renderChasePanel,300)" style="background:none;border:1px solid #b3d0ff;padding:1px 5px;border-radius:3px;cursor:pointer;font-size:11px;color:#0070c9;margin-left:4px;">换</button></div>`
             : `<button onclick="openCardholderDialog(${idx});setTimeout(renderChasePanel,300)" style="background:#0070c9;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;font-size:12px;font-weight:700;">+ 分配卡主</button>`}
+        </div>
+        <div style="background:#f0f5ff;padding:10px 14px;">
+          <div style="font-size:11px;color:#0050aa;font-weight:700;margin-bottom:4px;letter-spacing:0.05em;">⚖ 核价 FARE CHECK</div>
+          <button onclick="openFareCheck(${o.rmb || 0}, { pax: ${(o.passengers || []).length || 1}, disc: ${o.discount || 'null'}, chase: true })" style="background:#0070c9;color:#fff;border:none;padding:5px 12px;border-radius:3px;cursor:pointer;font-size:12px;font-weight:700;" title="对照 Chase Travel 页面价：支持输入积分 pts 自动折算美金">⚖ 核价（pts/USD）</button>
         </div>
         <div style="background:#f0f5ff;padding:10px 14px;">
           <div style="font-size:11px;color:#0050aa;font-weight:700;margin-bottom:4px;letter-spacing:0.05em;">卡号后四位</div>
@@ -29075,6 +29099,7 @@ function formatTime(t) {
 
 let toastTimer;
 function toast(msg, ms = 2200) {
+  ms = Math.max(ms, Math.min(9000, 1400 + String(msg || '').length * 65));   // v-DR 长文案按字数延时（≈65ms/字，上限 9s），读得完再消失
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');

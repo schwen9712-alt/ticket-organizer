@@ -469,4 +469,17 @@ const kk1 = parseSingleBooking(_rb[0]);
 eq('AK1 三人+婴儿免费铺价', [(kk1.pax||[]).length, kk1.pax[2].forcedType, JSON.stringify(kk1.fareByType), JSON.stringify(kk1.paxPrices), kk1.rmb, (kk1.unrecognizedLines||[]).length], [3, 'INFANT', JSON.stringify({adult:2750,infant:0}), JSON.stringify([2750,2750,0]), 2750, 0]);
 const kk2 = parseSingleBooking(splitIntoBookings(RS.replace('BOSSFO', 'BOSPVG'))[0]);
 eq('AK2 国际线不免费', kk2.fareByType.infant, undefined);
+// v-DP 矩阵 v3 固化：OCR 不误触发 / 护照号码行两形态 / 单字标签不污染 TOTAL
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const seg = " 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W  0 E  2 I\n";
+  const l1 = P("1.ZHANG/SAN\n" + seg + "国籍：中国\n1.ZHANG/SAN 护照号码 CN/E1234567/CN/01JAN80/M/01JAN30");
+  eq('AL1 含国籍/护照号码词不误开 OCR + 独立护照号码行', [(l1.pax||[]).length, l1.pax[0].dob, l1.pax[0].passportExpiry], [1, '01JAN80', '01JAN30']);
+  const l2 = P(seg + "乘机人：1.DENG/YIRUI  护照号码CN/EG7029264/CN/15OCT00/F/01JUL29");
+  eq('AL2 乘机人：护照号码形态资料不丢', [(l2.pax||[]).length, l2.pax[0].dob, l2.pax[0].gender], [1, '15OCT00', 'FEMALE']);
+  const l3 = P("1. *AA8439 C   SU03JAN  KIXLAX DK1   1800 1120   M 0\nHOU/QIAN M 20NOV88\n小\nHOU/LENNOX M 22DEC22\nTOTAL CNY 39234");
+  eq('AL3 名单前单字小不污染 TOTAL', [(l3.pax||[]).length, l3.rmb], [2, 39234]);
+  const l4 = P("乘机人： 1.MIAO/XIAOKANG 2.MIAO/YIXIN CHD");
+  eq('AL4 乘机人列表形态回归', [(l4.pax||[]).length, l4.pax[1].forcedType], [2, 'CHILD']);
+}
 process.exit(fails ? 1 : 0);
