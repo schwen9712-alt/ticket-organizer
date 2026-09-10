@@ -3004,6 +3004,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
 .hint { line-height: 1.55; }
 .ch-badge { max-width: 84px; }                                  /* 字号提升后略放宽卡主徽章 */
 @media (max-width: 640px) { .btn.small { min-height: 34px; } .tool-btn { min-height: 38px; } }   /* 触屏热区 */
+@media (max-width: 640px) { table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; } }   /* v-DY 窄屏表格横向滚动，不撑破布局 */
 .airline-usd-row, .ticket-card, .fc-out, td, .amount, [class*="price"], [class*="usd"] { font-variant-numeric: tabular-nums; }   /* 金额列等宽数字，扫读不跳 */
 ::selection { background: rgba(94,106,210,0.22); }
 @media print {
@@ -3032,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.09-DV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.10-DY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.09-DV</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.10-DY</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9587,9 +9588,9 @@ function extractDOB(text) {
   // OCR correction 2: fix extra letters appended to month names
   // e.g. "31MARA82" → "31MAR82", "08APRR88" → "08APR88"
   // Use lookahead/lookbehind since \b doesn't work between digit and letter
-  text = text.replace(/(?<=\d)([A-Za-z]{4,5})(?=\d)/g, (m) => {
-    const up = m.toUpperCase();
-    if (MONTHS.includes(up.slice(0, 3))) return m.slice(0, 3);
+  text = text.replace(/(\d)([A-Za-z]{4,5})(?=\d)/g, (m, d, w) => {   // v-DX 去 lookbehind（旧 iOS 白屏保险）
+    const up = w.toUpperCase();
+    if (MONTHS.includes(up.slice(0, 3))) return d + w.slice(0, 3);
     return m;
   });
   // Try Chinese "YYYY年M月D[日]" format (year first)
@@ -9975,7 +9976,7 @@ function parseSingleBooking(raw) {
       } else {
         // Lookaround instead of \b: "…>08-24PVG" glues digits to the code, and \b
         // sees no boundary inside a \w run. (?<![A-Za-z]) still blocks ABCD→BCD.
-        const codes = [...line.matchAll(/(?<![A-Za-z])([A-Z]{3})(?![A-Za-z])/g)];
+        const codes = [...line.matchAll(/(?:^|[^A-Za-z])([A-Z]{3})(?![A-Za-z])/g)];   // v-DX 去 lookbehind
         if (codes.length) dest = codes[codes.length - 1][1];
       }
       // Return-trip layout: the airline line carries NO destination (e.g.
@@ -10511,8 +10512,7 @@ function parseSingleBooking(raw) {
     const gdsSegRe = /\b[A-Z]{2}\s*\d{1,4}\s+[A-Z]\s+(?:MO|TU|WE|TH|FR|SA|SU)\d{1,2}[A-Z]{3}/g;
     const gdsSegCount = (ln.match(gdsSegRe) || []).length;
     if (dateCount >= 2) {
-      const splitRe = /(?<=\s)(?=\d{1,2}月\d{1,2}日)/g;
-      const parts = ln.split(splitRe).filter(p => p && p.trim());
+      const parts = ln.replace(/\s(?=\d{1,2}月\d{1,2}日)/g, '\n').split('\n').filter(p => p && p.trim());   // v-DX 去 lookbehind（等价切分）
       parts.forEach(p => expandedLines.push(p));
     } else if (gdsSegCount >= 2) {
       // Two+ GDS segments glued on one line — split before each segment head
@@ -10704,7 +10704,7 @@ function parseSingleBooking(raw) {
     const froms = [...raw.matchAll(/Air Lines\s*([A-Z]{3})(?=[A-Z]{2}\s?\d{2,4}|[^A-Za-z]|$)/g)].map(m => m[1]);
     const tosM = raw.match(/^([A-Z]{3})([A-Z]{3})\s*$/m);
     const tos = tosM ? [tosM[1], tosM[2]] : [];
-    const nos = [...raw.matchAll(/(?<![a-z])(DL|AA|UA|B6|AS|NK|F9|WN|HA|LA)\s?(\d{2,4})(?!\d)/g)].map(m => m[1] + m[2]);
+    const nos = [...raw.matchAll(/(?:^|[^a-z])(DL|AA|UA|B6|AS|NK|F9|WN|HA|LA)\s?(\d{2,4})(?!\d)/g)].map(m => m[1] + m[2]);   // v-DX 去 lookbehind
     const times = [...raw.matchAll(/(\d{1,2}):(\d{2})\s*([ap])\.?m/gi)].map(m => ({ idx: m.index, t: (() => { let h = (+m[1]) % 12; if (/p/i.test(m[3])) h += 12; return String(h).padStart(2, '0') + ':' + m[2]; })() }));
     const flIdx = mFl.map(m => m.index);   // 与 mFl 同源（裸 Flight N: 会多匹配致数组不齐，v-CO 插桩实证）
     if (mFl.length >= 2 && mFl.length === froms.length && froms.length === tos.length && tos.length === nos.length && times.length >= mFl.length * 2) {
@@ -16177,7 +16177,7 @@ function _fareQuoteText(rate, usd, pax, disc) {
 }
 function _fareQuoteCopy() {
   const rate = parseFloat((document.getElementById('fcRate') || {}).value);
-  const usd = parseFloat((document.getElementById('fcUsd') || {}).value);
+  const usd = _fareUsdPer();
   const pax = parseInt((document.getElementById('fcPax') || {}).value, 10) || 1;
   const disc = parseFloat((document.getElementById('fcDisc') || {}).value);
   const txt = _fareQuoteText(rate, usd, pax, disc);
@@ -16195,6 +16195,7 @@ function _fareChasePts() {
   if (pts > 0 && cpp > 0) {
     const pax = Math.max(1, parseInt((document.getElementById('fcPax') || {}).value, 10) || 1);
     usdEl.value = (pts * cpp / 100 / pax).toFixed(2);   // pts 为整单，折成每人 USD
+    const _perRadio = document.querySelector('input[name="fcUsdMode"][value="per"]'); if (_perRadio) _perRadio.checked = true;   // 已按人数折过，口径切回每人
     if (typeof settings !== 'undefined') settings.chaseCpp = cpp;
   }
   _fareCheckRender();
@@ -16206,10 +16207,19 @@ function _fareQuoteFallbackCopy(txt) {
   try { document.execCommand('copy'); } catch (e) {}
   ta.remove();
 }
+// v-DW 美国运价口径：每人 / 总价（总价 ÷ 人数 = 单价，比价与报价一律按单价）
+function _fareUsdMode() { const el = document.querySelector('input[name="fcUsdMode"]:checked'); return el ? el.value : 'per'; }
+function _fareUsdPer() {
+  const raw = parseFloat((document.getElementById('fcUsd') || {}).value);
+  if (!(raw > 0)) return NaN;
+  if (_fareUsdMode() !== 'total') return raw;
+  const pax = Math.max(1, parseInt((document.getElementById('fcPax') || {}).value, 10) || 1);
+  return +(raw / pax).toFixed(2);
+}
 function _fareCheckRender() {
   const rmb = parseFloat((document.getElementById('fcRmb') || {}).value);
   const rate = parseFloat((document.getElementById('fcRate') || {}).value);
-  const usd = parseFloat((document.getElementById('fcUsd') || {}).value);
+  const usd = _fareUsdPer();
   const out = document.getElementById('fcOut');
   if (!out) return;
   const r = _fareCheckCalc(rmb, rate, usd);
@@ -16221,8 +16231,14 @@ function _fareCheckRender() {
     const word = good ? '美国价更低（有空间）' : r.diff < 0 ? '美国价更贵' : '完全一致';
     cmp = `<div style="margin-top:8px; font-size:13px; color:${col}; font-weight:700;">Δ $${Math.abs(r.diff).toLocaleString('en-US')} · ${Math.abs(r.diffPct)}% — ${word}</div>`;
   }
+  let perLine = '';
+  if (_fareUsdMode() === 'total' && usd > 0) {
+    const rawT = parseFloat((document.getElementById('fcUsd') || {}).value);
+    const paxN = Math.max(1, parseInt((document.getElementById('fcPax') || {}).value, 10) || 1);
+    perLine = `<div style="margin-top:8px; padding:6px 10px; background:#eaf3ff; border-radius:var(--r-md); font-size:12px; color:#0050aa;">查到总价 $${rawT.toLocaleString('en-US')} ÷ ${paxN} 人 = <b style="font-family:'JetBrains Mono',monospace;">$${usd.toLocaleString('en-US')}</b>/人（比价与报价按此单价）</div>`;
+  }
   out.innerHTML = `<div style="font-size:12px; color:var(--muted);">折算美金（每人）</div>
-    <div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800; color:var(--ink);">$${r.cnUsd.toLocaleString('en-US')}</div>${cmp}`;
+    <div style="font-family:'JetBrains Mono',monospace; font-size:26px; font-weight:800; color:var(--ink);">$${r.cnUsd.toLocaleString('en-US')}</div>${cmp}${perLine}`;
 }
 function openFareCheck(prefillRmb, ctx) {
   ctx = ctx || {};
@@ -16240,7 +16256,12 @@ function openFareCheck(prefillRmb, ctx) {
         <label style="font-size:11px; font-weight:700;">代理人民币价 ¥<input id="fcRmb" type="number" step="0.01" value="${prefillRmb ? Number(prefillRmb) : ''}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
         <label style="font-size:11px; font-weight:700;">汇率 USD/CNY<input id="fcRate" type="number" step="0.0001" value="${rate}" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()"></label>
       </div>
-      <label style="font-size:11px; font-weight:700; display:block; margin-top:10px;">美国运价 $（你查到的）<input id="fcUsd" type="number" step="0.01" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()" placeholder="如 1180.20"></label>
+      <label style="font-size:11px; font-weight:700; display:block; margin-top:10px;">美国运价 $（你查到的）
+        <span style="float:right; font-weight:600; font-size:11px; color:var(--muted);">
+          <label style="margin-right:8px; cursor:pointer;"><input type="radio" name="fcUsdMode" value="per" checked onchange="_fareCheckRender()"> 每人</label>
+          <label style="cursor:pointer;"><input type="radio" name="fcUsdMode" value="total" onchange="_fareCheckRender()"> 总价（÷人数）</label>
+        </span>
+        <input id="fcUsd" type="number" step="0.01" style="width:100%; margin-top:3px;" oninput="_fareCheckRender()" placeholder="如 1180.20（每人）或整单总价"></label>
       ${ctx.chase ? `<div style="display:grid; grid-template-columns:1.4fr 1fr; gap:10px; margin-top:8px; padding:8px 10px; background:#eaf3ff; border-radius:var(--r-md);">
         <label style="font-size:11px; font-weight:700; color:#0050aa;">💳 Chase Travel 积分 pts<input id="fcPts" type="number" step="1" style="width:100%; margin-top:3px;" placeholder="如 367857" oninput="_fareChasePts()"></label>
         <label style="font-size:11px; font-weight:700; color:#0050aa;">兑换率 ¢/pt<input id="fcCpp" type="number" step="0.05" value="${(typeof settings !== 'undefined' && settings.chaseCpp) || 1.5}" style="width:100%; margin-top:3px;" oninput="_fareChasePts()"></label>
@@ -16301,7 +16322,8 @@ function diagOrder(idx) {
     if (p) parsed = { segs: (p.segs || []).map(s => `${s.flight} ${s.from}${s.to} ${s.date} ${s.depTime}-${s.arrTime}`), pax: (p.pax || []).map(x => [x.name, x.dob || '', x.forcedType || '']), rmb: p.rmb, usd: p.usd, paxPrices: p.paxPrices, fareByType: p.fareByType, discount: p.discount, cabin: p.cabin, unrec: p.unrecognizedLines || [] };
   } catch (e) { parsed = { error: String(e && e.message || e) }; }
   const stored = { basePrice: o.basePrice, rmb: o.rmb, usd: o.usd, discount: o.discount, paxPrices: o.paxPrices, fareByType: o.fareByType, pax: (o.passengers || []).length, segs: (o.segments || []).length, tableLabel: o.tableLabel, agent: o.agent };
-  const txt = '【解析诊断】' + (ver ? ' ' + ver.trim() : '') + '\n== 存储字段 ==\n' + JSON.stringify(stored) + '\n== 当前解析 ==\n' + JSON.stringify(parsed) + '\n== 原文 rawPnr ==\n' + (o.rawPnr || '（无）');
+  const recentErr = (typeof _errLog !== 'undefined' && Array.isArray(_errLog) && _errLog.length) ? _errLog.slice(-5).map(x => (typeof x === 'string' ? x : JSON.stringify(x))).join('\n') : '（无）';
+  const txt = '【解析诊断】' + (ver ? ' ' + ver.trim() : '') + '\n== 存储字段 ==\n' + JSON.stringify(stored) + '\n== 当前解析 ==\n' + JSON.stringify(parsed) + '\n== 最近错误 ==\n' + recentErr + '\n== 原文 rawPnr ==\n' + (o.rawPnr || '（无）');
   const done = () => toast('✓ 诊断信息已复制，发给开发即可定位');
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => { _fareQuoteFallbackCopy(txt); done(); });
   else { _fareQuoteFallbackCopy(txt); done(); }

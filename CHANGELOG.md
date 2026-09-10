@@ -1,3 +1,33 @@
+## 2026-09-10 — 🔬 第九轮：诊断附错误日志 + 窄屏表格横滚 + 速记报表断言 · v26.09.10-DY
+
+三项审计：①全局错误捕获已存在（_errPush + 错误日志面板），补强——「🧪 解析诊断」导出附带最近 5 条错误，排障一次到位；②移动端静态审计——无 >380px 固定宽、viewport 正确、7 条窄屏规则、13 处 flex-wrap；9 个 table 仅 4 处有横滚容器 → 窄屏通用规则 table 横向滚动不撑破布局；③速记单（无航班号）报表输出无 undefined、行程行正确（单人单 NAME/TKT 分行为既有设计）。
+
+**测试**：run_all 全部门槛通过（parse 99 · e2e 13 · report 13 · consistency · 审计 6 项）。
+
+**改动位置**：diagOrder；CSS 一则；report_test RP12/13。
+
+**回滚**：.backups/ 上一版。
+---
+## 2026-09-10 — 🔬 第八轮：兼容性去 lookbehind + 一键门槛 run_all · v26.09.10-DX
+
+新角度三项：①**兼容性**——4 处 lookbehind 正则（`(?<=` `(?<!`）在 iOS ≤16.3 Safari 会整页语法错误白屏（此前 iOS 白屏事件的可能根因之一），全部改写为等价无 lookbehind 形式（前导捕获放回 / `(?:^|[^…])` 前缀 / 替换后切分），parse 99 回归含相关样本（Delta 列式、中文日期切分、月份缩写）全绿；`?.`/`??` 109 处为 iOS 13.4+ 支持，保留。②**渲染性能**——尝试在 node 侧跑 buildCardHTML×200 计时，卡片链依赖机场库/OFAC 门/乘客历史等运行时数据表，桩不完备，放弃（浏览器 Performance 面板可直接看）。③**一键门槛** `tests/run_all.js`——parse/e2e/report/consistency 四测试 + 四审计（语法块·写手·桩泄漏·console/dupFns）+ UI 静态审计 + lookbehind 审计，任一失败非零退出，直跑不经管道（DU 事故制度化解法）；用户本地 `node tests/run_all.js` 即可自检。
+
+**测试**：run_all 全部门槛通过（parse 99 · e2e 13 · report 11 · consistency · 审计 6 项）。
+
+**改动位置**：4 处正则；tests/run_all.js 新增（八文件包）。
+
+**回滚**：.backups/ 上一版。**上线自检**：旧 iPad/iPhone 打开不再白屏；本地 node tests/run_all.js 全绿。
+---
+## 2026-09-10 — ⚖ 核价：美国运价可选「每人 / 总价」口径 · v26.09.10-DW
+
+用户需求：查到的美元可能是整单总价，要能选择口径并显示单价。实现：美国运价输入旁「每人 ／ 总价（÷人数）」单选；总价模式下 `_fareUsdPer()` 按面板人数除开得单价，**比价、Δ、报价复制一律按单价**；结果区显示换算行「查到总价 $X ÷ N 人 = $Y/人」。Chase 积分行折算后自动把口径切回每人（pts 已按人数折过，防二次除）。
+
+**测试**：FU 组 3 断言（总价÷人数/每人原样/空值）· parse 99 · e2e 12 · report 10 · consistency ✓ · 四审计（语法失败块常量更新为 1）。
+
+**改动位置**：_fareUsdMode/_fareUsdPer；_fareCheckRender；_fareQuoteCopy；面板 radio；_fareChasePts。
+
+**回滚**：.backups/ 上一版。**上线自检**：开核价 → 选"总价" → 填 3540.60、人数 3 → 换算行显示 $1,180.20/人，报价复制按 1180.20。
+---
 ## 2026-09-09 — 🗑 代理门户全面取消（用户决策：在中国行不通） · v26.09.09-DV
 
 用户决策：代理自助门户路线放弃。整体切除：①主站「📥 代理收件箱」模块（openAgentInbox/render/accept/reject 四函数与轮询定时器）；②Firebase 桥（专供 agent-orders 的 `<script type="module">`：firebase-app/auth/firestore 三个外部 SDK 引入随之消失——首屏少三个外部请求）；③入口按钮与架构说明行；④仓库文件 agent.html、firestore.rules 删除（Firestore 已无任何用途；控制台项目可自行停用）。保留：JSON 导入合并路径的制裁拒收计数（与门户无关）。删除 7,640 字符，残留引用零。审计常量更新：语法失败块（module 脚本误报）由 2 降为 1。

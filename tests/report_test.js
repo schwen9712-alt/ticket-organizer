@@ -125,6 +125,10 @@ SSR DOCS DL HK1 P/CN/ER6245545/CN/10JUL51/M/23MAR36/M/QIN/JINZHE/P2
 01 INX0ZNDZ+*          4400.53 USD
 `;
 { const o = buildOrder(S, {}); const c = withDeps(() => buildClientCopy(o)); has("RP9 混舱单报表舱位取最高(商务)", c, "商务舱"); has("RP10 USD 单折算人民币", buildInternalCopy(o), "31683.82"); }
+const Q = String.raw`9月07日 AF 公务舱 HKG-CDG-LHR
+ZHANG/SAN M 01JAN80
+TOTAL CNY 12312`;
+{ const o = buildOrder(Q, {}); const t = withDeps(() => buildInternalCopy(o)) + withDeps(() => buildClientCopy(o)); has("RP12 速记单报表无 undefined", t.includes("undefined") ? "" : "ok", "ok"); has("RP13 速记单行程行", t, "AF HKG-CDG-LHR"); }
 console.log("依赖:", DEPS.slice(15).join(", ") || "(无额外)");
 console.log(fails ? "✗ 报表 e2e 失败 " + fails : "✓ 报表 e2e 全绿");
 process.exit(fails ? 1 : 0);
