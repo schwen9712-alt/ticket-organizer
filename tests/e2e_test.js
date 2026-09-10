@@ -1,5 +1,16 @@
 // 端到端：原文 → splitIntoBookings → parseSingleBooking → 页面建单段（真码切片）→ computeFinalPrice
 // 运行：node tests/e2e_test.js（自包含：自行从 index.html 抽取，不依赖 /tmp）
+// ⏱ 测试时间钉死（v-EA）：婴儿 48 个月、美国境内 <2 岁、"最近未来年"推断都依赖"今天"，不钉死会随日历变红
+{
+  const FIXED = new Date(2026, 8, 10, 12, 0, 0).getTime();   // 2026-09-10 本地时间
+  const _RealDate = Date;
+  class PinnedDate extends _RealDate {
+    constructor(...a) { if (a.length === 0) super(FIXED); else super(...a); }
+    static now() { return FIXED; }
+  }
+  globalThis.Date = PinnedDate;
+}
+
 const fs = require('fs');
 const path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');

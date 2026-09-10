@@ -3,6 +3,17 @@
 // 运行：先按下方注释抽取 parser.js，然后 node tests/parse_test.js
 // 容器/环境重置后：解包 repo-update.zip 即恢复本文件，无需重建。
 // ════════════════════════════════════════════════════════════════════
+// ⏱ 测试时间钉死（v-EA）：婴儿 48 个月、美国境内 <2 岁、"最近未来年"推断都依赖"今天"，不钉死会随日历变红
+{
+  const FIXED = new Date(2026, 8, 10, 12, 0, 0).getTime();   // 2026-09-10 本地时间
+  const _RealDate = Date;
+  class PinnedDate extends _RealDate {
+    constructor(...a) { if (a.length === 0) super(FIXED); else super(...a); }
+    static now() { return FIXED; }
+  }
+  globalThis.Date = PinnedDate;
+}
+
 const fs = require('fs');
 const settings = { rate: 7.2 };
 const dateGapDays = () => 0;
@@ -500,5 +511,30 @@ eq('AM2 逐段舱位+USD+清零', [JSON.stringify((s1.segs||[]).map(s=>s.cls)), 
 {
   const n1 = parseSingleBooking(splitIntoBookings("1. DL1388  09月29日  罗利 - 底特律  05:34  07:16\n2. DL389  09月29日  底特律 - 上海浦东  11:55  15:25+1\n舱位：J")[0]);
   eq('AN1 舱位单字母赋全段', JSON.stringify((n1.segs||[]).map(s=>s.cls)), JSON.stringify(['J','J']));
+}
+// UA 02 运价 + 经济舱位 → 基础经济舱；中文性别简表；称谓+生日名单
+const TS = String.raw`GAO/FENG 女 22MAR89
+XU/DANNI  女 26AUG96
+ 1.  UA858  K   MO19OCT  PVGSFO DK1   1210 0835            
+ 2.  UA5460 K   MO19OCT  SFOPHX DK1   1225 1443     
+02 KLX8IHBI            6593 CNY
+====
+1.TAN/YI MS 23MAY88
+2.REN/JING MS 28SEP86
+3.LIANG/JIEHAO MR 01MAY82
+1. UA878 K SU27SEP HKGSFO DK3 2230 2010 
+2. UA869 K SA03OCT SFOHKG DK3 1325 1855+1 
+02 KLW8RJB9+*          5703 CNY
+`;
+const _tb = splitIntoBookings(TS);
+eq('AO0 两单', _tb.length, 2);
+const t1 = parseSingleBooking(_tb[0]), t2 = parseSingleBooking(_tb[1]);
+eq('AO1 单1 中文性别简表+UA02基础经济', [(t1.pax||[]).length, t1.pax[0].gender, t1.pax[0].dob, t1.cabin, t1.rmb], [2, 'FEMALE', '22MAR89', '基础经济舱', 6593]);
+eq('AO2 单2 称谓+生日名单+UA02(+*尾)', [(t2.pax||[]).length, t2.pax[2].gender, t2.pax[2].dob, t2.cabin, t2.rmb], [3, 'MALE', '01MAY82', '基础经济舱', 5703]);
+eq('AO3 对照：01行/商务舱位/非UA 不触发', [parseSingleBooking(" 1.  UA858  K   MO19OCT  PVGSFO DK1   1210 0835\n01 KLX8IHBI 6593 CNY").cabin, parseSingleBooking(" 1.  UA858  P   MO19OCT  PVGSFO DK1   1210 0835\n02 PLX8IHBI 26593 CNY").cabin, parseSingleBooking(" 1.  DL858  K   MO19OCT  PVGSFO DK1   1210 0835\n02 KLX8IHBI 6593 CNY").cabin], [null, null, null]);
+// UA 02 规则收紧：成人+儿童双运价行（01+02）不误标
+{
+  const p = parseSingleBooking(" 1.  UA858  K   MO19OCT  PVGSFO DK2   1210 0835\n1.ZHANG/SAN 2.ZHANG/XIAO CHD\n01 KLX8IHBI 6593 CNY\n02 KLX8IHBICH 4900 CNY");
+  eq('AP1 双运价行不误标基础经济', p.cabin, null);
 }
 process.exit(fails ? 1 : 0);

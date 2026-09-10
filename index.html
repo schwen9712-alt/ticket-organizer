@@ -3033,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.10-DY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.10-EA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.10-DY</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.10-EA</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9751,6 +9751,7 @@ function parseSingleBooking(raw) {
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
   let _mrzPend = null;        // v-DK 护照机读区（MRZ）姓名行悬挂，等第二行
   let _cabinSeqPend = null;   // v-DT "舱位：I+I+X+X" 出现在段之前时悬挂，段齐后补赋
+  const _fareLineNos = [];    // v-DZ/EA GDS 运价行序号集合（"02 KLX8IHBI 6593 CNY" → '02'）；规则仅在"唯一一行且为 02"时触发
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
   let _lastFareType = undefined;
   let _equivFareAmt = undefined;
@@ -12506,7 +12507,8 @@ function parseSingleBooking(raw) {
     // GDS adult fare line: "02 SKW7RJYS+*   13585 CNY" (no CNN/INF/CHD code → adult)
     // Only treat as explicit adult fare when we already have (or will have) a child/infant line
     const inlineAdultFare = !fareTypeMatch && !inlineInfMatch && !inlineCnnMatch
-      && trimmed.match(/^\d{1,2}\s+[A-Z0-9]+[+*]?\s+(\d{3,6})\s*(?:CNY|RMB|人民币)\s*$/i);
+      && trimmed.match(/^(\d{1,2})\s+[A-Z0-9]+[+*]*\s+(\d{3,6})\s*(?:CNY|RMB|人民币)\s*$/i);   // v-DZ fare basis 尾符号可多个（KLW8RJB9+*）
+    if (inlineAdultFare) _fareLineNos.push(inlineAdultFare[1]);   // v-DZ 记录运价行序号
 
     // TOTAL CNY line: "TOTAL CNY 13555" — this is the authoritative fare (base + tax)
     // The fare TYPE may come from a PRECEDING line (大人运价...) via _lastFareType,
@@ -13044,6 +13046,12 @@ function parseSingleBooking(raw) {
       if (flM < dobM || (flM === dobM && flD < dobD)) age--;
       return age >= 0 ? age : null;
     };
+    // v-DZ 用户规则：UA 的 02 运价，若舱位为经济类字母，基本上是基础经济舱（可手改）
+    {
+      const _UA_ECON = new Set(['Y','B','M','E','U','H','Q','V','W','S','T','L','K','G','N']);
+      if (String(airline || '').toUpperCase() === 'UA' && _fareLineNos.length === 1 && _fareLineNos[0] === '02' && parsedCabin === undefined && segs.length
+          && segs.every(s => !s.cls || _UA_ECON.has(String(s.cls).toUpperCase()))) parsedCabin = '基础经济舱';
+    }
     if (_cabinSeqPend && segs.length) { if (_cabinSeqPend.length === 1) segs.forEach(s => { if (!s.cls) s.cls = _cabinSeqPend[0]; }); else _cabinSeqPend.forEach((c, k) => { if (segs[k] && !segs[k].cls) segs[k].cls = c; }); _cabinSeqPend = null; }
     // v-DO 用户规则：美国航司的美国境内行程，怀抱婴儿（起飞日未满 2 岁）票免费
     const _US_CARRIERS = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
@@ -23420,7 +23428,8 @@ function buildItineraryCopy(o) {
     const num = String(i + 1).padStart(2, ' ');
     const flight = (s.flight || '').toUpperCase().trim().padEnd(7, ' ');
     const cls = (s.cls || '').toUpperCase().trim();
-    const cabinWord = _cabinFullName(cls, o.airline || (s.flight || '').slice(0, 2)) || orderCabin;
+    const _segWord = _cabinFullName(cls, o.airline || (s.flight || '').slice(0, 2));
+    const cabinWord = (orderCabin === 'BASIC ECONOMY' && (_segWord === 'ECONOMY' || !_segWord)) ? 'BASIC ECONOMY' : (_segWord || orderCabin);   // v-DZ 基础经济细分优先
     const cabinTag = cabinWord ? `${cabinWord}${cls ? '-' + cls : ''}` : (cls || '');
     const date = (s.date || '').toUpperCase().trim();
     const from = (s.from || '').toUpperCase().trim();

@@ -1,5 +1,16 @@
 // 报表模板端到端：原文 → 建单 → buildInternalCopy / buildClientCopy 文本断言（舱位词/婴儿标注/合计/产品词）
 // 运行：node tests/report_test.js（自包含）
+// ⏱ 测试时间钉死（v-EA）：婴儿 48 个月、美国境内 <2 岁、"最近未来年"推断都依赖"今天"，不钉死会随日历变红
+{
+  const FIXED = new Date(2026, 8, 10, 12, 0, 0).getTime();   // 2026-09-10 本地时间
+  const _RealDate = Date;
+  class PinnedDate extends _RealDate {
+    constructor(...a) { if (a.length === 0) super(FIXED); else super(...a); }
+    static now() { return FIXED; }
+  }
+  globalThis.Date = PinnedDate;
+}
+
 const fs = require("fs");
 const path = require("path");
 const src = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
@@ -129,6 +140,13 @@ const Q = String.raw`9月07日 AF 公务舱 HKG-CDG-LHR
 ZHANG/SAN M 01JAN80
 TOTAL CNY 12312`;
 { const o = buildOrder(Q, {}); const t = withDeps(() => buildInternalCopy(o)) + withDeps(() => buildClientCopy(o)); has("RP12 速记单报表无 undefined", t.includes("undefined") ? "" : "ok", "ok"); has("RP13 速记单行程行", t, "AF HKG-CDG-LHR"); }
+const T = String.raw`GAO/FENG 女 22MAR89
+XU/DANNI  女 26AUG96
+ 1.  UA858  K   MO19OCT  PVGSFO DK1   1210 0835            
+ 2.  UA5460 K   MO19OCT  SFOPHX DK1   1225 1443     
+02 KLX8IHBI            6593 CNY
+`;
+{ const o = buildOrder(T, {}); const it = withDeps(() => buildItineraryCopy(o)); has("RP14 行程复制 BASIC ECONOMY-K", it, "BASIC ECONOMY-K"); has("RP15 行程复制含两段", it, "UA5460"); }
 console.log("依赖:", DEPS.slice(15).join(", ") || "(无额外)");
 console.log(fails ? "✗ 报表 e2e 失败 " + fails : "✓ 报表 e2e 全绿");
 process.exit(fails ? 1 : 0);
