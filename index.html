@@ -3033,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.10-EA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.11-EB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.10-EA</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.11-EB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -11520,7 +11520,8 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2})\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2})\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 效期后可选重复性别
+    const ssrMatch = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:[-\/]P\d*)?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 效期后可选重复性别 · v-EB 四位年
+    const _y4to2 = (d) => String(d || '').toUpperCase().replace(/^(\d{1,2}[A-Z]{3})(\d{2})(\d{2})$/, '$1$3');
     // v-DA 变体：六位数字生日 YYMMDD、无效期、无 P 尾（"P/USA/A39321637/USA/761015/M/CHANG/WEYLU"）
     if (!ssrMatch) {
       const m6 = ssrLine.match(/SSR\s+DOC[SA]?\b.*?\bP\/[A-Z]{2,3}\/[A-Z0-9]{5,}\/[A-Z]{2,3}\/(\d{2})(\d{2})(\d{2})\/([MF])\/(?:(\d{2})(\d{2})(\d{2})\/)?([A-Z][A-Z\s]*?)\/([A-Z][A-Z\s]+?)(?:\/P\d*)?\s*$/i);
@@ -11542,9 +11543,9 @@ function parseSingleBooking(raw) {
     }
     if (ssrMatch) {
       const _pad2 = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');  // "2MAR71"→"02MAR71"
-      const dob = _pad2(ssrMatch[1].toUpperCase());
+      const dob = _pad2(_y4to2(ssrMatch[1]));   // v-EB 四位年归一
       const gender = ssrMatch[2].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-      const expiry = ssrMatch[3] ? _pad2(ssrMatch[3].toUpperCase()) : '';  // optional
+      const expiry = ssrMatch[3] ? _pad2(_y4to2(ssrMatch[3])) : '';  // optional · v-EB 四位年归一
       const surname = ssrMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
       let given = ssrMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       let ssrFt = null;
@@ -12714,7 +12715,7 @@ function parseSingleBooking(raw) {
     // ── Multi-part cabin fare: "普通经济9120*0.88*3+9050*0.88" ────────────
     // Format: cabinLabel + price*discount*count + price*discount*count ...
     const pCabinMulti = !pA && !pB && !pPrefix && !pYunjia && !pCO &&
-      trimmed.match(/(?:基础经济|普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(?:\d+PC)?\s*(\d[\d\*\.\+]+)\s*$/);
+      trimmed.match(/(?:基础经济|普通经济|超级经济|超经|经济舱|经济|商务舱|商务|公务舱|公务|头等舱|头等)\s*(?:\d+\s*[Pp][Cc])?\s*(\d[\d\*\.\+]+)\s*$/);   // v-EB 行李件数 2pc 大小写不敏感
     if (pCabinMulti) {
       if (/基础经济/.test(trimmed)) parsedCabin = '基础经济舱';   // v-DI 产品细分保留（勿折叠成经济舱）
       const expr = pCabinMulti[1];

@@ -537,4 +537,15 @@ eq('AO3 对照：01行/商务舱位/非UA 不触发', [parseSingleBooking(" 1.  
   const p = parseSingleBooking(" 1.  UA858  K   MO19OCT  PVGSFO DK2   1210 0835\n1.ZHANG/SAN 2.ZHANG/XIAO CHD\n01 KLX8IHBI 6593 CNY\n02 KLX8IHBICH 4900 CNY");
   eq('AP1 双运价行不误标基础经济', p.cabin, null);
 }
+// DL 四段 + 超经 2pc 金额 + SSR 四位年份/斜杠接 P
+const US_ = String.raw`2.  DL388  G1  SU13DEC  PVGDTW HK1   1000 1033      SEAME 1 M
+ 3.  DL1429 W1  SU13DEC  DTWCLT HK1   1416 1612      SEAME M --
+ 4.  DL1405 W2  SA30JAN  CLTDTW HK1   0600 0752      SEAME --M
+ 5.  DL389  G2  SA30JAN  DTWPVG HK1   1005 1515+1    SEAME M 1
+超经  2pc   20064 
+
+SSR DOCS DL HK1/P/CHN/EK6774838/CHN/26JUN1992/F/26JUN2033/YANG/YUEQIAO
+`;
+const u1 = parseSingleBooking(splitIntoBookings(US_)[0]);
+eq('AQ1 四位年 DOCS + 超经 2pc', [(u1.pax||[]).length, u1.pax[0].dob, u1.pax[0].gender, u1.pax[0].passportExpiry, u1.rmb, u1.cabin, (u1.segs||[]).length, (u1.unrecognizedLines||[]).length], [1, '26JUN92', 'FEMALE', '26JUN33', 20064, '超级经济舱', 4, 0]);
 process.exit(fails ? 1 : 0);
