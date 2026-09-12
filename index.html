@@ -3033,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.11-EB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.12-ED\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.11-EB</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.12-ED</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -8920,7 +8920,7 @@ async function parseMRZ() {
     const dobFormatted = `${dobDD}${monthAbbr[mIdx]}${year.slice(2)}`;  // store as 6-char e.g. "01APR70"
 
     const gender = sex === 'M' ? 'MALE' : (sex === 'F' ? 'FEMALE' : '');
-    const name = `${surname}/${given}`;
+    const name = _stripTitle(`${surname}/${given}`);   // v-EC
 
     // Add passenger to current order
     const o = curr();
@@ -9251,7 +9251,8 @@ function splitChunkByProposals(chunkText) {
 // 宁可多报"未见"交人工确认，不做任何自动删除。
 // 乘客名归一化比对（v-CW 用户纠正）：名单 "JIANG/JIAN QING" 与护照 "JIANG/JIANQING" 是同一人——
 // 去重/合并一律按去空格·点·连字符后的键比对，显示名保留先到者。
-function _nameKey(n) { return String(n || '').toUpperCase().replace(/[\s.\-]+/g, '').replace(/\/+/g, '/').trim(); }
+function _stripTitle(n) { return String(n || '').replace(/\s+(?:MR|MRS|MS|MSTR|MISS|DR)\.?\s*$/i, '').trim(); }   // v-EC 剥尾称谓（中国录入习惯，美国出票不需要）
+function _nameKey(n) { return _stripTitle(String(n || '').toUpperCase()).replace(/[\s.\-]+/g, '').replace(/\/+/g, '/').trim(); }
 function _sameName(a, b) {
   const ka = _nameKey(a), kb = _nameKey(b);
   if (!ka || !kb) return false;
@@ -10748,7 +10749,7 @@ function parseSingleBooking(raw) {
     const g = raw.match(/女\s*\/\s*F|男\s*\/\s*M|\bSex\b[^\n]*?\b([MF])\b/i);
     const gender = g ? (/女|F$/i.test(g[0].replace(/.*\b([MF])\b$/, '$1')) && !/男/.test(g[0]) ? 'FEMALE' : 'MALE') : '';
     if (nm && dates.length) {
-      const name = (nm[1].trim() + '/' + nm[2].trim()).toUpperCase().replace(/\s+/g, ' ');
+      const name = _stripTitle((nm[1].trim() + '/' + nm[2].trim()).toUpperCase().replace(/\s+/g, ' '));
       const dob = dates[0].s;
       const expiry = dates.length >= 2 ? dates[dates.length - 1].s : '';
       const ex = pax.find(p => _sameName(p.name, name));
@@ -10826,7 +10827,8 @@ function parseSingleBooking(raw) {
       }
       // ── ⚡ 快速录入格式（v-DN）: "9月07日 AF 公务舱 HKG-CDG-LHR" → 链式拆段，航班号/乘客后补 ──
       {
-        const qk = trimmed.match(/^(\d{1,2})月(\d{1,2})日\s+([A-Z]{2})\s+(基础经济舱?|超级经济舱?|超经|经济舱?|商务舱?|公务舱?|头等舱?)\s+([A-Z]{3}(?:\s*[-—–→>]\s*[A-Z]{3})+)\s*$/i);
+        // v-ED 扩：舱位词可选、末尾可带起降时刻（12:46-21:52 / 1246 2152）
+        const qk = trimmed.match(/^(\d{1,2})月(\d{1,2})日\s+([A-Z0-9][A-Z0-9])\s+(?:(基础经济舱?|超级经济舱?|超经|经济舱?|商务舱?|公务舱?|头等舱?)\s+)?([A-Z]{3}(?:\s*[-—–→>]\s*[A-Z]{3})+)(?:\s+(\d{1,2}:?\d{2})\s*[-—–~\s]\s*(\d{1,2}:?\d{2}(?:\+\d)?))?\s*$/i);   // 航司码可含数字（B6/9W/3U）
         if (qk) {
           const mi = parseInt(qk[1], 10) - 1;
           const codes = qk[5].toUpperCase().split(/\s*[-—–→>]\s*/).filter(Boolean);
@@ -10834,9 +10836,10 @@ function parseSingleBooking(raw) {
             const date = String(parseInt(qk[2], 10)).padStart(2, '0') + _MN3[mi];
             const al = qk[3].toUpperCase();
             for (let k = 0; k + 1 < codes.length; k++) segs.push({ from: codes[k], to: codes[k + 1], date, flight: '', cls: '', depTime: '', arrTime: '' });
+            if (qk[6] && qk[7]) { segs[segs.length - codes.length + 1].depTime = qk[6]; segs[segs.length - 1].arrTime = qk[7]; }
             if (!airline) airline = al;
-            const cw = qk[4];
-            parsedCabin = /基础/.test(cw) ? '基础经济舱' : /超/.test(cw) ? '超级经济舱' : /商务|公务/.test(cw) ? '商务舱' : /头等/.test(cw) ? '头等舱' : '经济舱';
+            const cw = qk[4] || '';
+            if (cw) parsedCabin = /基础/.test(cw) ? '基础经济舱' : /超/.test(cw) ? '超级经济舱' : /商务|公务/.test(cw) ? '商务舱' : /头等/.test(cw) ? '头等舱' : '经济舱';
             _d(trimmed, '✅ SEG', `快速录入 ${al} ${codes.join('→')} ${parsedCabin}`);
             continue;
           }
@@ -11531,7 +11534,7 @@ function parseSingleBooking(raw) {
         const dob = toDDMMMYY(m6[1], m6[2], m6[3]);
         const expiry = m6[5] ? toDDMMMYY(m6[5], m6[6], m6[7]) : '';
         const gender = m6[4].toUpperCase() === 'M' ? 'MALE' : 'FEMALE';
-        const name = (m6[8].trim() + '/' + m6[9].trim()).toUpperCase().replace(/\s+/g, ' ');
+        const name = _stripTitle((m6[8].trim() + '/' + m6[9].trim()).toUpperCase().replace(/\s+/g, ' '));
         if (dob && name.length >= 4) {
           const ex = pax.find(p => _sameName(p.name, name));
           if (!ex) { const rec = { name, gender, dob }; if (expiry) rec.passportExpiry = expiry; pax.push(rec); }
@@ -11555,7 +11558,7 @@ function parseSingleBooking(raw) {
         if (/(儿童|小孩|小儿|CHD|CHILD)/i.test(ssrMatch[6])) ssrFt = 'CHILD';
         else if (/(婴儿|INF)/i.test(ssrMatch[6])) ssrFt = 'INFANT';
       }
-      const name = `${surname}/${given}`;
+      const name = _stripTitle(`${surname}/${given}`);   // v-EC
       let existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
         // 同姓模糊匹配：名前缀包含或编辑距离≤1（DOCS 录入误差，如 FUQIN vs FUQIU）
@@ -11645,6 +11648,7 @@ function parseSingleBooking(raw) {
     }
     if (/^护照信息$/.test(trimmed)) { _d(trimmed, '✅ PAX', '护照信息标签'); continue; }
     if (/^FSI\//.test(trimmed) || /^S\s+[A-Z]{2}\s+\d{1,4}[A-Z]\d{2}[A-Z]{3}\s/.test(trimmed)) { _d(trimmed, '✅ SEG', 'Sabre 系统行静默'); continue; }
+    if (/^\d*\.?\s*SSR\s+DOC[SA]?\s+[A-Z0-9]{2}\s+HK\d\s*$/i.test(trimmed)) { _d(trimmed, '✅ PAX', 'DOCS 拆行残段静默'); continue; }   // v-EC
     // ── 护照机读区 MRZ（TD3）：行1 "P<CHNLI<<ZIXUAN<<<…" 行2 "EM70636978CHN0606169M3406050…"（可拼成一行）──
     {
       const mrzLine2 = /([A-Z0-9<]{9})(\d)([A-Z]{3})(\d{2})(\d{2})(\d{2})(\d)([MF<])(\d{2})(\d{2})(\d{2})(\d)/;
@@ -11708,7 +11712,7 @@ function parseSingleBooking(raw) {
       const expiry = bareDocMatch[3] ? _pad2b(bareDocMatch[3].toUpperCase()) : '';
       const surname = bareDocMatch[4].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = bareDocMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
-      const name = `${surname}/${given}`;
+      const name = _stripTitle(`${surname}/${given}`);   // v-EC
       const t6 = bareDocMatch[6] || '';
       const bareFt = /(儿童|小孩|小儿|CHD|CHILD)/i.test(t6) ? 'CHILD' : /(婴儿|INF)/i.test(t6) ? 'INFANT' : null;
       const existing = pax.find(p => _sameName(p.name, name));
@@ -11740,7 +11744,7 @@ function parseSingleBooking(raw) {
       const gender = (gRaw === '男' || gRaw === 'M' || gRaw === 'MALE') ? 'MALE' : 'FEMALE';
       const surname = docTail[3].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = docTail[4].trim().toUpperCase().replace(/\s+/g, ' ');
-      const name = `${surname}/${given}`;
+      const name = _stripTitle(`${surname}/${given}`);   // v-EC
       const existing = pax.find(p => _sameName(p.name, name));
       if (!existing) pax.push({ name, gender, dob: dobT });
       else { if (!existing.dob) existing.dob = dobT; if (!existing.gender) existing.gender = gender; }
@@ -11757,7 +11761,7 @@ function parseSingleBooking(raw) {
       const expiry = docWithNat[6].toUpperCase();
       const surname = docWithNat[7].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = docWithNat[8].trim().toUpperCase().replace(/\s+/g, ' ');
-      const name = `${surname}/${given}`;
+      const name = _stripTitle(`${surname}/${given}`);   // v-EC
       const existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
         pax.push({ name, gender, dob, passportExpiry: expiry });
@@ -11779,7 +11783,7 @@ function parseSingleBooking(raw) {
       const expiry = compactDocMatch[5].toUpperCase();   // v-CX：效期组补捕获（此前漏）
       const surname = compactDocMatch[6].trim().toUpperCase().replace(/\s+/g, ' ');
       const given = compactDocMatch[7].trim().toUpperCase().replace(/\s+/g, ' ');
-      const name = `${surname}/${given}`;
+      const name = _stripTitle(`${surname}/${given}`);   // v-EC
       const existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
         pax.push({ name, gender, dob, passportExpiry: expiry });
@@ -13027,6 +13031,13 @@ function parseSingleBooking(raw) {
     else if (_equivFareType === 'INFANT') { if (parsedFareByType.infant == null) parsedFareByType.infant = _equivFareAmt; }
   }
 
+  // v-ED：无分档运价但为美国航司境内行程且含婴儿时，以统一价建成人档，让婴儿免费规则可铺价
+  {
+    const _USC = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
+    const _dom = segs.length > 0 && _USC.has(String(airline || '').toUpperCase()) && segs.every(s => _US_APTS.has(String(s.from || '').toUpperCase()) && _US_APTS.has(String(s.to || '').toUpperCase()));
+    if (_dom && rmb > 0 && pax.length > 1 && !(parsedFareByType && Object.keys(parsedFareByType).length) && parsedPaxPrices === undefined
+        && pax.some(p => p.forcedType === 'INFANT' || /^\d{1,2}[A-Z]{3}(2[5-9]|3\d)$/i.test(p.dob || ''))) parsedFareByType = { adult: rmb };
+  }
   if (parsedFareByType && Object.keys(parsedFareByType).length > 0 && pax.length > 0 && parsedPaxPrices === undefined) {
     const firstSegDate = segs.length > 0 ? segs[0].date : null;
     const MONTH_MAP2 = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
@@ -19750,7 +19761,7 @@ async function doMRZForOrder(idx) {
     const year = (parseInt(dobYY, 10) >= 30 ? '19' : '20') + dobYY;
     const dobFormatted = `${dobDD}${monthAbbr[mIdx]}${year.slice(2)}`;
     const gender = sex === 'M' ? 'MALE' : (sex === 'F' ? 'FEMALE' : '');
-    const name = `${surname}/${given}`;
+    const name = _stripTitle(`${surname}/${given}`);   // v-EC
 
     const existing = o.passengers.find(p => _sameName(p.name, name));
     if (existing) {

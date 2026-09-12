@@ -32,7 +32,7 @@ const grab = (n) => {
   throw new Error("unbalanced " + n);
 };
 const L = src.split("\n");
-const hs2 = L.findIndex(l => /^function _nameKey/.test(l)); let end2 = -1;
+const hs2 = L.findIndex(l => /^function _stripTitle/.test(l)); let end2 = -1;
 for (let i = L.length - 1; i >= 0; i--) if (/seatCount: _seatCountN };/.test(L[i])) { end2 = i; break; }
 globalThis.settings = { rate: 7.2, discountRules: [], fareClassByAirline: {} };
 globalThis.dateGapDays = () => 0;

@@ -10,7 +10,7 @@ const run = (f) => execSync("node " + JSON.stringify(path.join(__dirname, f)), {
 
 // 抽解析器供 parse_test（它读 /tmp/parser.js）
 const L = src.split("\n");
-const hs = L.findIndex(l => /^function _nameKey/.test(l)); let end = -1;
+const hs = L.findIndex(l => /^function _stripTitle/.test(l)); let end = -1;
 for (let i = L.length - 1; i >= 0; i--) if (/seatCount: _seatCountN };/.test(L[i])) { end = i; break; }
 fs.writeFileSync("/tmp/parser.js", L.slice(hs, end + 2).join("\n"));
 

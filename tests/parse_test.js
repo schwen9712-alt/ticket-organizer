@@ -22,7 +22,7 @@ const MN2 = _MN3; const _CN_CABIN = {}; const POINTS_TYPES = {}; const toast = (
 const CN_CITY_IATA = { '北京首都': 'PEK', '洛杉矶': 'LAX' };
 let _parseDebugMode = false; let _parseDebugLog = [];
 // parser.js 由跑测者从 index.html 抽取（锚定法）：
-//   hs=$(grep -n '^function _nameKey' index.html | cut -d: -f1)   # v-CW 起解析区首函数为 _nameKey
+//   hs=$(grep -n '^function _stripTitle' index.html | cut -d: -f1)   # v-EC 起解析区首函数为 _stripTitle
 //   end=$(grep -n 'seatCount: _seatCountN };' index.html | tail -1 | cut -d: -f1)
 //   sed -n "${hs},$((end+1))p" index.html > /tmp/parser.js
 eval(fs.readFileSync(process.env.PARSER_JS || '/tmp/parser.js', 'utf8'));
@@ -548,4 +548,27 @@ SSR DOCS DL HK1/P/CHN/EK6774838/CHN/26JUN1992/F/26JUN2033/YANG/YUEQIAO
 `;
 const u1 = parseSingleBooking(splitIntoBookings(US_)[0]);
 eq('AQ1 四位年 DOCS + 超经 2pc', [(u1.pax||[]).length, u1.pax[0].dob, u1.pax[0].gender, u1.pax[0].passportExpiry, u1.rmb, u1.cabin, (u1.segs||[]).length, (u1.unrecognizedLines||[]).length], [1, '26JUN92', 'FEMALE', '26JUN33', 20064, '超级经济舱', 4, 0]);
+// 称谓 MS 进证件名：归一忽略称谓、显示名剥称谓、拆行残段静默
+const VS = String.raw`1.HE/YUCHEN MS
+ 2.  AA8402 I   FR11DEC  JFKHND DK1   1220   1655+1 351  0 E  8 3 OP-JL05
+I舱 
+ 4.SSR DOCS AA HK1 P/CN/EJ6434172/CN/01OCT04/F/10JAN33/HE/YUCHEN MS/P1
+CNY   18633
+`;
+const v1 = parseSingleBooking(splitIntoBookings(VS)[0]);
+eq('AR1 称谓名合并为一人且剥 MS', [(v1.pax||[]).length, v1.pax[0].name, v1.pax[0].dob, v1.pax[0].gender, v1.rmb, (v1.unrecognizedLines||[]).length], [1, 'HE/YUCHEN', '01OCT04', 'FEMALE', 18633, 0]);
+const v2 = parseSingleBooking(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/E1/CN/01JAN80/M/01JAN30/WANG/LEI MR/P1");
+eq('AR2 仅证件行带称谓亦剥', v2.pax[0].name, 'WANG/LEI');
+// 速记变体（无舱位词+时刻范围+含数字航司码）+ 无分档运价的美国境内婴儿免费
+const WS = String.raw`9月29日 B6 LAX-BOS 12:46-21:52
+
+TOTAL USD 408 
+
+SSR DOCS XX HK1  P/CN/ER1356414/CN/01AUG97/M/WANG/WENBO/P1
+SSR DOCS XX HK1  P/CN/EP8170377/CN/01JUN97/F/LI/WENWEN/P2
+SSR DOCS XX HK1  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3
+`;
+const ws1 = parseSingleBooking(splitIntoBookings(WS)[0]);
+eq('AS1 速记 B6 LAX-BOS 12:46-21:52', [(ws1.segs||[]).length, ws1.segs[0].from, ws1.segs[0].to, ws1.segs[0].depTime, ws1.segs[0].arrTime, ws1.airline], [1, 'LAX', 'BOS', '12:46', '21:52', 'B6']);
+eq('AS2 TOTAL USD 单婴儿免费铺价', [(ws1.pax||[]).length, ws1.usd, JSON.stringify(ws1.fareByType), JSON.stringify(ws1.paxPrices), (ws1.unrecognizedLines||[]).length], [3, 408, JSON.stringify({adult:2937.6,infant:0}), JSON.stringify([2937.6,2937.6,0]), 0]);
 process.exit(fails ? 1 : 0);

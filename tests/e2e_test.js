@@ -17,7 +17,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const lines = src.split('\n');
 const li = (re) => lines.findIndex(l => re.test(l));
 // 解析区
-const hs = li(/^function _nameKey/); let end = -1;
+const hs = li(/^function _stripTitle/); let end = -1;
 for (let i = lines.length - 1; i >= 0; i--) if (/seatCount: _seatCountN };/.test(lines[i])) { end = i; break; }
 const parserSrc = lines.slice(hs, end + 2).join('\n');
 // 真函数抽取（大括号配平）
@@ -150,5 +150,15 @@ const R = `1.  UA1074 W   FR18SEP  BOSSFO DK1   1134 1457    SEAME  B 3
   eq('E11 美国境内婴儿免费落库', [o.paxPrices, o.fareByType.infant], [[2750, 2750, 0], 0]);
   eq('E12 免费婴儿最终价', computeFinalPrice(o), Math.round(2750 * 2 * 0.9));
 }
+// 速记+USD+美国境内婴儿：最终价 = 2937.6×2×90% + 0
+const W = `9月29日 B6 LAX-BOS 12:46-21:52
+
+TOTAL USD 408 
+
+SSR DOCS XX HK1  P/CN/ER1356414/CN/01AUG97/M/WANG/WENBO/P1
+SSR DOCS XX HK1  P/CN/EP8170377/CN/01JUN97/F/LI/WENWEN/P2
+SSR DOCS XX HK1  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3
+`;
+{ const { o } = buildOrder(W, {}); eq('E13 速记 USD 单婴儿免费最终价', computeFinalPrice(o), Math.round(2937.6 * 2 * 0.9)); }
 console.log(fails ? `\n✗ e2e 失败 ${fails}` : '\n✓ e2e 全绿');
 process.exit(fails ? 1 : 0);
