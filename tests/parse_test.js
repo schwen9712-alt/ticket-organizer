@@ -571,4 +571,13 @@ SSR DOCS XX HK1  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3
 const ws1 = parseSingleBooking(splitIntoBookings(WS)[0]);
 eq('AS1 速记 B6 LAX-BOS 12:46-21:52', [(ws1.segs||[]).length, ws1.segs[0].from, ws1.segs[0].to, ws1.segs[0].depTime, ws1.segs[0].arrTime, ws1.airline], [1, 'LAX', 'BOS', '12:46', '21:52', 'B6']);
 eq('AS2 TOTAL USD 单婴儿免费铺价', [(ws1.pax||[]).length, ws1.usd, JSON.stringify(ws1.fareByType), JSON.stringify(ws1.paxPrices), (ws1.unrecognizedLines||[]).length], [3, 408, JSON.stringify({adult:2937.6,infant:0}), JSON.stringify([2937.6,2937.6,0]), 0]);
+// 航司名行 + 航站楼中文城市段 + "B舱官网价 7065元"
+const XS = String.raw`联合航空(UA)
+1. UA771  09月22日  洛杉矶T7 - 北京首都T3  22:55  04:40+2 
+B舱官网价  7065元 
+
+SSR DOCS CA HK1 P/CHN/EJ6251310/CHN/27DEC06/F/01DEC27/ZHANG/XINYUAN/P1
+`;
+const x1 = parseSingleBooking(splitIntoBookings(XS)[0]);
+eq('AT1 航站楼城市段+B舱官网价', [(x1.segs||[]).length, x1.segs[0].from, x1.segs[0].to, x1.segs[0].cls, x1.segs[0].arrTime, x1.rmb, x1.airline, (x1.pax||[]).length, (x1.unrecognizedLines||[]).length], [1, 'LAX', 'PEK', 'B', '04:40+2', 7065, 'UA', 1, 0]);
 process.exit(fails ? 1 : 0);
