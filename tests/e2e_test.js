@@ -45,7 +45,9 @@ globalThis._parseDebugMode = false; globalThis._parseDebugLog = [];
 globalThis.isUSOrigin = () => false;
 globalThis._paxDobIssues = () => []; globalThis._isSeatTight = () => false;
 eval(parserSrc);
-for (const n of ['newOrder','_isInfantPax','_infantSum','matchDiscountRule','computeFinalPrice','calculateAgeAtFlight','_reparseInto']) eval(grab(n));
+(0, eval)(src.match(/const US_AIRPORTS = new Set\(\[[\s\S]*?\]\);/)[0].replace('const ', 'globalThis.'));
+(0, eval)(src.match(/const _US_CARRIERS_R = [^\n]*/)[0].replace('const ', 'globalThis.'));
+for (const n of ['newOrder','_isInfantPax','_infantSum','matchDiscountRule','computeFinalPrice','calculateAgeAtFlight','_reparseInto','_usDomesticOrder','_freeInfantIdx']) eval(grab(n));
 
 function buildOrder(raw, ctx) {
   const chunk = splitIntoBookings(raw)[0];
@@ -160,5 +162,10 @@ SSR DOCS XX HK1  P/CN/EP8170377/CN/01JUN97/F/LI/WENWEN/P2
 SSR DOCS XX HK1  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3
 `;
 { const { o } = buildOrder(W, {}); eq('E13 速记 USD 单婴儿免费最终价', computeFinalPrice(o), Math.round(2937.6 * 2 * 0.9)); }
+// 结算层兜底：旧单（无分档价）后补婴儿 → 美国境内自动免费
+{
+  const old = newOrder({ airline: 'B6', discount: 90, basePrice: 2937.6, paxPrices: null, segments: [{ from: 'LAX', to: 'BOS', date: '29SEP', flight: '' }], passengers: [{ name: 'WANG/WENBO', dob: '01AUG97' }, { name: 'LI/WENWEN', dob: '01JUN97' }, { name: 'WANG/ADRIAN', dob: '24FEB26' }] });
+  eq('E14 旧单后补婴儿结算层免费', computeFinalPrice(old), Math.round(2937.6 * 0.9 * 2));
+}
 console.log(fails ? `\n✗ e2e 失败 ${fails}` : '\n✓ e2e 全绿');
 process.exit(fails ? 1 : 0);

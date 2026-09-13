@@ -3033,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.12-ED\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.13-EE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.12-ED</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.13-EE</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -8680,13 +8680,16 @@ function computeFinalPrice(o) {
   }
   if (o.discount == null) return null;
   // If per-pax prices are set, total = Σ(price_i) × discount
+  const _free = _freeInfantIdx(o);   // v-EE 美国境内免费婴儿
   if (Array.isArray(o.paxPrices) && o.paxPrices.length > 0) {
-    const sum = o.paxPrices.reduce((a, b) => a + (Number(b) || 0), 0);
+    const prices = o.paxPrices.map((v, i) => _free.has(i) ? 0 : (Number(v) || 0));
+    const sum = prices.reduce((a, b) => a + b, 0);
     if (sum <= 0) return null;
-    return Math.round(((sum - _infantSum(o)) * (o.discount / 100) + _infantSum(o)));
+    const infFull = (o.passengers || []).reduce((acc, p, i) => acc + ((!_free.has(i) && _isInfantPax(o, i)) ? (Number(o.paxPrices[i]) || 0) : 0), 0);
+    return Math.round(((sum - infFull) * (o.discount / 100) + infFull));
   }
   if (o.basePrice == null) return null;
-  const pax = (o.passengers && o.passengers.length) || 1;
+  const pax = Math.max(0, ((o.passengers && o.passengers.length) || 1) - _free.size);
   return Math.round(o.basePrice * (o.discount / 100) * pax);
 }
 
@@ -22780,6 +22783,26 @@ function _isInfantPax(o, i) {
   return !!(o && o.fareByType && o.fareByType.infant != null && prices[i] != null
     && Math.abs(Number(prices[i]) - Number(o.fareByType.infant)) < 0.01);
 }
+// v-EE 结算层兜底（用户要求：一旦识别出婴儿且为美国境内航班，自动免费）——不依赖解析那一刻的铺价
+const _US_CARRIERS_R = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
+function _usDomesticOrder(o) {
+  const segs = (o && o.segments) || [];
+  if (!segs.length) return false;
+  const al = String(o.airline || (segs[0].flight || '').slice(0, 2) || '').toUpperCase();
+  if (!_US_CARRIERS_R.has(al)) return false;
+  return segs.every(s => US_AIRPORTS.has(String(s.from || '').toUpperCase()) && US_AIRPORTS.has(String(s.to || '').toUpperCase()));
+}
+function _freeInfantIdx(o) {
+  const out = new Set();
+  if (!_usDomesticOrder(o)) return out;
+  const d0 = ((o.segments || [])[0] || {}).date;
+  (o.passengers || []).forEach((p, i) => {
+    if (!p) return;
+    if (p.dob && d0 && typeof calculateAgeAtFlight === 'function') { const a = calculateAgeAtFlight(p.dob, d0); if (a != null) { if (a < 2) out.add(i); return; } }
+    if (p.forcedType === 'INFANT' && !p.dob) out.add(i);
+  });
+  return out;
+}
 function _infantSum(o) {
   const prices = (o && o.paxPrices) || [];
   const pax = (o && o.passengers) || [];
@@ -23115,7 +23138,8 @@ function buildCardHTML(o, idx) {
   const st = computeSettlement(o);
   const rmbEq = st != null ? st * effectiveRate(o) : null;
   const profit = (fp != null && rmbEq != null) ? fp - rmbEq : (fp != null && st == null ? null : null);
-  const pax = o.passengers.length || 1;
+  const _freeN = _freeInfantIdx(o).size;
+  const pax = (Math.max(0, (o.passengers.length || 1) - _freeN)) + (_freeN ? ` + ${_freeN}婴儿免费` : '');   // v-EE
 
   if (fp != null || st != null) {
     html += `<div class="ticket-card-price">`;

@@ -43,6 +43,8 @@ globalThis.isUSOrigin = () => false; globalThis._paxDobIssues = () => []; global
 eval(src.match(/const CABIN_RANK = \{[^}]+\}/)[0].replace("const ", "globalThis."));
 eval(src.match(/const CABIN_EN_TO_ZH = \{[^}]+\}/)[0].replace("const ", "globalThis."));
 { const i = src.indexOf("const POINTS_TYPES = {"); let d = 0, k = src.indexOf("{", i); for (; k < src.length; k++) { if (src[k] === "{") d++; else if (src[k] === "}") { d--; if (d === 0) break; } } eval(src.slice(i, k + 1).replace("const ", "globalThis.") + ";"); }
+(0, eval)(src.match(/const US_AIRPORTS = new Set\(\[[\s\S]*?\]\);/)[0].replace('const ', 'globalThis.'));
+(0, eval)(src.match(/const _US_CARRIERS_R = [^\n]*/)[0].replace('const ', 'globalThis.'));
 globalThis.STATE = { fareClassByAirline: { UA: { P: "Business", G: "Economy", W: "Economy" }, AF: {}, AA: { C: "Business" }, DL: { I: "Business", X: "Economy" } }, classMap: {}, orders: [] };
 (0, eval)(L.slice(hs2, end2 + 2).join("\n"));
 const DEPS = ["newOrder","_isInfantPax","_infantSum","matchDiscountRule","computeFinalPrice","calculateAgeAtFlight","inferCabinFromSegments","_liveCabinZh","_orderCabinWord","_cabinFullName","formatDateCN","isCardPayment","effectiveRate","buildClientCopy","buildInternalCopy"];
