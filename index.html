@@ -3033,10 +3033,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.15-EG\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.15-EH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.15-EG</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.15-EH</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9409,7 +9409,30 @@ function _wechatClean(raw) {
   return { cleaned: out.join('\n'), agent, multi, stripped };
 }
 
+// ═══ 形态归一化层（v-EH）：入口统一处理"可变部分"，各分支不再各自容错 ═══
+// 依据变体模糊测试（8 种形态 × 24 真样本）：航班号小写 / 全角数字·冒号 / 多空格 是三大翻车源
+function _normalizeRaw(raw) {
+  let s = String(raw || '');
+  if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  // ① 全角 → 半角：数字、冒号、空格、常见标点
+  s = s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 48))
+       .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF21 + 65 + (c.charCodeAt(0) >= 0xFF41 ? 32 : 0)))
+       .replace(/\u3000/g, ' ').replace(/：/g, ':').replace(/／/g, '/').replace(/＋/g, '+').replace(/－/g, '-');
+  // ② 段行统一大写：含 航司码+航班号 且 含日期形态（DDMMM / N月N日）的行——机场码/舱位/星期一并转大写
+  s = s.split(/\r?\n/).map(line => {
+    if (/\b[A-Za-z][A-Za-z0-9]\d{2,4}\b/.test(line) && (/\d{1,2}[A-Za-z]{3}\b/.test(line) || /\d{1,2}月\d{1,2}日/.test(line))) {
+      return line.replace(/[a-z]+/g, m => m.toUpperCase());
+    }
+    return line;
+  }).join('\n');
+  // ②b 航班号 token 级大写（"ua123" → "UA123"，与日期不同行时亦生效；英文中两字母+数字组合极少，无误伤）
+  s = s.replace(/\b([a-z]{2})(\d{2,4})\b/g, (m, a, n) => a.toUpperCase() + n);
+  // ③ 多空格/制表符压缩为单空格（行首缩进保留一个；换行保留）
+  s = s.replace(/[ \t]{2,}/g, ' ');
+  return s;
+}
 function splitIntoBookings(raw) {
+  raw = _normalizeRaw(raw);
   // Pre-normalize: some agents paste "第11单 87折1. UA858 ..." with no newline
   // between the order marker and segment list. Segments must start on their
   // own line for the downstream parser; insert a break right before any
@@ -9665,6 +9688,7 @@ function _parseFirstLastPax(lines) {
 }
 
 function parseSingleBooking(raw) {
+  raw = _normalizeRaw(raw);   // v-EH 形态归一（单独调用时亦生效）
   // ── Shared parse-scope constants (consolidated from per-block copies) ──────
   const _MN3 = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   // "MM","DD" → "DDMON" ('' when month invalid)
