@@ -580,4 +580,16 @@ SSR DOCS CA HK1 P/CHN/EJ6251310/CHN/27DEC06/F/01DEC27/ZHANG/XINYUAN/P1
 `;
 const x1 = parseSingleBooking(splitIntoBookings(XS)[0]);
 eq('AT1 航站楼城市段+B舱官网价', [(x1.segs||[]).length, x1.segs[0].from, x1.segs[0].to, x1.segs[0].cls, x1.segs[0].arrTime, x1.rmb, x1.airline, (x1.pax||[]).length, (x1.unrecognizedLines||[]).length], [1, 'LAX', 'PEK', 'B', '04:40+2', 7065, 'UA', 1, 0]);
+// 中文城市段序号无点（3 UA648）+ 舱位 P+P+K+K 四段
+const YS = String.raw`乘机人：CHEN/YEYUAN
+1. UA892  09月27日  首尔仁川 - 旧金山  16:50  11:40 
+2. UA2345  09月28日  丹佛 - 纽约纽瓦克  06:00  11:46 
+3 UA648  10月28日  纽约纽瓦克 - 旧金山  06:00  09:30 
+4 UA809  10月28日  旧金山 - 马尼拉  15:05  21:10+1  
+SSR DOCS UA HK1 P/CN/EJ2104860/CN/17APR02/M/11APR31/CHEN/YEYUAN/P1
+舱位：P+P+K+K
+01 PFL000VP+*          15886 CNY
+`;
+const y1 = parseSingleBooking(splitIntoBookings(YS)[0]);
+eq('AU1 四段含无点序号+逐段舱位', [(y1.segs||[]).length, JSON.stringify((y1.segs||[]).map(s=>s.cls)), y1.segs[3].to, y1.segs[3].arrTime, y1.rmb, (y1.pax||[]).length, (y1.unrecognizedLines||[]).length], [4, JSON.stringify(['P','P','K','K']), 'MNL', '21:10+1', 15886, 1, 0]);
 process.exit(fails ? 1 : 0);
