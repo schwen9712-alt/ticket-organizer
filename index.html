@@ -7,7 +7,11 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <!-- iPhone Safari / PWA polish -->
-<meta name="theme-color" content="#0C1B2A">
+<meta name="theme-color" content="#5E6AD2">
+<meta name="application-name" content="Ticket Organizer">
+<meta name="apple-mobile-web-app-title" content="出票">
+<meta name="description" content="订单整理工具 · 机票代订出票系统">
+<link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2064%2064"><rect%20width="64"%20height="64"%20rx="14"%20fill="#5E6AD2"/><path%20d="M50%2014%20L36%2030%20L18%2026%20L14%2030%20L28%2036%20L22%2044%20L14%2045%20L12%2048%20L20%2050%20L22%2058%20L25%2056%20L26%2048%20L34%2042%20L40%2056%20L44%2052%20L40%2034%20L52%2020%20Z"%20fill="#fff"/></svg>">
 <meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3033,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.15-EH\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.16-EI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.15-EH</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.16-EI</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -18201,6 +18205,48 @@ function renderPendingList() {
     });
   });
   // Agent highlight is applied to USD rows only - no re-apply needed here
+  _updateTabChrome();   // v-EI 标签页：标题待办数 + favicon 角标
+}
+
+// ═══ 标签页细节（v-EI）：标题前置待出票/加急数，favicon 右上角角标，iOS 主屏图标 ═══
+const _TAB_BASE_TITLE = '订单整理工具 · Ticket Organizer';
+let _tabLast = '';
+function _drawAppIcon(size, badge) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'); const r = size * 0.22;
+  g.fillStyle = '#5E6AD2'; g.beginPath(); g.roundRect(0, 0, size, size, r); g.fill();
+  const p = new Path2D('M50 14 L36 30 L18 26 L14 30 L28 36 L22 44 L14 45 L12 48 L20 50 L22 58 L25 56 L26 48 L34 42 L40 56 L44 52 L40 34 L52 20 Z');
+  g.save(); g.scale(size / 64, size / 64); g.fillStyle = '#fff'; g.fill(p); g.restore();
+  if (badge > 0) {
+    const txt = badge > 99 ? '99+' : String(badge);
+    const bs = size * (txt.length > 2 ? 0.30 : 0.26);
+    g.fillStyle = '#E5484D'; g.beginPath(); g.arc(size - bs * 0.95, bs * 0.95, bs, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#fff'; g.font = `bold ${Math.round(size * (txt.length > 2 ? 0.26 : 0.34))}px -apple-system,Segoe UI,Roboto,sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(txt, size - bs * 0.95, bs * 1.02);
+  }
+  return c;
+}
+function _updateTabChrome() {
+  try {
+    const orders = (typeof STATE !== 'undefined' && Array.isArray(STATE.orders)) ? STATE.orders : [];
+    const n = orders.length;
+    const urgent = orders.filter(o => o && o.urgent).length;
+    const title = (n ? `(${n} 待出票${urgent ? ` · 🔥${urgent}` : ''}) ` : '') + _TAB_BASE_TITLE;
+    if (document.title !== title) document.title = title;
+    const key = n + ':' + urgent;
+    if (key === _tabLast) return;
+    _tabLast = key;
+    const link = document.getElementById('favicon');
+    if (link && typeof Path2D !== 'undefined') {
+      if (!link.dataset.svg) link.dataset.svg = link.href;   // 记住原始 SVG 以便清零时还原
+      if (n > 0) { link.type = 'image/png'; link.href = _drawAppIcon(64, n).toDataURL('image/png'); }
+      else { link.type = 'image/svg+xml'; link.href = link.dataset.svg; }
+    }
+    if (!document.getElementById('appleTouchIcon') && typeof Path2D !== 'undefined') {
+      const l = document.createElement('link'); l.id = 'appleTouchIcon'; l.rel = 'apple-touch-icon'; l.href = _drawAppIcon(180, 0).toDataURL('image/png');
+      document.head.appendChild(l);
+    }
+  } catch (e) {}
 }
 
 // Extract the finalize form + action buttons into a helper so renderPendingList
