@@ -592,4 +592,14 @@ SSR DOCS UA HK1 P/CN/EJ2104860/CN/17APR02/M/11APR31/CHEN/YEYUAN/P1
 `;
 const y1 = parseSingleBooking(splitIntoBookings(YS)[0]);
 eq('AU1 四段含无点序号+逐段舱位', [(y1.segs||[]).length, JSON.stringify((y1.segs||[]).map(s=>s.cls)), y1.segs[3].to, y1.segs[3].arrTime, y1.rmb, (y1.pax||[]).length, (y1.unrecognizedLines||[]).length], [4, JSON.stringify(['P','P','K','K']), 'MNL', '21:10+1', 15886, 1, 0]);
+// 独行"基础经济" + "官网8106元"
+const ZS_ = String.raw`SSR DOCS YY HK1 P/CN/EM4425194/CN/30MAY74/F/16MAY34/LI/XIAOYUE/P1
+1.  UA199  G   FR18SEP  PVGLAX DK1   2010 1700    SEAME ----
+ 2.  UA771  G   SA26SEP  LAXPEK DK1   2255 0440+2    SEAME  7 3
+基础经济
+
+官网8106元
+`;
+const z1 = parseSingleBooking(splitIntoBookings(ZS_)[0]);
+eq('AV1 独行基础经济+官网价', [(z1.segs||[]).length, (z1.pax||[]).length, z1.rmb, z1.cabin, (z1.unrecognizedLines||[]).length], [2, 1, 8106, '基础经济舱', 0]);
 process.exit(fails ? 1 : 0);
