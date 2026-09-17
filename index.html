@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.16-EJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.17-EK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.16-EJ</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.17-EK</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10841,6 +10841,27 @@ function parseSingleBooking(raw) {
       if (/至/.test(trimmed) && /(次经停|直飞)/.test(trimmed) && /时长/.test(trimmed)) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
+      }
+      // ── 分档运价·中文类型词 + 金额 + 币种（v-EK）："大人2761.23 USD 每位" / "婴儿帮忙开开 1856 CNY" ──
+      {
+        const tf = trimmed.match(/^(大人|成人|儿童|小孩|小儿|婴儿)[^\d]{0,14}?(\d{3,6}(?:\.\d+)?)\s*(USD|美元|美金|\$|CNY|RMB|元|人民币)?\s*(?:每位|每人|\/人|一位|一人)?\s*$/);
+        if (tf) {
+          const kind = /大人|成人/.test(tf[1]) ? 'adult' : /婴儿/.test(tf[1]) ? 'infant' : 'child';
+          let amt = parseFloat(tf[2]);
+          const cur = tf[3] || '';
+          if (/USD|美元|美金|\$/.test(cur)) {
+            if (kind === 'adult' && !usd) usd = amt;
+            const rate = (typeof settings !== 'undefined' && settings.rate > 0) ? settings.rate : 7.2;
+            amt = +(amt * rate).toFixed(2);
+          }
+          if (amt >= 100 && amt <= 500000) {
+            if (!parsedFareByType) parsedFareByType = {};
+            if (parsedFareByType[kind] == null) parsedFareByType[kind] = amt;
+            if (kind === 'adult' && !rmb) rmb = amt;
+            _d(trimmed, '💰 FARE', `${kind} ¥${amt}${cur ? ' (' + cur + ')' : ''}`);
+            continue;
+          }
+        }
       }
       // ── 航司名行 "联合航空(UA)"（v-EF）：补航司并静默 ──
       {

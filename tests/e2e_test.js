@@ -167,5 +167,23 @@ SSR DOCS XX HK1  P/CN/A78132530/CN/24FEB26/M/WANG/ADRIAN/P3
   const old = newOrder({ airline: 'B6', discount: 90, basePrice: 2937.6, paxPrices: null, segments: [{ from: 'LAX', to: 'BOS', date: '29SEP', flight: '' }], passengers: [{ name: 'WANG/WENBO', dob: '01AUG97' }, { name: 'LI/WENWEN', dob: '01JUN97' }, { name: 'WANG/ADRIAN', dob: '24FEB26' }] });
   eq('E14 旧单后补婴儿结算层免费', computeFinalPrice(old), Math.round(2937.6 * 0.9 * 2));
 }
+// 第三单：成人 USD×3×90% + 婴儿全价（国际线不免费）
+const AA_ = `第三单    9折 商务加经济 
+
+ 1.  DL039  Z   WE30SEP  LAXPVG DK1   1125 1605+1 D 0  R E 3 1 
+1.  KE660  V   TU27OCT  BKKICN DK1   0950 1705   L 0 RE --2                  
+ 2.  DL172  V   TU27OCT  ICNSLC DK1   1840 1447   D 0 RE 2 --                 
+ 3.  DL1161 V   TU27OCT  SLCLAX DK1   1713 1812     0 RE --3 
+大人2761.23  USD 每位 
+
+婴儿帮忙开开  1856 CNY 
+
+SSR DOCS 航司 HK1 P/CHN/EH7067517/CHN/26NOV99/F/30OCT29/ZHENG/YI/P1
+  SSR DOCS 航司 HK1 P/CHN/EJ4503608/CHN/10MAR00/M/21JUN31/LIN/MING/P1
+ SSR DOCS 航司 HK1 P/CHN/EB6223298/CHN/16MAR77/F/12NOV27/CHEN/HUA/P1
+
+SSR DOCS 航司 HK1 P/USA/A92526755/USA/23MAY26/F/19JUL31/LIN/XIYUE/P1   婴儿
+`;
+{ const { o } = buildOrder(AA_, {}); eq('E15 混币种婴儿全价最终价', computeFinalPrice(o), Math.round(19880.86 * 3 * 0.9 + 1856)); }
 console.log(fails ? `\n✗ e2e 失败 ${fails}` : '\n✓ e2e 全绿');
 process.exit(fails ? 1 : 0);

@@ -602,4 +602,25 @@ const ZS_ = String.raw`SSR DOCS YY HK1 P/CN/EM4425194/CN/30MAY74/F/16MAY34/LI/XI
 `;
 const z1 = parseSingleBooking(splitIntoBookings(ZS_)[0]);
 eq('AV1 独行基础经济+官网价', [(z1.segs||[]).length, (z1.pax||[]).length, z1.rmb, z1.cabin, (z1.unrecognizedLines||[]).length], [2, 1, 8106, '基础经济舱', 0]);
+// 第三单：混舱四段 + 成人 USD 每位 + 婴儿 CNY（噪音词）+ 四 DOCS 含婴儿标
+const AAS = String.raw`第三单    9折 商务加经济 
+
+ 1.  DL039  Z   WE30SEP  LAXPVG DK1   1125 1605+1 D 0  R E 3 1 
+1.  KE660  V   TU27OCT  BKKICN DK1   0950 1705   L 0 RE --2                  
+ 2.  DL172  V   TU27OCT  ICNSLC DK1   1840 1447   D 0 RE 2 --                 
+ 3.  DL1161 V   TU27OCT  SLCLAX DK1   1713 1812     0 RE --3 
+大人2761.23  USD 每位 
+
+婴儿帮忙开开  1856 CNY 
+
+SSR DOCS 航司 HK1 P/CHN/EH7067517/CHN/26NOV99/F/30OCT29/ZHENG/YI/P1
+  SSR DOCS 航司 HK1 P/CHN/EJ4503608/CHN/10MAR00/M/21JUN31/LIN/MING/P1
+ SSR DOCS 航司 HK1 P/CHN/EB6223298/CHN/16MAR77/F/12NOV27/CHEN/HUA/P1
+
+SSR DOCS 航司 HK1 P/USA/A92526755/USA/23MAY26/F/19JUL31/LIN/XIYUE/P1   婴儿
+`;
+const _ab = splitIntoBookings(AAS);
+eq('AW0 分单不裂(序号重置不切)', _ab.length, 1);
+const aa1 = parseSingleBooking(_ab[0]);
+eq('AW1 混币种分档铺价', [(aa1.segs||[]).length, (aa1.pax||[]).length, aa1.pax[3].forcedType, aa1.usd, aa1.rmb, JSON.stringify(aa1.fareByType), JSON.stringify(aa1.paxPrices), aa1.discount, (aa1.unrecognizedLines||[]).length], [4, 4, 'INFANT', 2761.23, 19880.86, JSON.stringify({adult:19880.86,infant:1856}), JSON.stringify([19880.86,19880.86,19880.86,1856]), 90, 0]);
 process.exit(fails ? 1 : 0);
