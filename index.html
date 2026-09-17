@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.17-EK\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.17-EL\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.17-EK</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.17-EL</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9783,6 +9783,7 @@ function parseSingleBooking(raw) {
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
   let _mrzPend = null;        // v-DK 护照机读区（MRZ）姓名行悬挂，等第二行
   let _cabinSeqPend = null;   // v-DT "舱位：I+I+X+X" 出现在段之前时悬挂，段齐后补赋
+  let _enSegPend = null;      // v-EL 官网英文分行版：头行 → 航班行 → 时刻行 状态机
   const _fareLineNos = [];    // v-DZ/EA GDS 运价行序号集合（"02 KLX8IHBI 6593 CNY" → '02'）；规则仅在"唯一一行且为 02"时触发
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
   let _lastFareType = undefined;
@@ -10841,6 +10842,41 @@ function parseSingleBooking(raw) {
       if (/至/.test(trimmed) && /(次经停|直飞)/.test(trimmed) && /时长/.test(trimmed)) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
+      }
+      // ── 官网英文分行版（v-EL）："Beijing (PEK) to Newark (EWR) on Mon, Sep 28" / "United 772" / "12:00 PM to 9:20 AM …" / "Business (P)" ──
+      {
+        const _EN_AL = { UNITED: 'UA', DELTA: 'DL', AMERICAN: 'AA', 'AIR CANADA': 'AC', 'ALASKA': 'AS', JETBLUE: 'B6', 'AIR CHINA': 'CA', 'CATHAY PACIFIC': 'CX', 'ANA': 'NH', 'JAPAN AIRLINES': 'JL', 'EVA AIR': 'BR', 'CHINA EASTERN': 'MU', 'KOREAN AIR': 'KE', 'ASIANA': 'OZ', LUFTHANSA: 'LH', 'AIR FRANCE': 'AF', 'BRITISH AIRWAYS': 'BA' };
+        const eh = trimmed.match(/^[A-Za-z .'\-]+\(([A-Z]{3})\)\s+to\s+[A-Za-z .'\-]+\(([A-Z]{3})\)\s+on\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+([A-Z][a-z]{2})\s+(\d{1,2})\b/i);
+        if (eh) {
+          const mi = _MN3.indexOf(eh[3].toUpperCase());
+          _enSegPend = { from: eh[1].toUpperCase(), to: eh[2].toUpperCase(), date: mi >= 0 ? String(parseInt(eh[4], 10)).padStart(2, '0') + _MN3[mi] : '', flight: '' };   // 总行程头会被下一个头覆盖
+          _d(trimmed, '✅ SEG', `英文头行 ${eh[1]}→${eh[2]}`); continue;
+        }
+        const ef = trimmed.match(/^([A-Za-z][A-Za-z ]{2,20}?)\s+(\d{2,4})\s*$/);
+        if (ef && _enSegPend && _EN_AL[ef[1].trim().toUpperCase()]) {
+          _enSegPend.flight = _EN_AL[ef[1].trim().toUpperCase()] + ef[2];
+          if (!airline) airline = _EN_AL[ef[1].trim().toUpperCase()];
+          _d(trimmed, '✅ SEG', `英文航班行 ${_enSegPend.flight}`); continue;
+        }
+        const et = trimmed.match(/^(\d{1,2}):(\d{2})\s*([AP])M\s+to\s+(\d{1,2}):(\d{2})\s*([AP])M(?:\s+on\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,?\s+([A-Z][a-z]{2})\s+(\d{1,2}))?/i);
+        if (et && _enSegPend && _enSegPend.flight) {
+          const to24 = (h, m, ap) => { let hh = parseInt(h, 10) % 12; if (/p/i.test(ap)) hh += 12; return String(hh).padStart(2, '0') + ':' + m; };
+          const dep = to24(et[1], et[2], et[3]); let arr = to24(et[4], et[5], et[6]);
+          if (et[7] && et[8]) {   // 时刻行自带到达日期：与出发日比较（同日不加，不同则 +N）
+            const mi = _MN3.indexOf(et[7].toUpperCase());
+            const arrDate = mi >= 0 ? String(parseInt(et[8], 10)).padStart(2, '0') + _MN3[mi] : '';
+            if (arrDate && arrDate !== _enSegPend.date) {
+              const dd = (d) => { const m2 = _MN3.indexOf(d.slice(2)); return m2 >= 0 ? new Date(2000, m2, parseInt(d.slice(0, 2), 10)).getTime() : NaN; };
+              const diff = Math.round((dd(arrDate) - dd(_enSegPend.date)) / 864e5);
+              if (diff > 0) arr += '+' + diff;
+            }
+          } else if (arr < dep) arr += '+1';
+          segs.push({ from: _enSegPend.from, to: _enSegPend.to, date: _enSegPend.date, flight: _enSegPend.flight, cls: '', depTime: dep, arrTime: arr });
+          _d(trimmed, '✅ SEG', `英文时刻行 ${dep}-${arr}`); _enSegPend = null; continue;
+        }
+        const ec = trimmed.match(/^(Business|First|Economy|Premium(?:\s+Plus|\s+Economy)?|Polaris)\s*\(([A-Z])\)\s*$/i);
+        if (ec) { if (segs.length && !segs[segs.length - 1].cls) segs[segs.length - 1].cls = ec[2].toUpperCase(); _d(trimmed, '✅ SEG', `英文舱位 ${ec[2]}`); continue; }
+        if (/^(Boeing|Airbus|Embraer|Bombardier)\s+[A-Z0-9-]+|^LAYOVER\s+IN\b|^Operated by\b/i.test(trimmed)) { _d(trimmed, '✅ SEG', '英文行程噪音'); continue; }
       }
       // ── 分档运价·中文类型词 + 金额 + 币种（v-EK）："大人2761.23 USD 每位" / "婴儿帮忙开开 1856 CNY" ──
       {

@@ -623,4 +623,23 @@ const _ab = splitIntoBookings(AAS);
 eq('AW0 分单不裂(序号重置不切)', _ab.length, 1);
 const aa1 = parseSingleBooking(_ab[0]);
 eq('AW1 混币种分档铺价', [(aa1.segs||[]).length, (aa1.pax||[]).length, aa1.pax[3].forcedType, aa1.usd, aa1.rmb, JSON.stringify(aa1.fareByType), JSON.stringify(aa1.paxPrices), aa1.discount, (aa1.unrecognizedLines||[]).length], [4, 4, 'INFANT', 2761.23, 19880.86, JSON.stringify({adult:19880.86,infant:1856}), JSON.stringify([19880.86,19880.86,19880.86,1856]), 90, 0]);
+// 官网英文分行版（Chase Travel / united.com 详情页）
+const ABS = String.raw`Beijing (PEK) to Newark (EWR) on Mon, Sep 28
+Beijing (PEK) to Los Angeles (LAX) on Mon, Sep 28
+United 772
+12:00 PM to 9:20 AM on Mon, Sep 28 (12h 20m)
+Boeing 787
+Business (P)
+LAYOVER IN LAX (11H 40M)
+Los Angeles (LAX) to Newark (EWR) on Mon, Sep 28
+United 2397
+9:00 PM to 5:13 AM (5h 13m)
+Boeing 777
+Business (P)
+
+TOTAL USD 3,412.43
+`;
+const ab1 = parseSingleBooking(splitIntoBookings(ABS)[0]);
+eq('AX1 英文分行版两段+舱位+同日到达', [JSON.stringify((ab1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime,s.cls])), ab1.airline, ab1.usd, ab1.cabin, (ab1.unrecognizedLines||[]).length],
+   [JSON.stringify([['UA772','PEK','LAX','28SEP','12:00','09:20','P'],['UA2397','LAX','EWR','28SEP','21:00','05:13+1','P']]), 'UA', 3412.43, '商务舱', 0]);
 process.exit(fails ? 1 : 0);
