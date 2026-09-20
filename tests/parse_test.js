@@ -659,4 +659,16 @@ const ay2 = parseSingleBooking(splitIntoBookings("1.zhang/san 2.li/si\n 3.  UA85
 eq('AY2 名单小写归一', (ay2.pax||[]).map(p=>p.name).join(','), 'ZHANG/SAN,LI/SI');
 const ay3 = parseSingleBooking(splitIntoBookings(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n婴儿\nSSR DOCS UA HK1 P/CN/E2/CN/05MAY26/F/01JAN30/WANG/BAO/P1\nTOTAL CNY 5000")[0]);
 eq('AY3 SSR 消费独行婴儿标签', [ay3.pax[0].forcedType, ay3.rmb], ['INFANT', 5000]);
+// 证件行尾括号常旅客号 + 小写 p1 + 含税元/人 + 退改规则行
+const ADS = String.raw`P/US/A62748268/US/14OCT74/F/10JUL35/ZHOU/LIYA/p1
+P/US/A62747889/USA/23OCT03/M/09JUL35/ZHANG/HAOHAN（UA:SLS66059）
+P/CN/EJ1525540/CN/03JUL65/M/26AUG30/ZHANG/YOUHUA/P1
+
+联合航空(UA)
+1. UA2477  09月29日  纽约纽瓦克 - 圣安娜约翰维纳 SNA  14:31  17:20
+含税：3513元/人 , 无免费托运行李
+机票可改不退
+`;
+const adz1 = parseSingleBooking(splitIntoBookings(ADS)[0]);
+eq('AZ1 三证件(含括号尾/小写p1)+含税价', [(adz1.pax||[]).length, adz1.pax[1].name, adz1.pax[1].dob, adz1.pax[1].gender, adz1.rmb, (adz1.segs||[]).length, adz1.segs[0].to, (adz1.unrecognizedLines||[]).length], [3, 'ZHANG/HAOHAN', '23OCT03', 'MALE', 3513, 1, 'SNA', 0]);
 process.exit(fails ? 1 : 0);
