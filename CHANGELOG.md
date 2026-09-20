@@ -1,3 +1,13 @@
+## 2026-09-20 — 解析器：Travelport（Apollo/Galileo）段行 + 矩阵 v4 两处修复 · v26.09.20-EM
+
+样本第 3 单：`1 DL  27G 03OCT 6 ATLICN SS1  2335  0415   05OCT 1 /DCDL /E`（Travelport 格式：航班号与舱位粘连、星期数字、SS 状态、到达日期、/DC 尾）——新分支，到达日期与出发日相差 N 天则 +N；`第3单 89` 裸数折扣与 `超级经济+经济2PC结算 13190CNY/人` 既通。产出：DL27 G ATL→ICN 0415+2、KE831 Q ICN→SHE，89 折，¥13,190/人，两客。**矩阵 v4 修复**：①名单小写（`1.zhang/san`）——归一化层"姓/名"token 大写；②独行"婴儿"标签在 SSR DOCS 前不生效——此前仅裸 P/ 分支消费 _docTypePend，SSR 分支补消费。
+
+**测试**：AY 3 · run_all 全部门槛通过（parse 118 · variant 224/0）。
+
+**改动位置**：Travelport 分支；_normalizeRaw ②c；SSR 分支 _docTypePend 消费；dtag 后置模式不设 pend（首发触发 H2 回归：后置词被当护照标签致成人标婴儿——门槛拦住、修正重发）。**流程修正**：发货调用 run_all 改为直跑判退出码，不经管道（DU 事故同类，再犯一次）。
+
+**回滚**：.backups/ 上一版。**上线自检**：贴本样本——两段（DL27 G / KE831 Q）、89 折、¥13,190、两客。
+---
 ## 2026-09-17 — 解析器：官网英文分行版行程（Chase Travel / united.com 详情页） · v26.09.17-EL
 
 样本为 UA 官网/Chase Travel 详情页复制的分行英文行程（此前仅收编粘连版）：总行程头行 + 每段"City (XXX) to City (YYY) on Mon, Sep 28" / "United 772" / "12:00 PM to 9:20 AM on Mon, Sep 28 (12h 20m)" / "Boeing 787" / "Business (P)" / "LAYOVER IN LAX"。实现状态机：头行悬挂（总行程头被下一头覆盖）→ 航班行（英文航司名→二字码表：United/Delta/American/Air Canada/Cathay/ANA/JAL/EVA/Korean…）→ 时刻行产段（12h→24h；**到达日期判定**：时刻行自带 "on 日期" 则与出发日比较，同日不加、跨日 +N；无日期时到达早于出发即 +1）→ 舱位行回填上一段 cls；机型/中转/承运噪音静默。`TOTAL USD 3,412.43` 千分位既通。产出：UA772 PEK→LAX 12:00–09:20（同日，时差）、UA2397 LAX→EWR 21:00–05:13+1，P 舱商务，$3,412.43。

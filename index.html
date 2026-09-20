@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.17-EL\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.20-EM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.17-EL</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.20-EM</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9431,6 +9431,8 @@ function _normalizeRaw(raw) {
   }).join('\n');
   // ②b 航班号 token 级大写（"ua123" → "UA123"，与日期不同行时亦生效；英文中两字母+数字组合极少，无误伤）
   s = s.replace(/\b([a-z]{2})(\d{2,4})\b/g, (m, a, n) => a.toUpperCase() + n);
+  // ②c "姓/名" token 大写（"1.zhang/san" → "1.ZHANG/SAN"；英文里 and/or 之类被大写无碍解析）
+  s = s.replace(/\b([a-z]{2,})\/([a-z]{2,})\b/g, (m, a, b) => a.toUpperCase() + '/' + b.toUpperCase());
   // ③ 多空格/制表符压缩为单空格（行首缩进保留一个；换行保留）
   s = s.replace(/[ \t]{2,}/g, ' ');
   return s;
@@ -10843,6 +10845,23 @@ function parseSingleBooking(raw) {
         _d(trimmed, '⏭ SKIP', 'OD 总览行');
         continue;
       }
+      // ── Travelport（Apollo/Galileo）段行（v-EM）："1 DL  27G 03OCT 6 ATLICN SS1  2335  0415   05OCT 1 /DCDL /E" ──
+      {
+        const tp = trimmed.match(/^(\d{1,2})\s+([A-Z0-9]{2})\s+(\d{1,4})([A-Z])\s+(\d{2}[A-Z]{3})\s+\d\s+([A-Z]{3})([A-Z]{3})\s+(?:SS|HK|DK|GK|LL|UN|TK|KK|HL)\d\s+(\d{4})\s+(\d{4})(?:\s+(\d{2}[A-Z]{3})\s+\d)?(?:\s+\/DC[A-Z0-9]{2})?(?:\s+\/E)?\s*$/i);
+        if (tp) {
+          const al = tp[2].toUpperCase(), date = tp[5].toUpperCase();
+          let arr = tp[9];
+          if (tp[10]) {   // 到达日期 ≠ 出发日期 → +N
+            const dd = (d) => { const mi = _MN3.indexOf(d.slice(2).toUpperCase()); return mi >= 0 ? new Date(2000, mi, parseInt(d.slice(0, 2), 10)).getTime() : NaN; };
+            const diff = Math.round((dd(tp[10].toUpperCase()) - dd(date)) / 864e5);
+            if (diff > 0) arr += '+' + diff;
+          }
+          segs.push({ from: tp[6].toUpperCase(), to: tp[7].toUpperCase(), date, flight: al + tp[3], cls: tp[4].toUpperCase(), depTime: tp[8], arrTime: arr });
+          if (!airline) airline = al;
+          _d(trimmed, '✅ SEG', `Travelport 段 ${al}${tp[3]} ${tp[6]}→${tp[7]}`);
+          continue;
+        }
+      }
       // ── 官网英文分行版（v-EL）："Beijing (PEK) to Newark (EWR) on Mon, Sep 28" / "United 772" / "12:00 PM to 9:20 AM …" / "Business (P)" ──
       {
         const _EN_AL = { UNITED: 'UA', DELTA: 'DL', AMERICAN: 'AA', 'AIR CANADA': 'AC', 'ALASKA': 'AS', JETBLUE: 'B6', 'AIR CHINA': 'CA', 'CATHAY PACIFIC': 'CX', 'ANA': 'NH', 'JAPAN AIRLINES': 'JL', 'EVA AIR': 'BR', 'CHINA EASTERN': 'MU', 'KOREAN AIR': 'KE', 'ASIANA': 'OZ', LUFTHANSA: 'LH', 'AIR FRANCE': 'AF', 'BRITISH AIRWAYS': 'BA' };
@@ -11665,6 +11684,10 @@ function parseSingleBooking(raw) {
         if (/(儿童|小孩|小儿|CHD|CHILD)/i.test(ssrMatch[6])) ssrFt = 'CHILD';
         else if (/(婴儿|INF)/i.test(ssrMatch[6])) ssrFt = 'INFANT';
       }
+      if (!ssrFt && _docTypePend) {   // v-EM：独行"婴儿/儿童"前置标签亦被 SSR 分支消费（此前仅裸 P/ 分支消费）
+        ssrFt = _docTypePend === '婴儿' ? 'INFANT' : /儿童|小孩|小儿|小/.test(_docTypePend) ? 'CHILD' : null;
+        _docTypePend = null;
+      }
       const name = _stripTitle(`${surname}/${given}`);   // v-EC
       let existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
@@ -11719,7 +11742,8 @@ function parseSingleBooking(raw) {
           _d(trimmed, '💰 FARE', '运价前置类型 → ' + _lastFareType);
           continue;
         }
-        _docTypePend = dtag[1]; continue;
+        if (!(_fareTypeMode === 'post' && /^TOTAL\b/i.test(_pv))) _docTypePend = dtag[1];   // v-EM：后置运价词（属上块 TOTAL）不作护照前置标签
+        continue;
       }
       // SEL 票价基础行（IN=婴儿 / CH=儿童 fare basis 标识）：定型信号 + 静默
       {

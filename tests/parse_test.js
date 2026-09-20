@@ -642,4 +642,21 @@ TOTAL USD 3,412.43
 const ab1 = parseSingleBooking(splitIntoBookings(ABS)[0]);
 eq('AX1 英文分行版两段+舱位+同日到达', [JSON.stringify((ab1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime,s.cls])), ab1.airline, ab1.usd, ab1.cabin, (ab1.unrecognizedLines||[]).length],
    [JSON.stringify([['UA772','PEK','LAX','28SEP','12:00','09:20','P'],['UA2397','LAX','EWR','28SEP','21:00','05:13+1','P']]), 'UA', 3412.43, '商务舱', 0]);
+// Travelport 段 + 裸数折扣 + 混舱结算行；名单小写；SSR 消费独行婴儿标签
+const ACS = String.raw`第3单   89
+
+1 DL  27G 03OCT 6 ATLICN SS1  2335  0415   05OCT 1 /DCDL /E
+ 2 KE 831Q 05OCT 1 ICNSHE SS1  0805  0855  /DCKE 
+
+SSR DOCS 航司 HK1 P/CHN/EJ2408637/CHN/04AUG58/M/31MAR30/HAN/RUI/P1
+SSR DOCS 航司 HK1 P/USA/569606205/USA/30NOV74/F/12NOV27/LU/HAIYAN/P1
+
+超级经济+经济2PC结算 13190CNY/人
+`;
+const ac1 = parseSingleBooking(splitIntoBookings(ACS)[0]);
+eq('AY1 Travelport 两段(到达+2)+89折+结算价', [JSON.stringify((ac1.segs||[]).map(s=>[s.flight,s.cls,s.from,s.to,s.date,s.arrTime])), ac1.airline, ac1.discount, ac1.rmb, (ac1.pax||[]).length, (ac1.unrecognizedLines||[]).length], [JSON.stringify([['DL27','G','ATL','ICN','03OCT','0415+2'],['KE831','Q','ICN','SHE','05OCT','0855']]), 'DL', 89, 13190, 2, 0]);
+const ay2 = parseSingleBooking(splitIntoBookings("1.zhang/san 2.li/si\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nTOTAL CNY 5000")[0]);
+eq('AY2 名单小写归一', (ay2.pax||[]).map(p=>p.name).join(','), 'ZHANG/SAN,LI/SI');
+const ay3 = parseSingleBooking(splitIntoBookings(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n婴儿\nSSR DOCS UA HK1 P/CN/E2/CN/05MAY26/F/01JAN30/WANG/BAO/P1\nTOTAL CNY 5000")[0]);
+eq('AY3 SSR 消费独行婴儿标签', [ay3.pax[0].forcedType, ay3.rmb], ['INFANT', 5000]);
 process.exit(fails ? 1 : 0);
