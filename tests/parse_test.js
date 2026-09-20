@@ -671,4 +671,16 @@ P/CN/EJ1525540/CN/03JUL65/M/26AUG30/ZHANG/YOUHUA/P1
 `;
 const adz1 = parseSingleBooking(splitIntoBookings(ADS)[0]);
 eq('AZ1 三证件(含括号尾/小写p1)+含税价', [(adz1.pax||[]).length, adz1.pax[1].name, adz1.pax[1].dob, adz1.pax[1].gender, adz1.rmb, (adz1.segs||[]).length, adz1.segs[0].to, (adz1.unrecognizedLines||[]).length], [3, 'ZHANG/HAOHAN', '23OCT03', 'MALE', 3513, 1, 'SNA', 0]);
+// SSR ODCS 错拼 + 名尾 CHD + Z+Z 无前缀舱位 + 类型词前缀运价行
+const AES = String.raw`乘机人： 1.ZHENG/TIANYUAN 2.ZHU/CHULING CHD
+1. NH182  12月20日  东京成田 - 火奴鲁鲁  21:10  09:10 
+2. UA8011  12月27日  火奴鲁鲁 - 东京成田  11:30  15:45+1 
+Z+Z
+成人：01 ZLRNI1+*            16737 CNY                   
+儿童01 ZLRNI1+*       CNN  13475 CNY                   
+SSR DOCS UA HK1 P/CN/EG8761389/CN/04JUL91/M/27AUG29/ZHENG/TIANYUAN/P1
+SSR ODCS UA HK1 P/CN/EJ7116106/CN/08AUG15/F/27JAN28/ZHU/CHULING CHD/P2
+`;
+const ae1 = parseSingleBooking(splitIntoBookings(AES)[0]);
+eq('BA1 儿童单两人合并+分档+舱位', [(ae1.pax||[]).length, ae1.pax[1].name, ae1.pax[1].dob, ae1.pax[1].forcedType, JSON.stringify((ae1.segs||[]).map(s=>s.cls)), JSON.stringify(ae1.fareByType), JSON.stringify(ae1.paxPrices), (ae1.unrecognizedLines||[]).length], [2, 'ZHU/CHULING', '08AUG15', 'CHILD', JSON.stringify(['Z','Z']), JSON.stringify({adult:16737,child:13475}), JSON.stringify([16737,13475]), 0]);
 process.exit(fails ? 1 : 0);
