@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.20-EO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.22-EP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.20-EO</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.22-EP</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14599,9 +14599,11 @@ function renderAirlineUsdPanel(orders) {
   // Group by AIRLINE, sorted small→large within each group
   // Airlines ordered by total USD descending (biggest first)
   // Apply agent filter if active
-  const filteredIndexed = _usdAgentFilter
+  let filteredIndexed = _usdAgentFilter
     ? indexed.filter(item => (item.o.agent || '(未指定)') === _usdAgentFilter)
     : indexed;
+  if (_usdAirlineFilter) filteredIndexed = filteredIndexed.filter(item => String(item.o.airline || '').toUpperCase() === _usdAirlineFilter);   // v-EP
+  renderAirlineQuickBar(indexed.map(x => x.o));
 
   const byAirlineMap = {};
   filteredIndexed.forEach(item => {
@@ -15045,7 +15047,24 @@ function applyAgentHighlight(agent) {
 
 // ── Agent summary bar — clickable chips to filter USD rows by agent ──────────
 let _usdAgentFilter = null;  // null = show all
+let _usdAirlineFilter = null;  // v-EP 航司快切：null = 全部
 
+// v-EP 航司快切条：全部 N · UA n · DL n …（与代理条同款交互）
+function renderAirlineQuickBar(orders) {
+  let bar = document.getElementById('airlineQuickBar');
+  const host = document.getElementById('agentSummaryBar');
+  if (!host) return;
+  if (!bar) { bar = document.createElement('div'); bar.id = 'airlineQuickBar'; host.insertAdjacentElement('afterend', bar); }
+  const cnt = {};
+  orders.forEach(o => { const al = String(o.airline || '').toUpperCase() || '??'; cnt[al] = (cnt[al] || 0) + 1; });
+  const als = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b));
+  if (als.length <= 1) { bar.innerHTML = ''; return; }
+  const chip = (label, count, active, onclick) => `<button onclick="${onclick}" style="display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:999px; border:1.5px solid ${active ? 'var(--accent-deep)' : 'var(--line)'}; background:${active ? 'var(--accent-deep)' : '#fff'}; color:${active ? '#fff' : 'var(--ink)'}; font-size:12px; font-weight:700; cursor:pointer; margin:0 4px 0 0;">${label}<span style="font-family:'JetBrains Mono',monospace; font-size:11px; opacity:${active ? 0.85 : 0.6};">${count}</span></button>`;
+  bar.style.cssText = 'display:flex; align-items:center; flex-wrap:wrap; gap:4px; padding:6px 10px 2px; font-size:12px;';
+  bar.innerHTML = `<span style="color:var(--muted); margin-right:6px;">航司</span>` +
+    chip('全部', orders.length, _usdAirlineFilter === null, "window._usdAirlineFilter=null; renderAirlineUsdPanel()") +
+    als.map(al => chip(al, cnt[al], _usdAirlineFilter === al, `window._usdAirlineFilter='${al}'; renderAirlineUsdPanel()`)).join('');
+}
 function renderAgentSummaryBar(orders) {
   const bar = document.getElementById('agentSummaryBar');
   if (!bar) return;
