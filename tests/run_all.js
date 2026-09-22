@@ -18,6 +18,7 @@ step("parse_test", () => { const out = run("parse_test.js"); const bad = (out.ma
 step("e2e_test", () => { const out = run("e2e_test.js"); if (!/e2e 全绿/.test(out)) throw new Error(out.split("\n").filter(l => l.startsWith("✗")).join("\n")); return (out.match(/^✓/gm) || []).length + " 断言"; });
 step("report_test", () => { const out = run("report_test.js"); if (!/报表 e2e 全绿/.test(out)) throw new Error(out.split("\n").filter(l => l.startsWith("✗")).join("\n")); return (out.match(/^✓/gm) || []).length + " 断言"; });
 step("consistency_audit", () => run("consistency_audit.js").trim());
+step("ui_guard（功能存在性守卫）", () => run("ui_guard.js").trim());
 step("variant_test（形态变体模糊）", () => { const out = run("variant_test.js"); return out.split("\n")[0]; });
 
 step("语法块审计", () => {
