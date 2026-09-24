@@ -19,6 +19,9 @@ const variants = {
   "航班号小写": (s) => s.replace(/\b([A-Z]{2})(\d{2,4})\b/g, (m, a, n) => a.toLowerCase() + n),
   "首尾空行": (s) => "\n\n" + s + "\n\n",
   "制表符代替多空格": (s) => s.replace(/ {2,}/g, "\t"),
+  "零宽字符": (s) => s.replace(/ /g, " \u200B"),
+  "NBSP 空格": (s) => s.replace(/ /g, "\u00A0"),
+  "全角波浪时刻": (s) => s.replace(/(\d{2}:\d{2})-(\d{2}:\d{2})/g, "$1～$2"),
 };
 const key = (r) => JSON.stringify([(r.pax || []).length, (r.segs || []).length, r.rmb ?? null, r.usd ?? null]);
 const P = (raw) => { const b = splitIntoBookings(raw); return b.map(c => parseSingleBooking(c)); };

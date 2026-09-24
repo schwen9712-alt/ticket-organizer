@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.24-ES\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.24-ET\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.24-ES</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.24-ET</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9418,6 +9418,8 @@ function _wechatClean(raw) {
 function _normalizeRaw(raw) {
   let s = String(raw || '');
   if (s.charCodeAt(0) === 0xFEFF) s = s.slice(1);
+  // ⓪ 隐形字符（微信/网页复制常带）：零宽空格/连接符/BOM/软连字符 → 删；NBSP → 普通空格；全角波浪/句点 → 半角（v-ET）
+  s = s.replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g, '').replace(/\u00A0/g, ' ').replace(/～/g, '~').replace(/．/g, '.');
   // ① 全角 → 半角：数字、冒号、空格、常见标点
   s = s.replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF10 + 48))
        .replace(/[Ａ-Ｚａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFF21 + 65 + (c.charCodeAt(0) >= 0xFF41 ? 32 : 0)))
