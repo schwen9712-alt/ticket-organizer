@@ -691,4 +691,12 @@ SSR DOCS  UA HK1 P/CN/HJ2394462/CN/04JUL68/F/06MAR34/KWOK/CHING SHUN/P1
 `;
 const af1 = parseSingleBooking(splitIntoBookings(AFS)[0]);
 eq('BB1 金额前置官网价+舱位词', [af1.rmb, af1.cabin, (af1.segs||[]).length, af1.pax[0].name, (af1.unrecognizedLines||[]).length], [10195, '超级经济舱', 1, 'KWOK/CHING SHUN', 0]);
+// 速记·点分日期 + 航司航班号分开 + 中文城市对
+const AGS = String.raw`9.25 UA 892 首尔-旧金山 16:50-11:40
+10.05 UA 285 纽瓦克-首尔 10:35-15:20
+
+TOTAL USD 4400
+`;
+const ag1 = parseSingleBooking(splitIntoBookings(AGS)[0]);
+eq('BC1 点分日期速记两段+USD', [JSON.stringify((ag1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime])), ag1.airline, ag1.usd, (ag1.unrecognizedLines||[]).length], [JSON.stringify([['UA892','ICN','SFO','25SEP','16:50','11:40'],['UA285','EWR','ICN','05OCT','10:35','15:20']]), 'UA', 4400, 0]);
 process.exit(fails ? 1 : 0);
