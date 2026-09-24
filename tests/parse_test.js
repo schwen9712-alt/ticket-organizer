@@ -699,4 +699,12 @@ TOTAL USD 4400
 `;
 const ag1 = parseSingleBooking(splitIntoBookings(AGS)[0]);
 eq('BC1 点分日期速记两段+USD', [JSON.stringify((ag1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime])), ag1.airline, ag1.usd, (ag1.unrecognizedLines||[]).length], [JSON.stringify([['UA892','ICN','SFO','25SEP','16:50','11:40'],['UA285','EWR','ICN','05OCT','10:35','15:20']]), 'UA', 4400, 0]);
+// SSR 名后 /H/ 额外字段 + 乘机人列表带 MS + 运价行尾中文备注
+const AHS = String.raw`乘机人： 1.WU/HONGYAN MS
+1. DL2139  09月27日  波特兰 - 纽约肯尼迪  22:00  06:28+1 
+SSR DOCS DL HK1 P/CN/EK2012076/CN/08APR82/F/02APR33/WU/HONGYAN/H/P1
+02 UA0NA0MC            3642 CNY 这个帮忙出
+`;
+const ah1 = parseSingleBooking(splitIntoBookings(AHS)[0]);
+eq('BD1 /H/字段+剥MS+尾注运价', [(ah1.pax||[]).length, ah1.pax[0].name, ah1.pax[0].dob, ah1.pax[0].gender, ah1.rmb, (ah1.segs||[]).length, (ah1.unrecognizedLines||[]).length], [1, 'WU/HONGYAN', '08APR82', 'FEMALE', 3642, 1, 0]);
 process.exit(fails ? 1 : 0);
