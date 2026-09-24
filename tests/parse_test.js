@@ -683,4 +683,12 @@ SSR ODCS UA HK1 P/CN/EJ7116106/CN/08AUG15/F/27JAN28/ZHU/CHULING CHD/P2
 `;
 const ae1 = parseSingleBooking(splitIntoBookings(AES)[0]);
 eq('BA1 儿童单两人合并+分档+舱位', [(ae1.pax||[]).length, ae1.pax[1].name, ae1.pax[1].dob, ae1.pax[1].forcedType, JSON.stringify((ae1.segs||[]).map(s=>s.cls)), JSON.stringify(ae1.fareByType), JSON.stringify(ae1.paxPrices), (ae1.unrecognizedLines||[]).length], [2, 'ZHU/CHULING', '08AUG15', 'CHILD', JSON.stringify(['Z','Z']), JSON.stringify({adult:16737,child:13475}), JSON.stringify([16737,13475]), 0]);
+// 金额前置官网价 "10195官网 超经"
+const AFS = String.raw`1.  UA672  R   TH24SEP  SFOBCN DK1   1730   1355+1 789  0   ----
+10195官网  超经
+
+SSR DOCS  UA HK1 P/CN/HJ2394462/CN/04JUL68/F/06MAR34/KWOK/CHING SHUN/P1
+`;
+const af1 = parseSingleBooking(splitIntoBookings(AFS)[0]);
+eq('BB1 金额前置官网价+舱位词', [af1.rmb, af1.cabin, (af1.segs||[]).length, af1.pax[0].name, (af1.unrecognizedLines||[]).length], [10195, '超级经济舱', 1, 'KWOK/CHING SHUN', 0]);
 process.exit(fails ? 1 : 0);

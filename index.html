@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.22-EQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.24-ER\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.22-EQ</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.24-ER</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -10934,6 +10934,18 @@ function parseSingleBooking(raw) {
           if (c) { if (segs.length) segs.forEach(s => { if (!s.cls) s.cls = c; }); else _cabinSeqPend = [c]; }
           if (!rmb && amt >= 100 && amt <= 500000) rmb = amt;
           _d(trimmed, '💰 RMB', `${c ? c + '舱 ' : ''}官网 ¥${amt}`);
+          continue;
+        }
+      }
+      // ── 金额前置官网价 "10195官网 超经" / "8106元 官网 商务"（v-ER）：金额 + 官网/票价词 + 可选舱位词 ──
+      {
+        const pf = trimmed.match(/^(\d{3,6}(?:\.\d+)?)\s*(?:元|CNY|RMB)?\s*(?:官网价|官网|票价|价格|运价)\s*(基础经济舱?|超级经济舱?|超经|经济舱?|商务舱?|公务舱?|头等舱?)?\s*$/);
+        if (pf) {
+          const amt = parseFloat(pf[1]);
+          if (!rmb && amt >= 100 && amt <= 500000) rmb = amt;
+          const cw = pf[2] || '';
+          if (cw && parsedCabin === undefined) parsedCabin = /基础/.test(cw) ? '基础经济舱' : /超/.test(cw) ? '超级经济舱' : /商务|公务/.test(cw) ? '商务舱' : /头等/.test(cw) ? '头等舱' : '经济舱';
+          _d(trimmed, '💰 RMB', `官网 ¥${amt}${cw ? ' ' + cw : ''}`);
           continue;
         }
       }
