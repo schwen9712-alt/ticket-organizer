@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.25-EV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.25-EW\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EV</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EW</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13213,6 +13213,8 @@ function parseSingleBooking(raw) {
     if (_dom && rmb > 0 && pax.length > 1 && !(parsedFareByType && Object.keys(parsedFareByType).length) && parsedPaxPrices === undefined
         && pax.some(p => p.forcedType === 'INFANT' || /^\d{1,2}[A-Z]{3}(2[5-9]|3\d)$/i.test(p.dob || ''))) parsedFareByType = { adult: rmb };
   }
+  // v-EW ①：有分档（儿童/婴儿）但缺成人档时，"运价/总价"即成人价
+  if (parsedFareByType && Object.keys(parsedFareByType).length > 0 && parsedFareByType.adult == null && rmb > 0) parsedFareByType.adult = rmb;
   if (parsedFareByType && Object.keys(parsedFareByType).length > 0 && pax.length > 0 && parsedPaxPrices === undefined) {
     const firstSegDate = segs.length > 0 ? segs[0].date : null;
     const MONTH_MAP2 = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
@@ -13250,6 +13252,12 @@ function parseSingleBooking(raw) {
       pax.length = 0; merged.forEach(p => pax.push(p));
     }
     if (_cabinSeqPend && segs.length) { if (_cabinSeqPend.length === 1) segs.forEach(s => { if (!s.cls) s.cls = _cabinSeqPend[0]; }); else _cabinSeqPend.forEach((c, k) => { if (segs[k] && !segs[k].cls) segs[k].cls = c; }); _cabinSeqPend = null; }
+    // v-EW ②：2–4 岁孩子——报文只有儿童价没有婴儿价时归儿童（价格档决定类型）；<2 岁一律婴儿；有婴儿价才按 48 个月口径归婴儿
+    pax.forEach(p => {
+      const a = getAgeAtFlight(p.dob);
+      if (a === null) return;
+      if (a >= 2 && a < 4 && parsedFareByType.infant == null && parsedFareByType.child != null) p.forcedType = 'CHILD';
+    });
     // v-DO 用户规则：美国航司的美国境内行程，怀抱婴儿（起飞日未满 2 岁）票免费
     const _US_CARRIERS = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
     const _usDomestic = segs.length > 0 && _US_CARRIERS.has(String(airline || '').toUpperCase())

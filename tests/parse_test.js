@@ -721,4 +721,16 @@ SSR DOCS UA HK1 P/CN/EE9860539/CN/26MAR02/F/20DEC28/MA/NINGSHAN/P1
 `;
 const ai1 = parseSingleBooking(splitIntoBookings(AIS)[0]);
 eq('BE1 重复段合并补全+拼音名合并', [(ai1.segs||[]).length, ai1.segs[0].cls, ai1.segs[0].arrTime, (ai1.pax||[]).length, ai1.pax[0].name, ai1.pax[0].dob, ai1.rmb, (ai1.unrecognizedLines||[]).length], [3, 'P', '0500+2', 1, 'MA/NINGSHAN', '26MAR02', 23227, 0]);
+// 运价=成人档补全 + 2–4 岁按价格档归儿童
+const AJS = String.raw`PAN/XIN  男  02FEB95
+TANG/KUNHAN  女  22NOV95
+PAN/JASPER  男  29AUG24
+ 1.  DL172  I   TH01OCT  ICNSLC DK1   1920   1524   
+ 2.  DL3744 I   SA03OCT  SLCONT DK1   1535   1635   
+运价 ： 21050
+儿童运价：21020
+======
+`;
+const aj1 = parseSingleBooking(splitIntoBookings(AJS)[0]);
+eq('BF1 成人档补全+2岁儿童归类+铺价', [(aj1.pax||[]).length, aj1.pax[2].forcedType, JSON.stringify(aj1.fareByType), JSON.stringify(aj1.paxPrices), aj1.rmb, (aj1.segs||[]).length, (aj1.unrecognizedLines||[]).length], [3, 'CHILD', JSON.stringify({child:21020,adult:21050}), JSON.stringify([21050,21050,21020]), 21050, 2, 0]);
 process.exit(fails ? 1 : 0);
