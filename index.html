@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.24-EU\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.25-EV\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.24-EU</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EV</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -13239,7 +13239,16 @@ function parseSingleBooking(raw) {
       if (String(airline || '').toUpperCase() === 'UA' && _fareLineNos.length === 1 && _fareLineNos[0] === '02' && parsedCabin === undefined && segs.length
           && segs.every(s => !s.cls || _UA_ECON.has(String(s.cls).toUpperCase()))) parsedCabin = '基础经济舱';
     }
-    pax.forEach(p => { if (p && p.name) p.name = _stripTitle(p.name); });   // v-EU 组装阶段统一剥称谓/类型标签（覆盖所有入列路径）
+    pax.forEach(p => {
+      if (!p || !p.name) return;
+      if (/[\u4e00-\u9fa5]/.test(p.name)) { const pm = p.name.match(/([A-Z]{2,}(?:\s[A-Z]+)*\/[A-Z]+(?:\s[A-Z]+)*)/); if (pm) p.name = pm[1]; }   // v-EV "1.马宁杉 MA/NINGSHAN" → 拼音名
+      p.name = _stripTitle(p.name);   // v-EU 组装阶段统一剥称谓/类型标签（覆盖所有入列路径）
+    });
+    {   // v-EV 组装阶段同人合并（归一键相同者合并资料，保留先到位置）
+      const merged = [];
+      pax.forEach(p => { const ex = merged.find(q => _sameName(q.name, p.name)); if (!ex) merged.push(p); else { for (const k of ['dob', 'gender', 'forcedType', 'passportExpiry', 'paxType']) if (p[k] && !ex[k]) ex[k] = p[k]; if (!ex.name.includes('/') && p.name.includes('/')) ex.name = p.name; } });
+      pax.length = 0; merged.forEach(p => pax.push(p));
+    }
     if (_cabinSeqPend && segs.length) { if (_cabinSeqPend.length === 1) segs.forEach(s => { if (!s.cls) s.cls = _cabinSeqPend[0]; }); else _cabinSeqPend.forEach((c, k) => { if (segs[k] && !segs[k].cls) segs[k].cls = c; }); _cabinSeqPend = null; }
     // v-DO 用户规则：美国航司的美国境内行程，怀抱婴儿（起飞日未满 2 岁）票免费
     const _US_CARRIERS = new Set(['UA','AA','DL','AS','B6','WN','NK','F9','HA','G4','SY']);
@@ -13286,13 +13295,16 @@ function parseSingleBooking(raw) {
   }
 
 
-  // Dedup segments: remove exact duplicates (same flight + date)
-  const seenSegs = new Set();
-  const dedupedSegs = segs.filter(s => {
+  // Dedup segments（v-EV：同段多次出现时合并补全，而非丢弃后到者——中文行常缺舱位/跨天，Sabre 行更全）
+  const seenSegs = new Map();
+  const dedupedSegs = [];
+  segs.forEach(s => {
     const key = `${s.flight}|${s.date}|${s.from}|${s.to}`;
-    if (seenSegs.has(key)) return false;
-    seenSegs.add(key);
-    return true;
+    const ex = seenSegs.get(key);
+    if (!ex) { seenSegs.set(key, s); dedupedSegs.push(s); return; }
+    if (!ex.cls && s.cls) ex.cls = s.cls;
+    const better = (a, b) => { if (!a) return b; if (!b) return a; if (/\+\d/.test(b) && !/\+\d/.test(a)) return b; return a; };
+    ex.depTime = better(ex.depTime, s.depTime); ex.arrTime = better(ex.arrTime, s.arrTime);
   });
 
   // ── Urgent flag + ticketing-sequence note ──

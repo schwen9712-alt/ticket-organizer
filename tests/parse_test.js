@@ -707,4 +707,18 @@ SSR DOCS DL HK1 P/CN/EK2012076/CN/08APR82/F/02APR33/WU/HONGYAN/H/P1
 `;
 const ah1 = parseSingleBooking(splitIntoBookings(AHS)[0]);
 eq('BD1 /H/字段+剥MS+尾注运价', [(ah1.pax||[]).length, ah1.pax[0].name, ah1.pax[0].dob, ah1.pax[0].gender, ah1.rmb, (ah1.segs||[]).length, (ah1.unrecognizedLines||[]).length], [1, 'WU/HONGYAN', '08APR82', 'FEMALE', 3642, 1, 0]);
+// 同段中文行+Sabre 行重复 → 合并补全；中文名+拼音名乘客合并
+const AIS = String.raw`乘机人：1.马宁杉 MA/NINGSHAN
+1. 联合航空UA877  10月06日  旧金山 - 香港T1  23:30出发  05:00+2到达  
+
+1.  UA877  P   TU06OCT  SFOHKG DK1   2330   0500+2 77W  0   ----
+ 2.  UA862  K   MO16NOV  HKGSFO DK1   1035   0705   77W  0   ----
+ 3.  UA2421 K   MO16NOV  SFOYVR DK1   1015   1343 
+
+01 PFX00EO9+*          23227 CNY     
+
+SSR DOCS UA HK1 P/CN/EE9860539/CN/26MAR02/F/20DEC28/MA/NINGSHAN/P1
+`;
+const ai1 = parseSingleBooking(splitIntoBookings(AIS)[0]);
+eq('BE1 重复段合并补全+拼音名合并', [(ai1.segs||[]).length, ai1.segs[0].cls, ai1.segs[0].arrTime, (ai1.pax||[]).length, ai1.pax[0].name, ai1.pax[0].dob, ai1.rmb, (ai1.unrecognizedLines||[]).length], [3, 'P', '0500+2', 1, 'MA/NINGSHAN', '26MAR02', 23227, 0]);
 process.exit(fails ? 1 : 0);
