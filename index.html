@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.25-EY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.25-EZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EY</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EZ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9792,6 +9792,8 @@ function parseSingleBooking(raw) {
   let _enSegPend = null;      // v-EL 官网英文分行版：头行 → 航班行 → 时刻行 状态机
   let _docTypePendDob = '';   // v-EX 生日行先于乘客出现时悬挂
   let _pendGender = '';       // v-EY 独行性别先于乘客出现时悬挂
+  // v-EZ 乘客语境信号：英文"名 姓"分支仅在报文含乘客信息字样时启用（防 Chase/官网英文行程短语被当成人）
+  const _paxCtx = /生日|出生|DOB|Date of Birth|性别|(^|\s)(男|女)(\s|$)|护照|passport|乘客|乘机人|旅客|名字|姓|passenger|SSR\s+DOC|\bP\/[A-Z]{2,3}\//im.test(raw);
   const _y4to2 = (d) => String(d || '').toUpperCase().replace(/^(\d{1,2}[A-Z]{3})(\d{2})(\d{2})$/, '$1$3');   // 四位年→两位年
   const _fareLineNos = [];    // v-DZ/EA GDS 运价行序号集合（"02 KLX8IHBI 6593 CNY" → '02'）；规则仅在"唯一一行且为 02"时触发
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
@@ -10907,8 +10909,8 @@ function parseSingleBooking(raw) {
       // ── 英文"名 姓"乘客行 "Qingyang Zeng"（v-EX）→ ZENG/QINGYANG；排除舱位/航司/机型等英文词 ──
       {
         const en = trimmed.match(/^([A-Z][a-z]+(?:[ -][A-Z][a-z]+)?)\s+([A-Z][a-z]+(?:[ -][A-Z][a-z]+)?)\s*$/);
-        const _EN_STOP = /^(Economy|Business|First|Premium|Class|Airlines?|Airways|Air|Flight|Total|United|Delta|American|Boeing|Airbus|Terminal|Layover|Cabin|Seat|Basic|Plus|Select|Comfort|Main|Polaris|Operated|Nonstop|Return|Depart|Arrive|Trip|Round|One|Way|Adult|Child|Infant|Passenger|Name|Ticket|Price|Fare|Tax|Fee|Baggage|Checked|Carry)$/i;
-        if (en && !_EN_STOP.test(en[1].split(/[ -]/)[0]) && !_EN_STOP.test(en[2].split(/[ -]/)[0])) {
+        const _EN_STOP = /^(Economy|Business|First|Premium|Class|Airlines?|Airways|Air|Flight|Total|United|Delta|American|Boeing|Airbus|Terminal|Layover|Cabin|Seat|Basic|Plus|Select|Comfort|Main|Polaris|Operated|Nonstop|Return|Depart|Arrive|Trip|Round|One|Way|Adult|Child|Infant|Passenger|Name|Ticket|Price|Fare|Tax|Fee|Baggage|Checked|Carry|Cathay|Pacific|China|Eastern|Southern|Korean|Japan|Singapore|Eva|Star|Alliance|Chase|Travel|Sapphire|Reserve|Preferred|Global|Entry|Priority|Pass|Hong|Kong|New|York|San|Francisco|Los|Angeles|Las|Vegas|City|International|Airport|Gate|Boarding|Departure|Arrival|Confirmation|Number|Record|Locator|Booking|Reference|Please|Thank|You|Dear|Hi|Hello|Best|Regards|Frequent|Flyer|Summary|Itinerary|Receipt|Payment|Points|Miles|Award|Mileage|Member|Account|Order|Status|Confirmed|Pending|Cancel|Refund|Change|Date|Time|Duration|Stop|Stops|Direct|Connecting|Connection|Aircraft|Meal|Wifi|Power|Legroom|Window|Aisle|Middle|Exit|Row)$/i;
+        if (en && _paxCtx && !_EN_STOP.test(en[1].split(/[ -]/)[0]) && !_EN_STOP.test(en[2].split(/[ -]/)[0])) {
           const name = (en[2] + '/' + en[1]).toUpperCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
           if (!pax.find(p => _sameName(p.name, name))) pax.push({ name, gender: '', dob: '' });
           _d(trimmed, '✅ PAX', `英文名 ${name}`); continue;

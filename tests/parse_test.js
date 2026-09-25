@@ -769,4 +769,13 @@ eq('BH1 人物全字段', [(al1.pax||[]).length, al1.pax[0].name, al1.pax[0].gen
   eq('BH2 姓在前写法经解释行校正', P("Zeng Qingyang\nQingyang是名字 Zeng是姓\n女").pax[0].name + '|' + P("Zeng Qingyang\nQingyang是名字 Zeng是姓\n女").pax[0].gender, 'ZENG/QINGYANG|FEMALE');
   eq('BH3 性别先于名悬挂', P("男\nQingyang Zeng").pax[0].gender, 'MALE');
 }
+// v-EZ 英文名分支误伤面（矩阵 v5 固化）
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const seg = " 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\n";
+  const phrases = ["Cathay Pacific","China Eastern","Chase Travel","Sapphire Reserve","Star Alliance","Hong Kong","New York","San Francisco","Confirmation Number","Thank You","Best Regards","Frequent Flyer","Boarding Pass","Booking Reference"];
+  eq('BI1 无乘客语境英文短语零误伤', phrases.filter(ph => (P(seg + ph).pax||[]).length).length, 0);
+  eq('BI2 有语境停用词全拦', phrases.filter(ph => (P(seg + ph + "\n生日 01JAN80").pax||[]).length).length, 0);
+  eq('BI3 真人名有语境识别', ["Wei Zhang","Mary Johnson","Jean-Pierre Dubois","Li Na"].filter(n => (P(seg + n + "\n生日 01JAN80").pax||[]).length === 1).length, 4);
+}
 process.exit(fails ? 1 : 0);
