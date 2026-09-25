@@ -733,4 +733,24 @@ PAN/JASPER  男  29AUG24
 `;
 const aj1 = parseSingleBooking(splitIntoBookings(AJS)[0]);
 eq('BF1 成人档补全+2岁儿童归类+铺价', [(aj1.pax||[]).length, aj1.pax[2].forcedType, JSON.stringify(aj1.fareByType), JSON.stringify(aj1.paxPrices), aj1.rmb, (aj1.segs||[]).length, (aj1.unrecognizedLines||[]).length], [3, 'CHILD', JSON.stringify({child:21020,adult:21050}), JSON.stringify([21050,21050,21020]), 21050, 2, 0]);
+// 英文"名 姓"乘客 + 生日行；组装逻辑无条件执行（无分档价单）
+const AKS = String.raw`1.  UA821  P   SA26SEP  HKGLAX DK1   2145   2010   789  0   ----
+ 2.  UA1006 P   SU27SEP  LAXLAS DK1   0820   0939   738  0   ----
+ 3.  UA1125 K   TH22OCT  LASSFO DK1   0947   1135   738  0   ----
+ 4.  UA869  K   TH22OCT  SFOHKG DK1   1325   1855+1 77W  
+
+
+Qingyang Zeng
+
+生日10/27/2001
+`;
+const ak1 = parseSingleBooking(splitIntoBookings(AKS)[0]);
+eq('BG1 英文名+美式生日', [(ak1.pax||[]).length, ak1.pax[0].name, ak1.pax[0].dob, (ak1.segs||[]).length, (ak1.unrecognizedLines||[]).length], [1, 'ZENG/QINGYANG', '27OCT01', 4, 0]);
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  eq('BG2 停用英文词不当乘客', (P(" 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nBusiness Class\nUnited Airlines\nPremium Plus").pax||[]).length, 0);
+  eq('BG3 生日先于名(无价单)', P("生日 27OCT01\nQingyang Zeng\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W").pax[0].dob, '27OCT01');
+  eq('BG4 无价单剥称谓', P("1.WU/HONGYAN MS\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W").pax[0].name, 'WU/HONGYAN');
+  eq('BG5 无价单拼音名合并', (P("乘机人：1.马宁杉 MA/NINGSHAN\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/EE9860539/CN/26MAR02/F/20DEC28/MA/NINGSHAN/P1").pax||[]).length, 1);
+}
 process.exit(fails ? 1 : 0);
