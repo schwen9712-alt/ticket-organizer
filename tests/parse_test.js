@@ -753,4 +753,20 @@ eq('BG1 英文名+美式生日', [(ak1.pax||[]).length, ak1.pax[0].name, ak1.pax
   eq('BG4 无价单剥称谓', P("1.WU/HONGYAN MS\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W").pax[0].name, 'WU/HONGYAN');
   eq('BG5 无价单拼音名合并', (P("乘机人：1.马宁杉 MA/NINGSHAN\n 3.  UA858  T   FR25SEP  PVGSFO  HK2   1210   0835   77W\nSSR DOCS UA HK1 P/CN/EE9860539/CN/26MAR02/F/20DEC28/MA/NINGSHAN/P1").pax||[]).length, 1);
 }
+// 英文名 + 姓名顺序解释行 + 独行性别 + 生日
+const ALS = String.raw`Qingyang Zeng
+
+Qingyang是名字 Zeng是姓哈
+
+生日10/27/2001
+
+男
+`;
+const al1 = parseSingleBooking(splitIntoBookings(ALS)[0] || ALS);
+eq('BH1 人物全字段', [(al1.pax||[]).length, al1.pax[0].name, al1.pax[0].gender, al1.pax[0].dob, (al1.unrecognizedLines||[]).length], [1, 'ZENG/QINGYANG', 'MALE', '27OCT01', 0]);
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  eq('BH2 姓在前写法经解释行校正', P("Zeng Qingyang\nQingyang是名字 Zeng是姓\n女").pax[0].name + '|' + P("Zeng Qingyang\nQingyang是名字 Zeng是姓\n女").pax[0].gender, 'ZENG/QINGYANG|FEMALE');
+  eq('BH3 性别先于名悬挂', P("男\nQingyang Zeng").pax[0].gender, 'MALE');
+}
 process.exit(fails ? 1 : 0);

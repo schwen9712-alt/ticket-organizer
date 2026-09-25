@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.25-EX\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.25-EY\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EX</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EY</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9791,6 +9791,7 @@ function parseSingleBooking(raw) {
   let _cabinSeqPend = null;   // v-DT "舱位：I+I+X+X" 出现在段之前时悬挂，段齐后补赋
   let _enSegPend = null;      // v-EL 官网英文分行版：头行 → 航班行 → 时刻行 状态机
   let _docTypePendDob = '';   // v-EX 生日行先于乘客出现时悬挂
+  let _pendGender = '';       // v-EY 独行性别先于乘客出现时悬挂
   const _y4to2 = (d) => String(d || '').toUpperCase().replace(/^(\d{1,2}[A-Z]{3})(\d{2})(\d{2})$/, '$1$3');   // 四位年→两位年
   const _fareLineNos = [];    // v-DZ/EA GDS 运价行序号集合（"02 KLX8IHBI 6593 CNY" → '02'）；规则仅在"唯一一行且为 02"时触发
   let _fareTypeMode = null;   // v-DE 类型词模式：'pre'=词在运价块前（成人↓FARE）'post'=词在 TOTAL 后（TOTAL↓大人）；首次确立后全篇锁定
@@ -10911,6 +10912,28 @@ function parseSingleBooking(raw) {
           const name = (en[2] + '/' + en[1]).toUpperCase().replace(/-/g, ' ').replace(/\s+/g, ' ');
           if (!pax.find(p => _sameName(p.name, name))) pax.push({ name, gender: '', dob: '' });
           _d(trimmed, '✅ PAX', `英文名 ${name}`); continue;
+        }
+      }
+      // ── 姓名顺序解释行 "Qingyang是名字 Zeng是姓"（v-EY）：按说明校正为 姓/名 ──
+      {
+        const ex1 = trimmed.match(/^([A-Za-z]+)\s*是\s*名(?:字)?[，,\s]*([A-Za-z]+)\s*是\s*姓/);
+        const ex2 = trimmed.match(/^([A-Za-z]+)\s*是\s*姓[，,\s]*([A-Za-z]+)\s*是\s*名/);
+        const given = ex1 ? ex1[1] : ex2 ? ex2[2] : null, surname = ex1 ? ex1[2] : ex2 ? ex2[1] : null;
+        if (given && surname) {
+          const name = (surname + '/' + given).toUpperCase();
+          const hit = pax.find(p => { const k = _nameKey(p.name); return k === _nameKey(name) || k === _nameKey(given + '/' + surname); });
+          if (hit) hit.name = name; else pax.push({ name, gender: '', dob: '' });
+          _d(trimmed, '✅ PAX', `姓名顺序说明 → ${name}`); continue;
+        }
+      }
+      // ── 独行性别 "男" / "女" / "M" / "F"（v-EY）→ 绑最近一位无性别乘客 ──
+      {
+        const gd = trimmed.match(/^(男性?|女性?|M|F|MALE|FEMALE)\s*$/i);
+        if (gd) {
+          const g = /^(男|M)/i.test(gd[1]) ? 'MALE' : 'FEMALE';
+          const tgt = [...pax].reverse().find(p => !p.gender);
+          if (tgt) tgt.gender = g; else _pendGender = g;
+          _d(trimmed, '✅ PAX', `独行性别 ${g}`); continue;
         }
       }
       // ── "生日10/27/2001" / "出生日期：27OCT01"（v-EX）→ 绑最近一位无生日乘客 ──
@@ -13237,6 +13260,7 @@ function parseSingleBooking(raw) {
   }
   // ═ 无条件组装（v-EX 迁出：此前误挂在「有分档价」块内，无分档单不执行）═
   if (_docTypePendDob) { const t0 = pax.find(p => p && !p.dob); if (t0) t0.dob = _docTypePendDob; _docTypePendDob = ''; }
+  if (_pendGender) { const t1 = pax.find(p => p && !p.gender); if (t1) t1.gender = _pendGender; _pendGender = ''; }
   pax.forEach(p => {
     if (!p || !p.name) return;
     if (/[\u4e00-\u9fa5]/.test(p.name)) { const pm = p.name.match(/([A-Z]{2,}(?:\s[A-Z]+)*\/[A-Z]+(?:\s[A-Z]+)*)/); if (pm) p.name = pm[1]; }   // v-EV "1.马宁杉 MA/NINGSHAN" → 拼音名
