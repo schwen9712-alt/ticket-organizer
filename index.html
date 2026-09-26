@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.25-EZ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.26-FA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.25-EZ</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.26-FA</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -11739,7 +11739,7 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 效期后可选重复性别 · v-EB 四位年 · v-EN 尾括号
+    const ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 重复性别 · v-EB 四位年 · v-EN 尾括号 · v-FA 尾斜杠/单字类型
     // (_y4to2 已提升至函数顶部)
     // v-DA 变体：六位数字生日 YYMMDD、无效期、无 P 尾（"P/USA/A39321637/USA/761015/M/CHANG/WEYLU"）
     if (!ssrMatch) {
@@ -11771,8 +11771,8 @@ function parseSingleBooking(raw) {
       const gt = given.match(/\s+(CHD|CHILD|INF|INFANT)$/);
       if (gt) { given = given.slice(0, gt.index).trim(); ssrFt = gt[1].startsWith('INF') ? 'INFANT' : 'CHILD'; }
       if (!ssrFt && ssrMatch[6]) {
-        if (/(儿童|小孩|小儿|CHD|CHILD)/i.test(ssrMatch[6])) ssrFt = 'CHILD';
-        else if (/(婴儿|INF)/i.test(ssrMatch[6])) ssrFt = 'INFANT';
+        if (/(儿童|小孩|小儿|童|CHD|CHILD)/i.test(ssrMatch[6])) ssrFt = 'CHILD';
+        else if (/(婴儿|婴|INF)/i.test(ssrMatch[6])) ssrFt = 'INFANT';
       }
       if (!ssrFt && _docTypePend) {   // v-EM：独行"婴儿/儿童"前置标签亦被 SSR 分支消费（此前仅裸 P/ 分支消费）
         ssrFt = _docTypePend === '婴儿' ? 'INFANT' : /儿童|小孩|小儿|小/.test(_docTypePend) ? 'CHILD' : null;
@@ -11926,7 +11926,7 @@ function parseSingleBooking(raw) {
     //   "P/CHN/HJ2523417/CHN/15MAR09/F/12DEC35/OU/ANNIE/P1"
     // Same field order as SSR DOCS but without the SSR DOCS keyword
     // Tolerates missing "/" between DOB/gender and missing "/PN" suffix.
-    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?(?:[MF][-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-EN 尾括号备注（常旅客号）容忍
+    const bareDocMatch = trimmed.match(/^P[-\/](?:[A-Z]{2,3}[-\/][A-Z0-9]{5,}|[A-Z0-9]{5,})[-\/][A-Z]{2,3}[-\/](\d{1,2}[A-Z]{3}\d{2})[-\/]?([MF])[-\/](?:(\d{1,2}[A-Z]{3}\d{2})[-\/])?(?:[MF][-\/])?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-EN 尾括号 · v-FA 单字类型
     if (bareDocMatch) {
       const _pad2b = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');
       const dob = _pad2b(bareDocMatch[1].toUpperCase());
@@ -11936,7 +11936,7 @@ function parseSingleBooking(raw) {
       const given = bareDocMatch[5].trim().toUpperCase().replace(/\s+/g, ' ');
       const name = _stripTitle(`${surname}/${given}`);   // v-EC
       const t6 = bareDocMatch[6] || '';
-      const bareFt = /(儿童|小孩|小儿|CHD|CHILD)/i.test(t6) ? 'CHILD' : /(婴儿|INF)/i.test(t6) ? 'INFANT' : null;
+      const bareFt = /(儿童|小孩|小儿|童|CHD|CHILD)/i.test(t6) ? 'CHILD' : /(婴儿|婴|INF)/i.test(t6) ? 'INFANT' : null;   // v-FA 单字类型
       const existing = pax.find(p => _sameName(p.name, name));
       if (!existing) {
         const rec = { name, gender, dob };

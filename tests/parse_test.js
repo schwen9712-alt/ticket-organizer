@@ -778,4 +778,17 @@ eq('BH1 人物全字段', [(al1.pax||[]).length, al1.pax[0].name, al1.pax[0].gen
   eq('BI2 有语境停用词全拦', phrases.filter(ph => (P(seg + ph + "\n生日 01JAN80").pax||[]).length).length, 0);
   eq('BI3 真人名有语境识别', ["Wei Zhang","Mary Johnson","Jean-Pierre Dubois","Li Na"].filter(n => (P(seg + n + "\n生日 01JAN80").pax||[]).length === 1).length, 4);
 }
+// 证件尾 /童 单字类型 + 尾斜杠无 P + 类型词粘金额无币种
+const AMS = String.raw`1.  UA286  P1   WE30SEP  ICNEWR DK1   1715 1800      SEAME 1 B
+ 2.  UA1190 P1  WE30SEP  EWRMCO DK1   2043 2344      SEAME ----
+ 3.  UA285  G    TH05NOV  EWRICN DK1   1030 1625+1    SEAME ----  　
+成人17518
+儿童17124
+
+SSR DOCS CA HK1 P/CHN/EK3894044/CHN/11SEP21/M/03MAY28/ZHANG/XUNYU/童
+SSR DOCS CA HK1 P/CHN/EK2403844/CHN/31OCT92/F/30MAR33/CHEN/SI/P2
+SSR DOCS CA HK1 P/CHN/EM7568438/CHN/15AUG91/M/17JUN34/ZHANG/YILU/
+`;
+const am1 = parseSingleBooking(splitIntoBookings(AMS)[0]);
+eq('BJ1 三客(童标/尾斜杠)+分档铺价', [(am1.pax||[]).length, am1.pax[0].name, am1.pax[0].forcedType, am1.pax[2].name, JSON.stringify(am1.fareByType), JSON.stringify(am1.paxPrices), (am1.segs||[]).length, (am1.unrecognizedLines||[]).length], [3, 'ZHANG/XUNYU', 'CHILD', 'ZHANG/YILU', JSON.stringify({adult:17518,child:17124}), JSON.stringify([17124,17518,17518]), 3, 0]);
 process.exit(fails ? 1 : 0);
