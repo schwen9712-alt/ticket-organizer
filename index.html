@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.09.26-FA\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.09.27-FB\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.26-FA</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.09.27-FB</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -4649,9 +4649,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 /* Pause button in agent group header — subtle until hover */
 .agent-pause-btn {
   margin-left: auto;
-  background: transparent;
-  color: rgba(255,255,255,0.55);
-  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.10);
+  color: rgba(255,255,255,0.92);   /* v-FB 原 0.55 几乎不可见 */
+  border: 1px solid rgba(255,255,255,0.45);
   border-radius: var(--r-sm);
   padding: 3px 10px;
   font-size: 10.5px;
@@ -18741,6 +18741,9 @@ function renderPendingOrderActions(actions, o, idx) {
       <button class="btn ghost small" onclick="reparseOrder(${idx}); closeOrderMenu()" title="解析器升级后旧单数据不会自动变——按最新规则重跑原文，刷新乘客/航段/分档价/售价，票号卡主状态不动">🔄 重新解析</button>
       <button class="btn ghost small" onclick="diagOrder(${idx}); closeOrderMenu()" title="解析不对时点这个：复制该单原文+解析结果，发给开发一击定位">🧪 解析诊断</button>
       <button class="btn ghost small" onclick="toggleNoSplit(${idx}); closeOrderMenu()" title="标记/解除禁止拆单（代理不允许拆开出票；-T 前的存量单可在此补旗）" style="${o.noSplit ? doneStyle : ''}">${o.noSplit ? '⛔ 已禁拆' : '⛔ 禁拆'}</button>
+      ${(o.agent && o.agent !== '(未指定代理)') ? (isAgentPaused(o.agent)
+        ? `<button class="btn ghost small" onclick="unpauseAgent('${escapeAttr(o.agent)}'); closeOrderMenu()" style="color:var(--green);" title="恢复该代理全部订单的出票">▶ 恢复「${escapeHtml(o.agent)}」出票</button>`
+        : `<button class="btn ghost small" onclick="pauseAgent('${escapeAttr(o.agent)}'); closeOrderMenu()" style="color:var(--red);" title="暂停该代理全部订单的出票（争议/资金问题）">⏸ 暂停「${escapeHtml(o.agent)}」出票</button>`) : ''}
       <button class="btn ghost small" onclick="editOrderPrice(${idx}); closeOrderMenu()" title="手动修正此单总运价（人民币）">💰 改运价</button>
       <button class="btn ghost small" onclick="blacklistOrderPax(${idx}); closeOrderMenu()" title="把此单乘客加入在线开票黑名单（下次录入到同名会强提醒）">⛔ 加入黑名单</button>
       <button class="btn ghost small" onclick="openLinkOrderDialog(${idx}); closeOrderMenu()" title="设置出票先后顺序关联" style="${(o.ticketOrder || (o.linkedOrderIds && o.linkedOrderIds.length)) ? doneStyle : ''}">🔗 ${o.ticketOrder ? `第${o.ticketOrder}出` : '关联'}</button>
