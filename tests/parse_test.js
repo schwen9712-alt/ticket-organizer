@@ -791,4 +791,17 @@ SSR DOCS CA HK1 P/CHN/EM7568438/CHN/15AUG91/M/17JUN34/ZHANG/YILU/
 `;
 const am1 = parseSingleBooking(splitIntoBookings(AMS)[0]);
 eq('BJ1 三客(童标/尾斜杠)+分档铺价', [(am1.pax||[]).length, am1.pax[0].name, am1.pax[0].forcedType, am1.pax[2].name, JSON.stringify(am1.fareByType), JSON.stringify(am1.paxPrices), (am1.segs||[]).length, (am1.unrecognizedLines||[]).length], [3, 'ZHANG/XUNYU', 'CHILD', 'ZHANG/YILU', JSON.stringify({adult:17518,child:17124}), JSON.stringify([17124,17518,17518]), 3, 0]);
+// 段状态码：UC 未确认段识别；算式结果行静默
+const ANS = String.raw` 1.  AA1082 Q   WE14OCT  KINMIA DK1   1703   2005     0 RE ----               
+ 2.  AA2458 Q   WE14OCT  MIALAX DK1   2150   0036+1 R 0 RE --0                
+ 3.  AA2777 N   TU20OCT  LAXMIA DK1   2238   0631+1 M 0 RE 0 --               
+ 4.  AA2079 N   WE21OCT  MIAKIN UC1  1004 1057     0    E ----            
+
+SSR DOCS AA HK1 P/CN/EK3395214/CN/28APR93/F/25APR33/MEI/JINGER/P1
+
+普通经济   6213*0.9                                                                     
+      =5591.7000
+`;
+const an1 = parseSingleBooking(splitIntoBookings(ANS)[0]);
+eq('BK1 四段+UC状态+算式', [(an1.segs||[]).length, JSON.stringify((an1.segs||[]).map(s=>s.status||null)), an1.rmb, an1.discount, (an1.pax||[]).length, (an1.unrecognizedLines||[]).length], [4, JSON.stringify(['DK','DK','DK','UC']), 6213, 90, 1, 0]);
 process.exit(fails ? 1 : 0);
