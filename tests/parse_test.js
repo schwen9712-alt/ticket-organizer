@@ -804,4 +804,27 @@ SSR DOCS AA HK1 P/CN/EK3395214/CN/28APR93/F/25APR33/MEI/JINGER/P1
 `;
 const an1 = parseSingleBooking(splitIntoBookings(ANS)[0]);
 eq('BK1 四段+UC状态+算式', [(an1.segs||[]).length, JSON.stringify((an1.segs||[]).map(s=>s.status||null)), an1.rmb, an1.discount, (an1.pax||[]).length, (an1.unrecognizedLines||[]).length], [4, JSON.stringify(['DK','DK','DK','UC']), 6213, 90, 1, 0]);
+// Sabre 完整回显 + 中文名/中文段重复 + 安大略 ONT
+const APS = String.raw`NM1YING/JIANI
+SSR DOCS AA HK1 P/CN/EK5720167/CN/30MAY02/F/06JUN33/YING/JIANI/P1
+
+1.  AA2635 R   WE21OCT  DFWONT DK1   1220   1330   321 0
+>QTE:/AA
+ ONT V0AWUNR1                          NVBDEC NVA21OCT27 2PC 【运价规则】 
+FARE  USD    691.16 EQUIV  CNY    4640 
+TAX   CNY      38AY CNY      348US CNY      67XT 
+TOTAL CNY   5093 
+
+乘机人：应佳倪
+1. 美国航空AA2635  10月21日  达拉斯 沃斯0 - 洛杉矶安大略T4  12:20出发 - 13:30到达 
+
+商务现金
+`;
+const ap1 = parseSingleBooking(splitIntoBookings(APS)[0]);
+eq('BL1 一段一人+回显静默', [JSON.stringify((ap1.segs||[]).map(s=>[s.flight,s.cls,s.from,s.to])), (ap1.pax||[]).map(p=>p.name).join(','), ap1.rmb, ap1.usd, (ap1.unrecognizedLines||[]).length], [JSON.stringify([['AA2635','R','DFW','ONT']]), 'YING/JIANI', 5093, 691.16, 0]);
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const r2 = P("乘机人：应佳倪\n1. AA2635  10月21日  达拉斯 沃斯0 - 洛杉矶安大略T4  12:20出发 - 13:30到达\nTOTAL CNY 5093");
+  eq('BL2 仅中文：保留中文名+安大略 ONT', [(r2.pax||[]).map(p=>p.name).join(','), JSON.stringify((r2.segs||[]).map(s=>[s.from,s.to]))], ['应佳倪', JSON.stringify([['DFW','ONT']])]);
+}
 process.exit(fails ? 1 : 0);

@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.02-FC\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.03-FD\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.02-FC</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.03-FD</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9910,6 +9910,7 @@ function parseSingleBooking(raw) {
     // extend as needed.
     const V_CITY = {
       '香港':'HKG','洛杉矶':'LAX','上海':'PVG','北京':'PEK','纽约':'JFK',
+      '洛杉矶安大略': 'ONT', '安大略': 'ONT', '达拉斯沃斯': 'DFW', '达拉斯沃斯堡': 'DFW',   // v-FD
       '旧金山':'SFO','广州':'CAN','深圳':'SZX','成都':'CTU','西雅图':'SEA',
       '波士顿':'BOS','芝加哥':'ORD','华盛顿':'IAD','达拉斯':'DFW','休斯顿':'IAH',
       '首尔':'ICN','东京':'NRT','大阪':'KIX','温哥华':'YVR','多伦多':'YYZ',
@@ -10427,6 +10428,7 @@ function parseSingleBooking(raw) {
   // ── Chinese city name → IATA code lookup ────────────────────────────────
   const CN_CITY_IATA = {
     '洛杉矶':'LAX','旧金山':'SFO','纽约':'JFK','肯尼迪':'JFK','纽瓦克':'EWR','纽约纽瓦克':'EWR',
+    '洛杉矶安大略':'ONT','安大略':'ONT','达拉斯沃斯':'DFW','达拉斯沃斯堡':'DFW','达拉斯':'DFW',   // v-FD
     '米兰':'MXP','马尔彭萨':'MXP','米兰马尔彭萨':'MXP','米兰利纳特':'LIN',
     '伦敦':'LHR','希思罗':'LHR','盖特威克':'LGW','斯坦斯特德':'STN',
     '巴黎':'CDG','戴高乐':'CDG','奥利':'ORY','法兰克福':'FRA','阿姆斯特丹':'AMS',
@@ -10490,13 +10492,13 @@ function parseSingleBooking(raw) {
     '小石城':'LIT','威奇托':'ICT'
   };
   function cnCityToIATA(city) {
-    const c = (city || '').trim();
+    const c = (city || '').replace(/\s+/g, '').replace(/[T第]\d+(?:航站楼)?$/, '').trim();   // v-FD 去空格/航站楼后缀
     // Direct match first
     if (CN_CITY_IATA[c]) return CN_CITY_IATA[c];
-    // Partial match — find key that is contained in city name or vice versa
-    for (const [k, v] of Object.entries(CN_CITY_IATA)) {
-      if (c.includes(k) || k.includes(c)) return v;
-    }
+    // v-FD 最长键优先（"洛杉矶安大略" 须先于 "洛杉矶" 命中）
+    const keys = Object.keys(CN_CITY_IATA).sort((a, b) => b.length - a.length);
+    for (const k of keys) if (c.includes(k)) return CN_CITY_IATA[k];
+    for (const k of keys) if (k.includes(c) && c.length >= 2) return CN_CITY_IATA[k];
     return null;
   }
 
@@ -11871,6 +11873,7 @@ function parseSingleBooking(raw) {
     if (/^FSI\//.test(trimmed) || /^S\s+[A-Z]{2}\s+\d{1,4}[A-Z]\d{2}[A-Z]{3}\s/.test(trimmed)) { _d(trimmed, '✅ SEG', 'Sabre 系统行静默'); continue; }
     if (/^\d*\.?\s*SSR\s+(?:DOC[SA]?|ODCS|DCOS)\s+[A-Z0-9]{2}\s+HK\d\s*$/i.test(trimmed)) { _d(trimmed, '✅ PAX', 'DOCS 拆行残段静默'); continue; }   // v-EC
     if (/^(?:机票)?(?:可改不退|不可退改|不退不改|可退可改|不可退|不可改|可改可退|不退|不改)[^\n]{0,10}$/.test(trimmed)) { _d(trimmed, '✅ SEG', '退改规则行静默'); continue; }   // v-EN
+    if (/^>|\bNVB[A-Z0-9]*\b.*\bNVA|【运价规则】|^(?:商务|公务|经济|头等|超经)?现金$|^现金(?:支付|付款)?$/.test(trimmed)) { _d(trimmed, '✅ SEG', 'Sabre 回显/付款备注静默'); continue; }   // v-FD
     // ── 护照机读区 MRZ（TD3）：行1 "P<CHNLI<<ZIXUAN<<<…" 行2 "EM70636978CHN0606169M3406050…"（可拼成一行）──
     {
       const mrzLine2 = /([A-Z0-9<]{9})(\d)([A-Z]{3})(\d{2})(\d{2})(\d{2})(\d)([MF<])(\d{2})(\d{2})(\d{2})(\d)/;
@@ -13276,6 +13279,10 @@ function parseSingleBooking(raw) {
     if (/[\u4e00-\u9fa5]/.test(p.name)) { const pm = p.name.match(/([A-Z]{2,}(?:\s[A-Z]+)*\/[A-Z]+(?:\s[A-Z]+)*)/); if (pm) p.name = pm[1]; }   // v-EV "1.马宁杉 MA/NINGSHAN" → 拼音名
     p.name = _stripTitle(p.name);   // v-EU 组装阶段统一剥称谓/类型标签（覆盖所有入列路径）
   });
+  {   // v-FD 纯中文名乘客：报文已有英文名乘客时视为同一人的中文名，丢弃
+    const hasEn = pax.some(p => p && /[A-Z]/.test(p.name || ''));
+    if (hasEn) for (let i = pax.length - 1; i >= 0; i--) if (pax[i] && /^[\u4e00-\u9fa5·]+$/.test(pax[i].name || '')) pax.splice(i, 1);
+  }
   {   // v-EV 组装阶段同人合并（归一键相同者合并资料，保留先到位置）
     const merged = [];
     pax.forEach(p => { const ex = merged.find(q => _sameName(q.name, p.name)); if (!ex) merged.push(p); else { for (const k of ['dob', 'gender', 'forcedType', 'passportExpiry', 'paxType']) if (p[k] && !ex[k]) ex[k] = p[k]; if (!ex.name.includes('/') && p.name.includes('/')) ex.name = p.name; } });
@@ -13365,10 +13372,20 @@ function parseSingleBooking(raw) {
   // Dedup segments（v-EV：同段多次出现时合并补全，而非丢弃后到者——中文行常缺舱位/跨天，Sabre 行更全）
   const seenSegs = new Map();
   const dedupedSegs = [];
+  const _byFD = new Map();   // v-FD 同航班同日期但机场不同：以带舱位的（GDS）段为准
   segs.forEach(s => {
     const key = `${s.flight}|${s.date}|${s.from}|${s.to}`;
     const ex = seenSegs.get(key);
-    if (!ex) { seenSegs.set(key, s); dedupedSegs.push(s); return; }
+    if (!ex) {
+      const fd = s.flight ? `${s.flight}|${s.date}` : null;
+      if (fd && _byFD.has(fd)) {
+        const prev = _byFD.get(fd);
+        if (!prev.cls && s.cls) { prev.from = s.from; prev.to = s.to; prev.cls = s.cls; prev.depTime = prev.depTime || s.depTime; prev.arrTime = prev.arrTime || s.arrTime; }
+        return;
+      }
+      if (fd) _byFD.set(fd, s);
+      seenSegs.set(key, s); dedupedSegs.push(s); return;
+    }
     if (!ex.cls && s.cls) ex.cls = s.cls;
     const better = (a, b) => { if (!a) return b; if (!b) return a; if (/\+\d/.test(b) && !/\+\d/.test(a)) return b; return a; };
     ex.depTime = better(ex.depTime, s.depTime); ex.arrTime = better(ex.arrTime, s.arrTime);
