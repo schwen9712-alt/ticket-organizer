@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.04-FE\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.04-FF\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.04-FE</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.04-FF</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -14324,7 +14324,11 @@ async function parsePNR() {
       // Build flight-key & passenger-key sets per seq order
       const flightKeys = o => new Set((o.segments || []).map(s => `${s.flight}|${s.date}`));
       const paxKeys = o => new Set((o.passengers || []).map(p => (p.name || '').toUpperCase()));
+      // v-FF 显式序号（"第一个开"/"第二个开"/"先开"/"后开"）：同批即关联，不要求共享航班或乘客
+      const _cnNum = (s) => { const t = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10 }; return /^\d+$/.test(s) ? parseInt(s, 10) : (t[s] || null); };
+      const seqNo = (o) => { const n = o.ticketSeqNote || ''; const m = n.match(/第([一二三四五六七八九十\d]+)个?(?:开|出)/); if (m) return _cnNum(m[1]); if (/先开|先出/.test(n)) return 1; if (/后开|后出/.test(n)) return 2; return null; };
       const shares = (a, b) => {
+        if (seqNo(a) !== null && seqNo(b) !== null) return true;   // v-FF 显式序号同批关联
         const af = flightKeys(a), bf = flightKeys(b);
         for (const k of af) if (bf.has(k)) return true;       // shared flight
         const ap = paxKeys(a), bp = paxKeys(b);
@@ -14346,11 +14350,11 @@ async function parsePNR() {
         });
         // Only link if the group genuinely has 2+ related orders
         if (group.length >= 2) {
-          // Sort group by paste order (their index in newOrders)
-          group.sort((a, b) => newOrders.indexOf(a) - newOrders.indexOf(b));
+          // Sort group by explicit seq-no first, then paste order（v-FF）
+          group.sort((a, b) => { const sa = seqNo(a), sb = seqNo(b); if (sa !== null && sb !== null && sa !== sb) return sa - sb; if (sa !== null && sb === null) return -1; if (sa === null && sb !== null) return 1; return newOrders.indexOf(a) - newOrders.indexOf(b); });
           const groupIds = group.map(g => g.id);
           group.forEach((g, gi) => {
-            g.ticketOrder = gi + 1;
+            g.ticketOrder = seqNo(g) || (gi + 1);
             g.linkedOrderIds = groupIds.filter(id => id !== g.id);
             // urgent stays as parsed (💣); don't force it on the whole group
           });
@@ -14976,6 +14980,7 @@ function renderAirlineUsdPanel(orders) {
           }).filter(Boolean);
           const circled = o.ticketOrder ? ['①','②','③','④','⑤','⑥','⑦','⑧','⑨'][o.ticketOrder - 1] || `${o.ticketOrder}` : '🔗';
           let roleWord = o.ticketOrder === 1 ? '先出' : (o.ticketOrder >= 2 ? '后出' : '关联');
+          if (o.ticketSeqNote) roleWord += ' · ' + String(o.ticketSeqNote).replace(/\s+/g, ' ').slice(0, 14);   // v-FF 徽章直接显示提示原文
           // Build tooltip: include the seq-note if present
           let tip = linkedNames.length
             ? `第 ${o.ticketOrder} 个出票 · 关联 ${linkedNames.join('、')}`
