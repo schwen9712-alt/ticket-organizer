@@ -827,4 +827,18 @@ eq('BL1 一段一人+回显静默', [JSON.stringify((ap1.segs||[]).map(s=>[s.fli
   const r2 = P("乘机人：应佳倪\n1. AA2635  10月21日  达拉斯 沃斯0 - 洛杉矶安大略T4  12:20出发 - 13:30到达\nTOTAL CNY 5093");
   eq('BL2 仅中文：保留中文名+安大略 ONT', [(r2.pax||[]).map(p=>p.name).join(','), JSON.stringify((r2.segs||[]).map(s=>[s.from,s.to]))], ['应佳倪', JSON.stringify([['DFW','ONT']])]);
 }
+// 两单炸弹：位置紧张/第N个开 顺序提示 + 行静默
+const AQS = String.raw`1.HUANG/YITAO  男 22NOV64
+ 2.  UA889  P   WE28OCT  PEKSFO HK1   1920 1550        
+01 PLX0IPTP            22757 CNY        
+位置紧张  第一个开 [炸弹]
+----------
+1.HE/WEI  女 08NOV68
+ 2.  UA889  P   MO26OCT  PEKSFO HK1   1920 1550   
+01 PLX4IPTP            25757 CNY
+第二个开 [炸弹]
+`;
+const _aqb = splitIntoBookings(AQS);
+const aq1 = parseSingleBooking(_aqb[0]), aq2 = parseSingleBooking(_aqb[1]);
+eq('BM1 两单+加急+顺序', [_aqb.length, aq1.urgent, aq1.ticketSeqNote, aq2.ticketSeqNote, aq1.rmb, aq2.rmb, (aq1.unrecognizedLines||[]).length + (aq2.unrecognizedLines||[]).length], [2, true, '位置紧张 第一个开', '第二个开', 22757, 25757, 0]);
 process.exit(fails ? 1 : 0);

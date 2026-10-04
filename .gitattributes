@@ -1,0 +1,9 @@
+# 统一 LF 换行，避免 Windows autocrlf 把整文件标成已修改
+* text=auto eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.png binary
+*.zip binary
