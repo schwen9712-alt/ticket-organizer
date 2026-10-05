@@ -841,4 +841,12 @@ const AQS = String.raw`1.HUANG/YITAO  男 22NOV64
 const _aqb = splitIntoBookings(AQS);
 const aq1 = parseSingleBooking(_aqb[0]), aq2 = parseSingleBooking(_aqb[1]);
 eq('BM1 两单+加急+顺序', [_aqb.length, aq1.urgent, aq1.ticketSeqNote, aq2.ticketSeqNote, aq1.rmb, aq2.rmb, (aq1.unrecognizedLines||[]).length + (aq2.unrecognizedLines||[]).length], [2, true, '位置紧张 第一个开', '第二个开', 22757, 25757, 0]);
+// 航程行（航程:/星期/句号）+ DOCS 乱格式（证件号后空格、生日后多国籍段）+ 标准经济舱
+const ARS = String.raw`乘机人1: ZHANG/BAOXIN MR (EJ8044647)
+航程:    UA877 10月07日(星期三) 旧金山I-香港T1 23:30 05:00。      SSR DOCS UA HK1 P/CN/EJ8044647 /CN/29SEP06/CN/M/01FEB33/ZHANG/BAOXIN/P1
+
+标准经济舱6673
+`;
+const ar1 = parseSingleBooking(splitIntoBookings(ARS)[0]);
+eq('BN1 混排行程+乱 DOCS', [JSON.stringify((ar1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime])), (ar1.pax||[]).length, ar1.pax[0].name, ar1.pax[0].dob, ar1.pax[0].passportExpiry, ar1.rmb, ar1.cabin, (ar1.unrecognizedLines||[]).length], [JSON.stringify([['UA877','SFO','HKG','07OCT','23:30','05:00']]), 1, 'ZHANG/BAOXIN', '29SEP06', '01FEB33', 6673, '经济舱', 0]);
 process.exit(fails ? 1 : 0);

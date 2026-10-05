@@ -3037,10 +3037,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.04-FI\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.05-FJ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.04-FI</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.05-FJ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9431,6 +9431,8 @@ function _normalizeRaw(raw) {
     }
     return line;
   }).join('\n');
+  // ②a2 行级清理（v-FJ）：日期后的 "(星期三)/（周三）" 删除；行首 "航程:/行程:/航班:" 前缀删除；行尾中文句号删除
+  s = s.replace(/[（(]\s*(?:星期|周|礼拜)[一二三四五六日天]\s*[）)]/g, '').replace(/^\s*(?:航程|行程|航班|航段)\s*[:：]\s*/gm, '').replace(/。\s+(?=\S)/g, '\n').replace(/。\s*$/gm, '');   // 中文句号即分句
   // ②b 航班号 token 级大写（"ua123" → "UA123"，与日期不同行时亦生效；英文中两字母+数字组合极少，无误伤）
   s = s.replace(/\b([a-z]{2})(\d{2,4})\b/g, (m, a, n) => a.toUpperCase() + n);
   // ②c "姓/名" token 大写（"1.zhang/san" → "1.ZHANG/SAN"；英文里 and/or 之类被大写无碍解析）
@@ -11741,7 +11743,7 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 重复性别 · v-EB 四位年 · v-EN 尾括号 · v-FA 尾斜杠/单字类型
+    const ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\s*\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?(?:[A-Z]{2,3}\/)?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 重复性别 · v-EB 四位年 · v-EN 尾括号 · v-FA 尾斜杠/单字类型
     // (_y4to2 已提升至函数顶部)
     // v-DA 变体：六位数字生日 YYMMDD、无效期、无 P 尾（"P/USA/A39321637/USA/761015/M/CHANG/WEYLU"）
     if (!ssrMatch) {
