@@ -3071,10 +3071,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FQ</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FR</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9843,6 +9843,7 @@ function parseSingleBooking(raw) {
   let _cnPaxRef = null;       // 中文标签乘客块：当前正在填充的乘客
   let _docTypePend = null;    // 独行"婴儿/儿童/成人"标签悬挂，下一条 DOCS 消费
   let _mrzPend = null;        // v-DK 护照机读区（MRZ）姓名行悬挂，等第二行
+  let _surnamePend = null;    // v-FR 「姓 chen」悬挂，等下一行「名: kaixiao…」
   let _cabinSeqPend = null;   // v-DT "舱位：I+I+X+X" 出现在段之前时悬挂，段齐后补赋
   let _enSegPend = null;      // v-EL 官网英文分行版：头行 → 航班行 → 时刻行 状态机
   let _docTypePendDob = '';   // v-EX 生日行先于乘客出现时悬挂
@@ -11373,6 +11374,53 @@ function parseSingleBooking(raw) {
         if (zt) { const n = parseInt(zt[1], 10); if (n >= 1 && n <= 20 && !travelerCount) travelerCount = n; continue; }
       }
       if (/^(时长[:：]|飞机类型[:：]|每个座位类型的排放|\^?\s*隐藏详细信息$|票价$|旅客[:：]\s*\d+$|\d+名成人)/.test(trimmed)) {
+        continue;
+      }
+    }
+    // ── 姓/名 拆行或同行（v-FR）："姓 chen" ＋ "名: kaixiao，1999-01-12  加拿大  男士"、"姓：CHEN 名：KAIXIAO" ──
+    //   名行尾部可带 生日（1999-01-12 / 1999年1月12日 / 12JAN99）、国籍（中文国名或 2–3 字母码）、性别（男士/先生/女士/小姐/男/女/MR/MS）。
+    //   不与「姓名：」「名字：」行冲突（那两种在"姓/名"后紧跟的是汉字而非字母）。
+    {
+      const CN_NAT = { '中国': 'CHN', '中国大陆': 'CHN', '大陆': 'CHN', '香港': 'HKG', '中国香港': 'HKG', '澳门': 'MAC', '台湾': 'TWN', '中国台湾': 'TWN',
+        '美国': 'USA', '加拿大': 'CAN', '英国': 'GBR', '澳大利亚': 'AUS', '澳洲': 'AUS', '新西兰': 'NZL', '日本': 'JPN', '韩国': 'KOR', '新加坡': 'SGP',
+        '马来西亚': 'MYS', '德国': 'DEU', '法国': 'FRA', '意大利': 'ITA', '西班牙': 'ESP', '荷兰': 'NLD', '泰国': 'THA', '越南': 'VNM', '菲律宾': 'PHL', '印度': 'IND' };
+      const _applyPaxTail = (px, tail) => {
+        if (!tail) return;
+        const dob = extractDOB(tail);
+        if (dob && !px.dob) px.dob = dob;
+        if (!px.gender) {
+          if (/(?:^|[^A-Za-z])(?:男士|先生|男|MR|MALE)(?![A-Za-z])/i.test(tail)) px.gender = 'MALE';
+          else if (/(?:^|[^A-Za-z])(?:女士|小姐|女|MRS|MS|FEMALE)(?![A-Za-z])/i.test(tail)) px.gender = 'FEMALE';
+        }
+        if (!px.nationality) {
+          const cn = Object.keys(CN_NAT).sort((a, b) => b.length - a.length).find(k => tail.includes(k));
+          if (cn) px.nationality = CN_NAT[cn];
+          else { const cc = tail.match(/(?:^|[\s，,、])([A-Z]{3})(?=$|[\s，,、])/); if (cc && !/^(?:MRS|MAL|FEM)$/.test(cc[1])) px.nationality = cc[1]; }
+        }
+      };
+      const sn = trimmed.match(/^(?:(?:乘客|乘机人|旅客)\s*[:：]?\s*)?姓\s*[:：]?\s*([A-Za-z]{2,})\s*(?:[，,、]?\s*名\s*[:：]?\s*([A-Za-z]+(?:\s+[A-Za-z]+)*)\s*[，,、]?\s*(.*))?$/);
+      if (sn) {
+        if (sn[2]) {
+          const name = sn[1].toUpperCase() + '/' + sn[2].toUpperCase().replace(/\s+/g, ' ');
+          let px = pax.find(p => _sameName(p.name, name));
+          if (!px) { px = { name, gender: '', dob: '' }; pax.push(px); }
+          _applyPaxTail(px, sn[3]);
+          _surnamePend = null;
+          _d(trimmed, '✅ PAX', `姓+名 同行 → ${name}`);
+        } else {
+          _surnamePend = sn[1].toUpperCase();
+          _d(trimmed, '⏳ PAX', `姓 ${_surnamePend} 悬挂，等「名」行`);
+        }
+        continue;
+      }
+      const gn = _surnamePend && trimmed.match(/^名\s*[:：]?\s*([A-Za-z]+(?:\s+[A-Za-z]+)*)\s*[，,、]?\s*(.*)$/);
+      if (gn) {
+        const name = _surnamePend + '/' + gn[1].toUpperCase().replace(/\s+/g, ' ');
+        let px = pax.find(p => _sameName(p.name, name));
+        if (!px) { px = { name, gender: '', dob: '' }; pax.push(px); }
+        _applyPaxTail(px, gn[2]);
+        _surnamePend = null;
+        _d(trimmed, '✅ PAX', `姓/名 拆行 → ${name}${px.dob ? ' 生日 ' + px.dob : ''}${px.gender ? ' ' + px.gender : ''}${px.nationality ? ' ' + px.nationality : ''}`);
         continue;
       }
     }

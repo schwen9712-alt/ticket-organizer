@@ -898,4 +898,21 @@ CO26153*0.9=23537.7=23540`;
   eq('FP5 合法航班号不动', (P("1.  UA152  K   SU25OCT  LAXHKG NN1   1210 1915+1    789      E ----").segs||[]).map(s=>s.flight), ['UA152']);
   eq('FP6 =结果恰等于算式 → 不算一口价；抹零 → 一口价；差太多 → 不算', [P("9600*0.87=8352").flatPrice, P("9600*0.87=8360").flatPrice, P("9600*0.87=9000").flatPrice, P("普通经济 6213*0.9 =5591.7000").flatPrice], [null, 8360, null, null]);
 }
+// v-FR 识别问题（CHEN/KAIXIAO）：「姓 chen」＋「名: kaixiao，1999-01-12  加拿大  男士」拆行乘客 + 生日/国籍/性别
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const FR_CHEN = String.raw`2.  UA131   Z  FR30OCT  EWRHND DK1   1050 1420+1    SEAME ----                 
+ 3.  UA130  Z  TU17NOV  HNDEWR DK1   1625 1515    SEAME ----
+运价  67482 CNY  
+
+姓 chen
+名: kaixiao，1999-01-12  加拿大  男士`;
+  const r = P(FR_CHEN);
+  eq('FR1 姓/名拆行 → CHEN/KAIXIAO 男 1999-01-12 CAN', JSON.stringify((r.pax||[]).map(p=>[p.name,p.gender,p.dob,p.nationality])), JSON.stringify([['CHEN/KAIXIAO','MALE','12JAN99','CAN']]));
+  eq('FR2 两段+运价+零未识别', [(r.segs||[]).length, r.rmb, (r.unrecognizedLines||[]).length], [2, 67482, 0]);
+  eq('FR3 同行「姓：CHEN 名：KAIXIAO 1999年1月12日 中国 女」', JSON.stringify((P('姓：CHEN 名：KAIXIAO 1999年1月12日 中国 女').pax||[]).map(p=>[p.name,p.gender,p.dob,p.nationality])), JSON.stringify([['CHEN/KAIXIAO','FEMALE','12JAN99','CHN']]));
+  eq('FR4 多字名 + 字母国籍码 + MR', JSON.stringify((P('姓 wang\n名 li hua, 12JAN99 USA MR').pax||[]).map(p=>[p.name,p.gender,p.dob,p.nationality])), JSON.stringify([['WANG/LI HUA','MALE','12JAN99','USA']]));
+  eq('FR5 「姓」悬挂无「名」行 → 不建乘客；「姓名：」「名字：」行不受影响', [(P('姓 zhang\n2.  UA131   Z  FR30OCT  EWRHND DK1   1050 1420+1').pax||[]).length, (P('姓名：WANG LIHUA\n性别：女').pax||[])[0]?.name, (P('名字：CHEN/GONGHAI\n出生日期 1969-06-14').pax||[])[0]?.dob], [0, 'WANG/LIHUA', '14JUN69']);
+  eq('FR6 带「乘客：」前缀同行', JSON.stringify((P('乘客：姓 li 名 na，2001/3/5 香港 女士').pax||[]).map(p=>[p.name,p.gender,p.dob,p.nationality])), JSON.stringify([['LI/NA','FEMALE','05MAR01','HKG']]));
+}
 process.exit(fails ? 1 : 0);
