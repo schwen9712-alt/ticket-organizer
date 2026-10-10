@@ -849,4 +849,33 @@ const ARS = String.raw`乘机人1: ZHANG/BAOXIN MR (EJ8044647)
 `;
 const ar1 = parseSingleBooking(splitIntoBookings(ARS)[0]);
 eq('BN1 混排行程+乱 DOCS', [JSON.stringify((ar1.segs||[]).map(s=>[s.flight,s.from,s.to,s.date,s.depTime,s.arrTime])), (ar1.pax||[]).length, ar1.pax[0].name, ar1.pax[0].dob, ar1.pax[0].passportExpiry, ar1.rmb, ar1.cabin, (ar1.unrecognizedLines||[]).length], [JSON.stringify([['UA877','SFO','HKG','07OCT','23:30','05:00']]), 1, 'ZHANG/BAOXIN', '29SEP06', '01FEB33', 6673, '经济舱', 0]);
+// 头行自带金额："第一单 89商务 48391 含税"；九种头行形态不误抓
+const ASS = String.raw`第一单   89商务   48391 含税
+1.  UA1967 P   SA19DEC  ORDLAX GK1   1745   2025   753  0 E  1 7               
+ 2.  UA771  P   SA19DEC  LAXPEK GK1   2335   0635+2 789  0 E  7 3               
+ 1.  UA772  P   TH31DEC  PEKLAX DK1   1140   0755   789  0 E  3 B  
+ 1.  UA2831 P   TH31DEC  LAXSFO GK1   1134   1309   7M8  0 E  7 3               
+ 2.  UA2421 P   TH31DEC  SFOYVR GK1   1351   1719   7M9  0 E  3 M       
+
+
+SSR DOCS UA HK1 P/USA/643312053/USA/07JAN69/F/13MAY29/GAO/XIAOJIAN/P1
+`;
+const as1 = parseSingleBooking(splitIntoBookings(ASS)[0]);
+eq('BO1 头行金额+89折+商务+五段', [(as1.segs||[]).length, (as1.pax||[]).length, as1.rmb, as1.discount, as1.cabin, (as1.unrecognizedLines||[]).length], [5, 1, 48391, 89, '商务舱', 0]);
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const seg = "\n 2.  UA889  P   WE28OCT  PEKSFO HK1   1920 1550\n";
+  const cases = [["第九单 87 商务", null, 87], ["第九单 经济舱 87折", null, 87], ["第九单 头等 8.7折", null, 87], ["17单 0.87 超级经济", null, 87], ["19单    92", null, 92], ["第二单 9折 经济 6213元", 6213, 90], ["第13单，87折 超经。  1.  DL038  G  SA11JUL  PVGLAX DK1  1745 2025", null, 87]];
+  eq('BO2 头行形态回归（金额/折扣）', cases.map(([h, rmb, d]) => { const x = P(h + seg); return [(x.rmb ?? null) === rmb, x.discount === d].every(Boolean); }).filter(Boolean).length, cases.length);
+}
+// v-FL 审计修正：头行金额不吞年份/日期/人数/K；同号经停两段不合并；中文+GDS 重复仍合并
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const seg = "\n 2.  UA889  P   WE28OCT  PEKSFO HK1   1920 1550\n";
+  const hdr = [["第一单 89商务 2026年10月", null], ["第二单 89 2026-10-07 出发", null], ["第三单 89 共3人 1234K", null], ["第四单 89 商务 2024元", 2024], ["第六单 89 商务 15886", 15886], ["第八单 89 2人", null]];
+  eq('BP1 头行金额边界', hdr.map(([h, w]) => (P(h + seg).rmb ?? null) === w).filter(Boolean).length, hdr.length);
+  eq('BP2 经停同号两段保留', (P(" 1.  CA1405 Y   MO12OCT  PEKCTU HK1   0800 1100\n 2.  CA1405 Y   MO12OCT  CTUKMG HK1   1200 1330").segs||[]).length, 2);
+  const r2 = P("NM1YING/JIANI\n1.  AA2635 R   WE21OCT  DFWONT DK1   1220   1330   321 0\n乘机人：应佳倪\n1. 美国航空AA2635  10月21日  达拉斯 沃斯0 - 洛杉矶安大略T4  12:20出发 - 13:30到达\nTOTAL CNY 5093");
+  eq('BP3 中文+GDS 重复段仍合并为 ONT', JSON.stringify((r2.segs||[]).map(s=>[s.cls,s.to])), JSON.stringify([['R','ONT']]));
+}
 process.exit(fails ? 1 : 0);
