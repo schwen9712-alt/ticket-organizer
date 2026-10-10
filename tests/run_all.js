@@ -19,6 +19,7 @@ step("e2e_test", () => { const out = run("e2e_test.js"); if (!/e2e 全绿/.test(
 step("report_test", () => { const out = run("report_test.js"); if (!/报表 e2e 全绿/.test(out)) throw new Error(out.split("\n").filter(l => l.startsWith("✗")).join("\n")); return (out.match(/^✓/gm) || []).length + " 断言"; });
 step("consistency_audit", () => run("consistency_audit.js").trim());
 step("ui_guard（功能存在性守卫）", () => run("ui_guard.js").trim());
+step("runtime_test（jsdom 真实启动→建单→渲染→持久化）", () => { const out = run("runtime_test.js"); if (/跳过/.test(out)) return "⚠ 跳过：未安装 jsdom（仓库目录 npm install 后启用）"; if (!/运行时冒烟全绿/.test(out)) throw new Error(out.split("\n").filter(l => l.startsWith("✗")).join("\n")); return out.trim().split("\n").pop().replace(/^✓ 运行时冒烟全绿 · /, ""); });
 step("variant_test（形态变体模糊）", () => { const out = run("variant_test.js"); return out.split("\n")[0]; });
 
 step("语法块审计", () => {

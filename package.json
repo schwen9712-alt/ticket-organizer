@@ -1,0 +1,12 @@
+{
+  "name": "ticket-organizer",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ticket Organizer 单文件出票系统 · tests/ 为发货门槛（node tests/run_all.js）",
+  "scripts": {
+    "test": "node tests/run_all.js"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

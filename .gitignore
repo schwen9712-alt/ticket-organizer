@@ -4,3 +4,7 @@
 # Build artifacts
 *.bak
 *~
+
+# Test tooling（v-FM：jsdom 运行时门槛）
+node_modules/
+*.cpuprofile
