@@ -56,6 +56,24 @@ const SAMPLES = [
   const b6 = orders.find(o => o.airline === "B6");
   const b6per = b6 && ((Array.isArray(b6.paxPrices) && b6.paxPrices[0]) || b6.basePrice);
   ok("美国境内婴儿免费结算（B6 三人：每人价 ×2 人 ×90%，婴儿 0）", b6 && w.computeFinalPrice(b6) === Math.round(b6per * 2 * 0.9), b6 ? `${w.computeFinalPrice(b6)} = ${b6per}×2×90% · paxPrices ${JSON.stringify(b6.paxPrices)}` : "无 B6 单");
+  // v-FS 基础经济：建单即 基础经济舱 + 行李额；启动迁移不再把细分产品打回经济舱；v3 修复历史单；行上有基础运价徽章
+  {
+    setField("f-agent", "东莞"); setField("f-tableLabel", "A");
+    d.getElementById("rawInput").value = "1.  UA889  G   FR06NOV  PEKSFO DK1   1920   1450   777  0   ----\n2.  UA2610 G   SA07NOV  SFOLAX DK1   1400   1535   738  0   ----\n02 GKW0IPB9            3809 CNY\n基础经济 1件行李\nSSR DOCS UA HK1 P/CHN/EJ4863304/CHN/16SEP02/F/18OCT31/HU/FANGQING/P1";
+    await w.parsePNR(); await sleep(100);
+    const hu = (ST().orders || []).find(o => (o.passengers || []).some(p => /HU\/FANGQING/.test(p.name || "")));
+    ok("基础经济建单：cabin=基础经济舱 · basicFare · 行李 1件 · 已标记迁移版本", !!hu && hu.cabin === "基础经济舱" && hu.basicFare === true && hu.baggageNote === "1件" && hu._migV === w.eval("PENDING_MIG_VERSION"), hu ? `${hu.cabin}/${hu.basicFare}/${hu.baggageNote}/migV=${hu._migV}` : "无 HU 单");
+    if (hu) {
+      const clone = { ...hu, cabin: "基础经济舱", _migV: 0 }; w.runPendingMigrations([clone]);
+      ok("启动迁移 v2 不再把 基础经济舱 打回 经济舱", clone.cabin === "基础经济舱", clone.cabin);
+      const lost = { ...hu, cabin: "经济舱", _migV: 2 }; w.runPendingMigrations([lost]);
+      ok("v3 迁移按标签修复被打回的历史单", lost.cabin === "基础经济舱", lost.cabin);
+      ok("_liveCabinZh 在 cabin 丢失时仍给回细分产品", w._liveCabinZh({ ...hu, cabin: "经济舱" }) === "基础经济舱");
+      w.renderPendingList(); await sleep(60);
+      const hh = d.querySelector(`#pendingArea .order-collapse-header[data-order-id="${hu.id}"]`);
+      ok("折叠行有「基础经济」徽章", !!(hh && hh.querySelector(".ui-badge--basic")) && /基础经济/.test(hh.textContent), hh ? hh.textContent.replace(/\s+/g, " ").slice(0, 80) : "无行");
+    }
+  }
   // v-FP 算式后约定成交价 → 每人一口价；段行 D0L39 修复
   {
     setField("f-agent", "季凯"); setField("f-tableLabel", "A");

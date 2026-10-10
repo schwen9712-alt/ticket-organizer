@@ -180,6 +180,12 @@
   box-shadow: 0 0 0 1.5px rgba(255,255,255,0.7), 0 0 6px rgba(200,160,74,0.5);
   animation: tableYBreathe 2.4s ease-in-out infinite;
 }
+.ui-badge--basic {    /* 基础运价（不可退改）— amber tint-on-border, v-FS */
+  background: rgba(217,119,6,0.10);
+  color: #9a4f06;
+  border-color: rgba(217,119,6,0.45);
+  font-weight: 700;
+}
 .ui-badge--seq {      /* ticketing-sequence note — red, attention */
   background: var(--red-light);
   color: var(--red);
@@ -3071,10 +3077,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FR\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FS\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FR</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FS</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -5800,6 +5806,8 @@ function newOrder(init = {}) {
     // prominent warning badge — these fares cannot be refunded or changed.
     basicFare: init.basicFare || false,
     basicFareLabel: init.basicFareLabel || '',
+    baggageNote: init.baggageNote || '',   // v-FS 票面行李额备注（"1件"/"2PC"/"23kg"）
+    _migV: init._migV != null ? init._migV : undefined,   // v-FS 新建单可声明已按当前逻辑生成（启动迁移跳过）
     // Tiered fares parsed from the paste (per-person, CNY): { adult, child, infant }
     // e.g. "TOTAL CNY 17365 成人运价 / TOTAL CNY 16845 儿童运价" or "32041 商务大人 / 32000 儿童价格"
     fareByType: init.fareByType || null,
@@ -9833,6 +9841,7 @@ function parseSingleBooking(raw) {
   let parsedBasicFareLabel = '';     // 原始标签如"基础商务舱"
   let parsedPaxPrices = undefined;
   let parsedFlatPrice = null;   // v-FP 算式后的约定成交价（每人一口价）
+  let parsedBaggage = '';       // v-FS 舱位行尾的行李额（"基础经济 1件行李"）
   let parsedFareByType = undefined;
   let _uaPendSeg = null;      // UA官网中文详情：航段头暂存（航班号分行在后）
   let _uaPendCabin = '';
@@ -12171,8 +12180,13 @@ function parseSingleBooking(raw) {
     if (parsedCabin === undefined) {
       // Allow an optional 基础/特价/促销 prefix that marks a NON-REFUNDABLE
       // basic fare, e.g. "基础商务舱", "基础经济舱", "特价经济".
-      const standaloneCabin = trimmed.match(/^(?:大人|儿童|婴儿)?\s*(基础|特价|促销)?\s*[^\u4e00-\u9fa5]*(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)\s*(?:\d+PC|行李(?:\s*\d+\s*kg)?)?\s*$/i);
+      const standaloneCabin = trimmed.match(/^(?:大人|儿童|婴儿)?\s*(基础|特价|促销)?\s*[^\u4e00-\u9fa5]*(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)\s*[,，、]?\s*(\d+\s*PC|\d+\s*件(?:托运)?(?:行李)?|行李\s*\d+\s*件|行李(?:\s*\d+\s*kg)?|\d+\s*kg)?\s*$/i);
         if (standaloneCabin) {
+        if (standaloneCabin[3] && !parsedBaggage) {   // v-FS "1件行李" / "2PC" / "行李23kg" → 行李额备注
+          const bg = standaloneCabin[3].replace(/\s+/g, '').toUpperCase();
+          const pc = bg.match(/^(\d+)(?:PC|件)/); const kg = bg.match(/(\d+)KG/);
+          parsedBaggage = pc ? pc[1] + '件' : (kg ? kg[1] + 'kg' : (bg === '行李' ? '' : bg));
+        }
         const cabMap2 = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱',
           '公务': '商务舱', '公务舱': '商务舱',
           '超经': '超级经济舱', '超级经济': '超级经济舱', '超级经济舱': '超级经济舱',
@@ -12182,7 +12196,9 @@ function parseSingleBooking(raw) {
         if (standaloneCabin[1]) {
           parsedBasicFare = true;
           parsedBasicFareLabel = standaloneCabin[1] + standaloneCabin[2];  // e.g. "基础商务舱"
+          if (parsedCabin === '经济舱' && standaloneCabin[1] === '基础') parsedCabin = '基础经济舱';   // v-FS 产品细分保留（与 v-DI 口径一致，勿折叠成经济舱）
         }
+        _d(trimmed, '✅ CABIN', `独行舱位行 ${parsedCabin}${parsedBasicFare ? ' · ' + parsedBasicFareLabel : ''}${parsedBaggage ? ' · 行李 ' + parsedBaggage : ''}`);
         continue;
       }
     }
@@ -13555,6 +13571,7 @@ function parseSingleBooking(raw) {
 
   return { pax, segs: dedupedSegs, airline, rmb, usd, trip,
     flatPrice: parsedFlatPrice || null,
+    baggage: parsedBaggage || '',
     discount: parsedDiscount || null,
     cabin: parsedCabin ?? null,
     paxPrices: parsedPaxPrices ?? null,
@@ -14351,7 +14368,9 @@ async function parsePNR() {
       ticketSeqNote: primary.ticketSeqNote || '',
       basicFare: primary.basicFare || false,
       basicFareLabel: primary.basicFareLabel || '',
-      fareByType: primary.fareByType || null
+      baggageNote: primary.baggage || '',
+      fareByType: primary.fareByType || null,
+      _migV: (typeof PENDING_MIG_VERSION === 'number') ? PENDING_MIG_VERSION : undefined   // v-FS 新建单已按当前逻辑生成，不再被启动迁移二次改写
     });
     const bookingText = chunk;
     // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
@@ -18452,6 +18471,14 @@ function renderPendingList() {
         }
         // ───────────────────────────────────────────────────────────────────
 
+        // 基础运价标识（v-FS）：行上直接可见，不靠灰色舱位字
+        if (o.basicFare) {
+          const bf = document.createElement('span');
+          bf.className = 'ui-badge ui-badge--basic';
+          bf.textContent = (o.basicFareLabel && /^(基础|特价|促销)/.test(o.basicFareLabel)) ? o.basicFareLabel.replace(/舱$/, '') : '基础运价';
+          bf.title = `${o.basicFareLabel || '基础运价'} · 通常不可退改${o.baggageNote ? ' · 行李 ' + o.baggageNote : ''}`;
+          header.appendChild(bf);
+        }
         // Imminent-departure chip（前移到判别区：行动级警示优先于信息徽章）
         const imminentHtml = buildImminentDepartureHTML(o);
         {
@@ -23406,6 +23433,8 @@ function _liveCabinZh(o) {
     if (live) {
       const stored = (o.cabin || '').trim();
       if (live === '经济舱' && /基础经济/.test(stored)) return stored;   // v-DI 基础经济是经济细分，保留更具体产品
+      // v-FS 基础运价单：即使 o.cabin 已退化为基础舱位，也按标签给回细分产品名（基础经济舱/基础商务舱）
+      if (o.basicFare) { const refined = _refinedCabinFromLabel(o.basicFareLabel); if (refined && _baseCabinZh(refined) === live) return refined; }
       return live;
     }
   } catch (e) {}
@@ -23456,6 +23485,7 @@ function buildCardHTML(o, idx) {
   if (o.branch) tags.push(`<span class="tag">${escapeHtml(o.branch)}${o.client ? escapeHtml(o.client) : ''}</span>`);
   if (o.airline) tags.push(`<span class="tag airline-tag">${escapeHtml(o.airline)}</span>`);
   { const _lc = _liveCabinZh(o); if (_lc) tags.push(`<span class="tag">${escapeHtml(_lc)}</span>`); }
+  if (o.baggageNote) tags.push(`<span class="tag" title="票面注明的行李额">🧳 ${escapeHtml(o.baggageNote)}</span>`);   // v-FS
 
   // Detect mixed-cabin booking (different cabin classes across segments).
   // Looks at each segment's class code and checks if they map to different cabins.
@@ -29694,7 +29724,21 @@ function persistOrders() {
 // entry point (local load, cloud pull, import). Uses each order's `_migV` flag so
 // already-migrated orders are untouched. Also uses a `looksLikeFallback` heuristic
 // so we never clobber a user's manually-set discount that differs from the rule.
-const PENDING_MIG_VERSION = 2;
+const PENDING_MIG_VERSION = 3;
+// 舱位等级（v-FS）：细分产品（基础/特价/促销 + 舱位）按其基础舱位计等级
+function _baseCabinZh(zh) { return String(zh || '').trim().replace(/^(?:基础|特价|促销)/, ''); }
+function _cabinRankZh(zh) {
+  const base = _baseCabinZh(zh);
+  const en = Object.entries(CABIN_EN_TO_ZH).find(([, z]) => z === base)?.[0];
+  return en ? (CABIN_RANK[en] || 0) : 0;
+}
+// 「基础经济」/「基础商务舱」标签 → 规范舱位名「基础经济舱」/「基础商务舱」；非舱位类标签（如「不可退改」）→ null
+function _refinedCabinFromLabel(label) {
+  const m = String(label || '').match(/^(基础|特价|促销)(头等舱|头等|商务舱|商务|公务舱|公务|超级经济舱|超级经济|超经|经济舱|经济)$/);
+  if (!m) return null;
+  const norm = { '头等': '头等舱', '头等舱': '头等舱', '商务': '商务舱', '商务舱': '商务舱', '公务': '商务舱', '公务舱': '商务舱', '超经': '超级经济舱', '超级经济': '超级经济舱', '超级经济舱': '超级经济舱', '经济': '经济舱', '经济舱': '经济舱' };
+  return m[1] + norm[m[2]];
+}
 function runPendingMigrations(orders) {
   const changed = { discount: 0, cabin: 0 };
   (orders || []).forEach(o => {
@@ -29722,18 +29766,23 @@ function runPendingMigrations(orders) {
       }
     }
     // v2: cabin re-infer from segment fare classes. Upgrade-only — never downgrade.
+    //     v-FS：按"基础舱位"比等级——「基础经济舱」是经济舱的细分产品，等级同经济舱，
+    //     不能被 G 舱推出的「经济舱」覆盖（此前它不在等级表里按 0 算，刷新一次就丢了基础经济标识）。
     if (currentV < 2) {
       const inferredZh = inferCabinFromSegments(o.airline, o.segments);
       if (inferredZh) {
-        const currentEn = Object.entries(CABIN_EN_TO_ZH).find(([, zh]) => zh === (o.cabin || ''))?.[0];
-        const inferredEn = Object.entries(CABIN_EN_TO_ZH).find(([, zh]) => zh === inferredZh)?.[0];
-        const currentRank = currentEn ? (CABIN_RANK[currentEn] || 0) : 0;
-        const inferredRank = inferredEn ? (CABIN_RANK[inferredEn] || 0) : 0;
+        const currentRank = _cabinRankZh(o.cabin);
+        const inferredRank = _cabinRankZh(inferredZh);
         if (inferredRank > currentRank) {
           o.cabin = inferredZh;
           changed.cabin++;
         }
       }
+    }
+    // v3（v-FS）：修复被 v2 覆盖掉的细分产品——基础运价单的舱位若退化成了基础舱位（经济舱），按标签恢复（基础经济舱）
+    if (currentV < 3 && o.basicFare) {
+      const refined = _refinedCabinFromLabel(o.basicFareLabel);
+      if (refined && _baseCabinZh(refined) === (o.cabin || '')) { o.cabin = refined; changed.cabin++; }
     }
     o._migV = PENDING_MIG_VERSION;
   });

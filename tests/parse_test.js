@@ -915,4 +915,16 @@ CO26153*0.9=23537.7=23540`;
   eq('FR5 「姓」悬挂无「名」行 → 不建乘客；「姓名：」「名字：」行不受影响', [(P('姓 zhang\n2.  UA131   Z  FR30OCT  EWRHND DK1   1050 1420+1').pax||[]).length, (P('姓名：WANG LIHUA\n性别：女').pax||[])[0]?.name, (P('名字：CHEN/GONGHAI\n出生日期 1969-06-14').pax||[])[0]?.dob], [0, 'WANG/LIHUA', '14JUN69']);
   eq('FR6 带「乘客：」前缀同行', JSON.stringify((P('乘客：姓 li 名 na，2001/3/5 香港 女士').pax||[]).map(p=>[p.name,p.gender,p.dob,p.nationality])), JSON.stringify([['LI/NA','FEMALE','05MAR01','HKG']]));
 }
+// v-FS 基础经济标识（HU/FANGQING）：「基础经济 1件行李」独行舱位行 → 基础经济舱 + 基础运价标签 + 行李额；不再落未识别
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const FS_HU = String.raw`1.  UA889  G   FR06NOV  PEKSFO DK1   1920   1450   777  0   ----               
+2.  UA2610 G   SA07NOV  SFOLAX DK1   1400   1535   738  0   ----  
+02 GKW0IPB9            3809 CNY
+基础经济 1件行李
+SSR DOCS UA HK1 P/CHN/EJ4863304/CHN/16SEP02/F/18OCT31/HU/FANGQING/P1`;
+  const r = P(FS_HU);
+  eq('FS1 基础经济舱 + 标签 + 行李 1件 + 零未识别', [r.cabin, r.basicFare, r.basicFareLabel, r.baggage, r.rmb, (r.unrecognizedLines||[]).length, (r.pax||[])[0]?.name], ['基础经济舱', true, '基础经济', '1件', 3809, 0, 'HU/FANGQING']);
+  eq('FS2 行李后缀变体：2PC / 托运行李 / 行李23kg；特价不折叠成基础', [P('经济舱 2PC'), P('基础商务舱 1件托运行李'), P('特价经济，行李23kg')].map(q => [q.cabin, q.basicFare, q.basicFareLabel, q.baggage]), [['经济舱', false, '', '2件'], ['商务舱', true, '基础商务舱', '1件'], ['经济舱', true, '特价经济', '23kg']]);
+}
 process.exit(fails ? 1 : 0);
