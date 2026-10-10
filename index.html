@@ -3071,10 +3071,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FQ\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FP</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FQ</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3266,7 +3266,7 @@ SUN/KAILAI MS 女 28SEP08
 
   <!-- Categories - per current order -->
   <div class="section">
-    <div class="section-title"><span class="num">1</span>CATEGORIES <span class="zh">分类标签</span><span id="currentOrderLabel" class="current-order-label"></span></div>
+    <div class="section-title"><span class="num">2</span>CATEGORIES <span class="zh">分类标签</span><span id="currentOrderLabel" class="current-order-label"></span></div>
     <div class="row">
       <div class="field">
         <label>代理 Agent <span style="color:var(--red); font-weight:700;" title="必填">*</span></label>
@@ -3329,7 +3329,7 @@ SUN/KAILAI MS 女 28SEP08
 
   <!-- Passengers -->
   <div class="section">
-    <div class="section-title"><span class="num">2</span>PASSENGERS <span class="zh">乘客</span></div>
+    <div class="section-title"><span class="num">3</span>PASSENGERS <span class="zh">乘客</span></div>
 
 
     <div class="mrz-paste-zone" style="background:#fff8e7; border:1px dashed var(--accent); border-radius:4px; padding:10px 12px; margin-bottom:10px;">
@@ -3355,7 +3355,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <!-- Segments -->
   <div class="section collapsible-section" data-collapsed="true" data-section-key="segments">
     <div class="section-title collapsible-header" onclick="toggleSection('segments')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
-      <span><span class="num">3</span>SEGMENTS <span class="zh">航段</span></span>
+      <span><span class="num">4</span>SEGMENTS <span class="zh">航段</span></span>
       <span class="collapsible-summary" id="summary-segments" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
       <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
@@ -3379,7 +3379,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <!-- Price -->
   <div class="section collapsible-section" data-collapsed="true" data-section-key="pricing">
     <div class="section-title collapsible-header" onclick="toggleSection('pricing')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
-      <span><span class="num">4</span>PRICING <span class="zh">售价公式</span></span>
+      <span><span class="num">5</span>PRICING <span class="zh">售价公式</span></span>
       <span class="collapsible-summary" id="summary-pricing" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
       <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
@@ -3423,7 +3423,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <!-- Settlement (for internal copy + cardholder) -->
   <div class="section collapsible-section" data-collapsed="true" data-section-key="settlement">
     <div class="section-title collapsible-header" onclick="toggleSection('settlement')" style="cursor:pointer; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
-      <span><span class="num">5</span>SETTLEMENT <span class="zh">开票 & 结算（内部）</span></span>
+      <span><span class="num">6</span>SETTLEMENT <span class="zh">开票 & 结算（内部）</span></span>
       <span class="collapsible-summary" id="summary-settlement" style="font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; color:var(--muted); flex:1; text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
       <span class="collapsible-toggle" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--accent-deep); font-weight:700; letter-spacing:0.05em; padding:2px 8px; border:1px solid var(--line); border-radius:var(--r-sm); background:#fff;">展开 ▾</span>
     </div>
@@ -3461,7 +3461,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <!-- Current order preview + actions -->
 
   <div class="section">
-    <div class="section-title"><span class="num">6</span>PREVIEW <span class="zh">当前订单预览</span></div>
+    <div class="section-title"><span class="num">7</span>PREVIEW <span class="zh">当前订单预览</span></div>
     <div class="preview-area" id="previewArea">
       <div class="empty-state">
         <div class="icon">✈</div>
@@ -3723,6 +3723,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
     <input type="text" id="chSearchInput" placeholder="🔍 搜索卡主：名字 / 渠道"
            oninput="renderCardholdersList()"
            style="width:100%; padding:8px 12px; border:1px solid var(--line); border-radius:4px; font-size:13px; margin-bottom:10px; background:#fff;">
+    <div id="chListToolbar" class="filter-bar" style="margin-bottom:10px;"></div>
     <div id="cardholdersList"></div>
     <div class="divider-dashed"></div>
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
@@ -7366,6 +7367,8 @@ document.querySelectorAll('.tab').forEach(t => {
         gear.style.borderColor = 'var(--line)';
       }
     }
+    // v-FQ 浮钮文案跟随标签页（待出票=返回总览，其他=回到顶部）
+    { const fb = document.getElementById('backToOverviewBtn'); if (fb) fb.textContent = t.dataset.tab === 'pending' ? '↑ 返回总览' : '↑ 回到顶部'; }
     // Render Chase panel on demand
     if (t.dataset.tab === 'chase') renderChasePanel();
     if (t.dataset.tab === 'speed') renderSpeedAnalysis();
@@ -18403,10 +18406,12 @@ function renderPendingList() {
 
         // Imminent-departure chip（前移到判别区：行动级警示优先于信息徽章）
         const imminentHtml = buildImminentDepartureHTML(o);
-        if (imminentHtml) {
+        {
           const imminentWrap = document.createElement('span');
+          imminentWrap.className = 'collapse-imminent';
           imminentWrap.style.cssText = 'display:inline-flex; align-items:center; flex-shrink:0;';
           imminentWrap.innerHTML = imminentHtml;
+          if (!imminentHtml) imminentWrap.style.display = 'none';
           header.appendChild(imminentWrap);
         }
 
@@ -18485,11 +18490,19 @@ function renderPendingList() {
 
         group.appendChild(header);
 
-        // ── Collapsible body ──────────────────────────────────────────────
+        // ── Collapsible body（v-FQ 惰性构建：折叠着的卡不生成 DOM，展开时才建）────
+        //   单展开模式下 24 单只有 1 张展开，此前 24 份 18KB 的卡体全部构建再 display:none，
+        //   列表 DOM 432KB、每次重绘 90ms；惰性后 DOM 与重绘时间随展开数而非订单数增长。
         const cardBody = document.createElement('div');
         cardBody.className = 'order-card-body';
         if (isCollapsed) cardBody.style.display = 'none';
-        cardBody.innerHTML = buildCardHTML(o, idx);
+        const ensureBody = () => {
+          if (cardBody.dataset.built) return;
+          cardBody.innerHTML = buildCardHTML(o, idx);
+          renderPendingOrderGroupExtras(cardBody, o, idx);
+          cardBody.dataset.built = '1';
+        };
+        if (!isCollapsed) ensureBody();
         group.appendChild(cardBody);
 
         // Toggle on header click — single-expand (accordion) by default.
@@ -18508,6 +18521,7 @@ function renderPendingList() {
           if (focusMode === 'multi' || multiKey) {
             if (nowCollapsed) {
               STATE.collapsedOrders.delete(o.id);
+              ensureBody();
               cardBody.style.display = '';
               header.classList.add('is-expanded');
             } else {
@@ -18540,6 +18554,7 @@ function renderPendingList() {
               }
             });
             STATE.collapsedOrders.delete(o.id);
+            ensureBody();
             cardBody.style.display = '';
             header.classList.add('is-expanded');
             // Smooth-scroll the newly opened card to top so it's not below fold
@@ -18551,7 +18566,6 @@ function renderPendingList() {
           _saveCollapsedOrders();
         });
 
-        renderPendingOrderGroupExtras(cardBody, o, idx);
         area.appendChild(group);
       } catch (err) {
         console.error('renderPendingList: order #' + (idx + 1) + ' failed:', err, o);
@@ -18783,9 +18797,10 @@ function renderPendingOrderGroupExtras(group, o, idx) {
       if (o.basePrice != null) {
         const basePriceUsd = o.basePrice / effectiveRate(o);
         const paxCount = o.passengers.length || 1;
-        html += `<span style="color:var(--blue);">人均 ≈ <strong>$${basePriceUsd.toFixed(2)}</strong></span>`;
+        // v-FQ 明确口径：票面原价折算的美金（卡主实付/积分兑换基准），不是售价
+        html += `<span style="color:var(--blue);" title="票面原价 ¥${o.basePrice.toLocaleString()} ÷ 汇率 ${effectiveRate(o)}（卡主实付基准，非售价）">票面/人 ≈ <strong>$${basePriceUsd.toFixed(2)}</strong></span>`;
         if (paxCount > 1) {
-          html += `<span style="color:var(--blue);">总额 ≈ <strong>$${(basePriceUsd * paxCount).toFixed(2)}</strong></span>`;
+          html += `<span style="color:var(--blue);" title="票面原价 × ${paxCount} 人">票面合计 ≈ <strong>$${(basePriceUsd * paxCount).toFixed(2)}</strong></span>`;
         }
       }
     }
@@ -20633,9 +20648,9 @@ function refreshPendingOrderPreview(idx) {
     if (o.basePrice != null) {
       const basePriceUsd = o.basePrice / rate;
       const paxCount = o.passengers.length || 1;
-      html += `<span style="color:var(--blue);">人均 ≈ <strong>$${basePriceUsd.toFixed(2)}</strong></span>`;
+      html += `<span style="color:var(--blue);" title="票面原价 ¥${o.basePrice.toLocaleString()} ÷ 汇率 ${rate}（卡主实付基准，非售价）">票面/人 ≈ <strong>$${basePriceUsd.toFixed(2)}</strong></span>`;
       if (paxCount > 1) {
-        html += `<span style="color:var(--blue);">总额 ≈ <strong>$${(basePriceUsd * paxCount).toFixed(2)}</strong></span>`;
+        html += `<span style="color:var(--blue);" title="票面原价 × ${paxCount} 人">票面合计 ≈ <strong>$${(basePriceUsd * paxCount).toFixed(2)}</strong></span>`;
       }
     }
   }
@@ -22309,6 +22324,42 @@ function _loadCollapsedOrders() {
     const raw = sessionStorage.getItem('to-collapsed');
     if (raw) STATE.collapsedOrders = new Set(JSON.parse(raw));
   } catch(e) {}
+}
+
+// ── v-FQ 每分钟"轻刷"：只就地更新会随时间变化的元素，不再整表重建 ─────────────
+//   此前每 60s 调一次 renderPendingList（24 单 ≈ 90ms 同步重建 432KB DOM），
+//   用户每分钟看到一次整列表闪白/跳位，正在打开的弹层/输入也被毁掉。
+//   现在：折叠行的创建时长徽章与起飞倒计时 chip 原地替换；速览面板与智能建议
+//   只在"可见文字真的会变"（按签名比对）时才重绘。
+let _usdTickSig = '';
+function tickPendingTimers() {
+  const panel = document.getElementById('panel-pending');
+  if (!panel || !panel.classList.contains('active')) return;
+  const byId = new Map((STATE.orders || []).map(o => [o.id, o]));
+  document.querySelectorAll('#pendingArea .order-collapse-header[data-order-id]').forEach(h => {
+    const o = byId.get(h.getAttribute('data-order-id'));
+    if (!o) return;
+    const age = h.querySelector('.collapse-age');
+    if (age && o.createdAt) {
+      const nb = buildAgeBadge(o.createdAt);
+      if (nb) { nb.className = 'collapse-age'; if (nb.outerHTML !== age.outerHTML) age.replaceWith(nb); }
+    }
+    const im = h.querySelector('.collapse-imminent');
+    if (im) {
+      const html = buildImminentDepartureHTML(o);
+      if (im.innerHTML !== html) { im.innerHTML = html; im.style.display = html ? '' : 'none'; }
+    }
+  });
+  // 速览面板 / 智能建议：签名（每单 创建时长桶 + 起飞倒计时 chip）变了才重绘
+  const sig = (STATE.orders || []).filter(isMeaningfulOrder).map(o => (o.createdAt ? buildAgeDotHTML(o.createdAt) : '') + '|' + buildImminentDepartureHTML(o)).join(';');
+  if (sig !== _usdTickSig) {
+    const first = _usdTickSig === '';
+    _usdTickSig = sig;
+    if (first) return;   // 首次只记录基线
+    if (typeof renderAirlineUsdPanel === 'function') renderAirlineUsdPanel();
+    if (typeof renderSmartSuggestions === 'function') renderSmartSuggestions();
+    if (typeof renderPendingBanner === 'function') renderPendingBanner();
+  }
 }
 
 function collapseAllOrders(collapse, orderIds) {
@@ -27675,14 +27726,20 @@ function renderCardholdersList() {
   // Compute stats per cardholder (exclude VOID/CANCEL/REFUND-completed orders)
   const ticketed = (settings.ticketed || []).filter(t => !t.excludedFromReport);
   list.innerHTML = '';
-  // Sort alphabetically by name (case-insensitive), with CHASE TRAVEL channel floating to top
+  // v-FQ 一次遍历建立 卡主→订单 索引（原每个卡主各扫一遍已出票：660 卡主 × 400 单）
+  const ordersByCh = new Map();
+  ticketed.forEach(t => { if (!t.cardholderId) return; if (!ordersByCh.has(t.cardholderId)) ordersByCh.set(t.cardholderId, []); ordersByCh.get(t.cardholderId).push(t); });
+  const chOrders = (ch) => ordersByCh.get(ch.id) || [];
+  const isChase = (ch) => (ch.channel || '').toUpperCase().includes('CHASE') || (ch.name || '').toUpperCase().includes('CHASE');
+  // v-FQ 排序：CHASE 渠道置顶 → 有未付款的在前 → 订单数多的在前 → 名字
   let sortedCardholders = [...settings.cardholders].sort((a, b) => {
-    const aChase = (a.channel || '').toUpperCase().includes('CHASE') || (a.name || '').toUpperCase().includes('CHASE');
-    const bChase = (b.channel || '').toUpperCase().includes('CHASE') || (b.name || '').toUpperCase().includes('CHASE');
-    if (aChase !== bChase) return aChase ? -1 : 1;
-    const an = (a.name || '').toLowerCase();
-    const bn = (b.name || '').toLowerCase();
-    return an.localeCompare(bn);
+    const ac = isChase(a), bc = isChase(b);
+    if (ac !== bc) return ac ? -1 : 1;
+    const ao = chOrders(a), bo = chOrders(b);
+    const au = ao.some(t => !t.paidAt), bu = bo.some(t => !t.paidAt);
+    if (au !== bu) return au ? -1 : 1;
+    if (ao.length !== bo.length) return bo.length - ao.length;
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
   });
   if (searchQ) {
     sortedCardholders = sortedCardholders.filter(ch => {
@@ -27691,12 +27748,29 @@ function renderCardholdersList() {
       return n.includes(searchQ) || c.includes(searchQ);
     });
   }
+  // v-FQ 「只看有订单的」开关：0 单卡主（历史导入/误建的名字）默认折起，搜索时不折
+  const zeroCount = sortedCardholders.filter(ch => chOrders(ch).length === 0).length;
+  let hideZero = true;
+  try { hideZero = sessionStorage.getItem('chHideZero') !== '0'; } catch (e) {}
+  const effectiveHide = hideZero && !searchQ && zeroCount > 0 && zeroCount < sortedCardholders.length;
+  const toolbar = document.getElementById('chListToolbar');
+  if (toolbar) {
+    const active = sortedCardholders.length - zeroCount;
+    toolbar.innerHTML = `<div class="filter-row">
+      <span class="filter-row__label">显示</span>
+      <button type="button" class="fchip${effectiveHide ? ' is-active' : ''}" onclick="try{sessionStorage.setItem('chHideZero','1')}catch(e){}; renderCardholdersList();" title="只显示至少有 1 单已出票的卡主">有订单 <span class="fchip__n">${active}</span></button>
+      <button type="button" class="fchip${!effectiveHide ? ' is-active' : ''}" onclick="try{sessionStorage.setItem('chHideZero','0')}catch(e){}; renderCardholdersList();" title="包含从未出过票的卡主">全部 <span class="fchip__n">${sortedCardholders.length}</span></button>
+      ${zeroCount > 0 ? `<span class="fchip__sub" style="margin-left:4px;">${zeroCount} 个卡主从未出票${effectiveHide ? '（已折起）' : ''}</span>` : ''}
+    </div>`;
+    toolbar.style.display = (zeroCount > 0 || searchQ) ? '' : 'none';
+  }
+  if (effectiveHide) sortedCardholders = sortedCardholders.filter(ch => chOrders(ch).length > 0);
   if (sortedCardholders.length === 0) {
     list.innerHTML = `<div class="empty-state" style="padding:24px 16px;"><div>没有匹配的卡主</div></div>`;
     return;
   }
   sortedCardholders.forEach(ch => {
-    const orders = ticketed.filter(t => t.cardholderId === ch.id);
+    const orders = chOrders(ch);
     // "Unpaid" = orders without paidAt; 应付 only shows what's still outstanding
     const unpaidOrders = orders.filter(t => !t.paidAt);
     const unpaidFee = unpaidOrders.reduce((s, t) => s + (t.cardholderFee || 0), 0);
@@ -30041,8 +30115,7 @@ async function mergeImportData(event) {
   setInterval(() => {
     const pendingPanel = document.getElementById('panel-pending');
     if (pendingPanel && pendingPanel.classList.contains('active')) {
-      if (typeof renderPendingList === 'function') renderPendingList();
-      if (typeof renderPendingBanner === 'function') renderPendingBanner();
+      if (typeof renderPendingBanner === 'function') renderPendingBanner();   // v-FQ 列表本身由每分钟轻刷维护，不再整表重建
     }
   }, 10 * 60 * 1000);
 
@@ -30153,10 +30226,7 @@ async function mergeImportData(event) {
   // Refresh pending list every minute so age badges progress from green → yellow → orange → red.
   // Also refresh actions list (VOID countdowns).
   setInterval(() => {
-    const pendingPanel = document.getElementById('panel-pending');
-    if (pendingPanel && pendingPanel.classList.contains('active')) {
-      renderPendingList();
-    }
+    tickPendingTimers();   // v-FQ 就地轻刷（原 renderPendingList 整表重建，每分钟闪一次）
     const actionsPanel = document.getElementById('panel-actions');
     if (actionsPanel && actionsPanel.classList.contains('active')) {
       renderActionsList();

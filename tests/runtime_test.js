@@ -71,10 +71,30 @@ const SAMPLES = [
   // ── 渲染 ──
   const t1 = Date.now(); w.renderPendingList(); const renderMs = Date.now() - t1;
   await sleep(100);
-  const cards = d.querySelectorAll(".ticket-card").length;
-  ok("列表渲染出卡片", cards >= 5, `${cards} 张 · ${renderMs}ms`);
-  ok("卡片含「⚠ UC 未确认」徽章", /UC 未确认/.test(d.body.innerHTML));
-  ok("速览行含「⚠ UC 未确认」徽章", (d.body.innerHTML.match(/UC 未确认/g) || []).length >= 2, `${(d.body.innerHTML.match(/UC 未确认/g) || []).length} 处`);
+  const headers = d.querySelectorAll("#pendingArea .order-collapse-header").length;
+  const builtBodies = d.querySelectorAll("#pendingArea .order-card-body[data-built]").length;
+  const expanded = d.querySelectorAll("#pendingArea .order-collapse-header.is-expanded").length;
+  ok("列表渲染出折叠行（v-FQ 惰性卡体：只有展开的卡才构建 DOM）", headers >= 5 && builtBodies === expanded, `${headers} 行 · 已建卡体 ${builtBodies} = 展开 ${expanded} · ${renderMs}ms`);
+  ok("速览行含「⚠ UC 未确认」徽章", /UC 未确认/.test(d.body.innerHTML));
+  // 点开含 UC 段的折叠行 → 惰性构建卡体，卡片徽章出现
+  {
+    const ucHeader = uc && d.querySelector(`#pendingArea .order-collapse-header[data-order-id="${uc.id}"]`);
+    if (ucHeader && !ucHeader.classList.contains("is-expanded")) ucHeader.click();
+    await sleep(80);
+    const body = ucHeader && ucHeader.nextElementSibling;
+    ok("点开折叠行后卡体惰性构建且含「⚠ UC 未确认」", !!body && body.dataset.built === "1" && body.style.display !== "none" && /UC 未确认/.test(body.innerHTML) && d.querySelectorAll("#pendingArea .ticket-card").length >= 1,
+      body ? `built=${body.dataset.built} display=${body.style.display || "''"} bytes=${body.innerHTML.length}` : "无 UC 行");
+    const dupBodies = d.querySelectorAll("#pendingArea .order-card-body[data-built]").length;
+    ok("单展开模式：点开一张后其余折叠，已建卡体数不随订单数增长", dupBodies <= 2, `${dupBodies} 份`);
+  }
+  // 每分钟轻刷（v-FQ）：就地更新时长徽章/倒计时，不整表重建
+  {
+    const before = d.querySelectorAll("#pendingArea .order-collapse-header").length;
+    const bodyBefore = d.querySelector("#pendingArea .order-card-body[data-built]");
+    w.tickPendingTimers(); await sleep(30);
+    const after = d.querySelectorAll("#pendingArea .order-collapse-header").length;
+    ok("每分钟轻刷：行数不变、已建卡体对象未被重建、徽章仍在、无异常", before === after && d.querySelector("#pendingArea .order-card-body[data-built]") === bodyBefore && d.querySelectorAll("#pendingArea .collapse-age").length >= 1 && errors.length === 0, `${before}→${after} 行`);
+  }
   const alRow = d.getElementById("airlineFilterRow");
   ok("航司快切行渲染（与代理行同一筛选条）", !!alRow && alRow.closest(".filter-bar") === d.querySelector("#agentSummaryBar .filter-bar") && alRow.querySelectorAll(".fchip").length >= 3, alRow ? alRow.textContent.replace(/\s+/g, " ").trim().slice(0, 60) : "无");
   ok("代理行 chip 类化", d.querySelectorAll("#agentFilterRow .fchip").length >= 2, `${d.querySelectorAll("#agentFilterRow .fchip").length} 个`);
