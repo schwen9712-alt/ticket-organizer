@@ -3071,10 +3071,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FP\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FO</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FP</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9478,6 +9478,14 @@ function _normalizeRaw(raw) {
   s = s.replace(/\b([a-z]{2})(\d{2,4})\b/g, (m, a, n) => a.toUpperCase() + n);
   // ②c "姓/名" token 大写（"1.zhang/san" → "1.ZHANG/SAN"；英文里 and/or 之类被大写无碍解析）
   s = s.replace(/\b([a-z]{2,})\/([a-z]{2,})\b/g, (m, a, b) => a.toUpperCase() + '/' + b.toUpperCase());
+  // ②c2 GDS 段行航班号 token 修复（v-FP，先于 ②d 以便补点）："2. D0L39 Z TH24DEC LAXPVG DK1" 里的 D0L39 → DL39（码内混入 0），
+  //    "DLO39" → DL039（字母 O 当 0）。只在后文结构严格为 GDS 段行（舱位 星期日期 六字机场 状态码）时才修，不碰自由文本。
+  s = s.replace(/^(\s*\d{1,2}\.?\s+)([A-Z0-9]{3,7})(?=\s+[A-Z]\d?\s+(?:MO|TU|WE|TH|FR|SA|SU)?\d{2}[A-Z]{3}\s+[A-Z]{6}\s+[A-Z]{2}\d)/gm, (m, pre, tok) => {
+    if (/^[A-Z0-9]{2}\d{1,4}[A-Z]?$/.test(tok)) return m;                 // 已是合法 航司码+航班号
+    let fix = tok.replace(/^([A-Z])0([A-Z])(\d{1,4})$/, '$1$2$3');         // D0L39 → DL39
+    if (fix === tok) fix = tok.replace(/^([A-Z]{2})O(\d{1,4})$/, '$10$2');  // DLO39 → DL039
+    return /^[A-Z0-9]{2}\d{1,4}$/.test(fix) ? pre + fix : m;
+  });
   // ②d 序号补点："3 UA648 …" → "3. UA648 …"（仅当序号后紧跟 航司码+航班号；Travelport "1 DL 27G" 不受影响）
   s = s.replace(/^(\s*\d{1,2})\s+(?=[A-Z][A-Z0-9]\d{2,4}\b)/gm, '$1. ');
   // ③ 多空格/制表符压缩为单空格（行首缩进保留一个；换行保留）
@@ -9821,6 +9829,7 @@ function parseSingleBooking(raw) {
   let parsedBasicFare = false;       // 基础/特价运价（不可退改）
   let parsedBasicFareLabel = '';     // 原始标签如"基础商务舱"
   let parsedPaxPrices = undefined;
+  let parsedFlatPrice = null;   // v-FP 算式后的约定成交价（每人一口价）
   let parsedFareByType = undefined;
   let _uaPendSeg = null;      // UA官网中文详情：航段头暂存（航班号分行在后）
   let _uaPendCabin = '';
@@ -11328,6 +11337,11 @@ function parseSingleBooking(raw) {
             if (disc != null && parsedDiscount == null) {
               const pct = Math.round(disc * 100);
               if (pct >= 10 && pct <= 100) parsedDiscount = pct;
+            }
+            // v-FP "=8360" 与 9600×0.87=8352 相差 ≤0.5%（抹零）→ 约定成交价（每人一口价）；恰好相等或差太多则不动
+            if (fx[4] && disc != null && cnt === 1 && !parsedFlatPrice) {
+              const agreed = parseFloat(fx[4].replace(/,/g, '')), computed = a * disc, diff = Math.abs(agreed - computed);
+              if (agreed >= 500 && diff >= 0.5 && diff <= Math.max(5, computed * 0.005)) { parsedFlatPrice = agreed; _d(trimmed, '💰 FLAT', `约定成交价 ${agreed}/人（算式 ${computed.toFixed(2)}）`); }
             }
             _d(trimmed, '💰 FARE', `算式 每人票面${a}${disc != null ? ' 折扣' + Math.round(disc * 100) + '%' : ''} ×${cnt}人`);
             continue;
@@ -12896,6 +12910,21 @@ function parseSingleBooking(raw) {
         const firstRate = rates[0];
         // Only trust this path if rate looks like a discount (0.50 - 1.00)
         if (firstRate >= 0.5 && firstRate <= 1.0) {
+          // ── 算式后的"约定成交价"（v-FP）："26153*0.9=23537.7=23540" 末尾的 =23540 是代理把折后价抹零后的
+          //    实际收款价；与算式结果相差 ≤ 0.5%（且 ≥ 0.5 元，恰好等于算式结果的不算）时记为一口价（每人），
+          //    订单层以一口价覆盖折扣算式，卡片仍保留 原价×折扣 信息。
+          if (amounts.length === 1 && rates.length === 1) {
+            const eqM = trimmed.match(/=\s*([\d.]+)\s*$/);
+            const computed = amounts[0] * firstRate;
+            if (eqM) {
+              const agreed = parseFloat(eqM[1]);
+              const diff = Math.abs(agreed - computed);
+              if (agreed >= 500 && diff >= 0.5 && diff <= Math.max(5, computed * 0.005)) {
+                parsedFlatPrice = agreed;
+                _d(trimmed, '💰 FLAT', `算式 ${amounts[0]}×${firstRate}=${computed.toFixed(2)} → 约定成交价 ${agreed}/人（一口价）`);
+              }
+            }
+          }
           if (amounts.length === 1 || amounts.every(a => a === amounts[0])) {
             // Single price (or all same) — standard per-pax basePrice
             if (amounts[0] >= 500 && amounts[0] <= 500000) {
@@ -13474,6 +13503,7 @@ function parseSingleBooking(raw) {
   }
 
   return { pax, segs: dedupedSegs, airline, rmb, usd, trip,
+    flatPrice: parsedFlatPrice || null,
     discount: parsedDiscount || null,
     cabin: parsedCabin ?? null,
     paxPrices: parsedPaxPrices ?? null,
@@ -14275,6 +14305,8 @@ async function parsePNR() {
     const bookingText = chunk;
     // Store custom exchange rate if parsed from PNR (e.g. "7055.53*6.9*0.87")
     if (primary.customRate) o.customRate = primary.customRate;
+    // v-FP 算式后的约定成交价 "26153*0.9=23537.7=23540" → 每人一口价 23540（原价×折扣仍保留供查看）
+    if (primary.flatPrice && !primary.customRate) { o.flatPriceMode = true; o.flatPriceCny = primary.flatPrice; o.flatPricePerPax = true; }
 
     // If we have per-pax prices, compute rmb as sum-of-paxPrices × discount
     if (o.paxPrices && o.paxPrices.length > 0 && o.discount != null && !primary.customRate) {
@@ -18410,8 +18442,10 @@ function renderPendingList() {
         midEl.title = midText;
         const priceEl = document.createElement('span');
         priceEl.className = 'cs-price';
-        priceEl.textContent = o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '—';
-        if (!o.rmb) priceEl.classList.add('cs-price-empty');
+        // v-FP 行上价格 = 订单收入（与分组小计/横幅同口径：一口价/折扣/婴儿免费全部生效），不再是裸 rmb
+        const _rowRev = orderRevenue(o);
+        priceEl.textContent = _rowRev != null ? `¥${Math.round(_rowRev).toLocaleString()}` : (o.rmb ? `¥${Math.round(o.rmb).toLocaleString()}` : '—');
+        if (_rowRev == null && !o.rmb) priceEl.classList.add('cs-price-empty');
         if (o.rmb) {
           priceEl.style.cursor = 'pointer';
           priceEl.title = '点击核价：折算美金 vs 美国运价';
@@ -26220,7 +26254,8 @@ function renderChasePanel() {
     const paxNames = (o.passengers||[]).map(p => (p.name||'').split('/')[0]).filter(Boolean).join(' / ');
     const seg0 = o.segments[0], segN = o.segments[o.segments.length-1];
     const route = seg0 ? seg0.from + '→' + (segN||seg0).to : '';
-    const price = o.rmb ? '¥' + Math.round(o.rmb).toLocaleString() : '';
+    const _rev = orderRevenue(o);   // v-FP 与待出票行同口径（收入）
+    const price = _rev != null ? '¥' + Math.round(_rev).toLocaleString() : (o.rmb ? '¥' + Math.round(o.rmb).toLocaleString() : '');
     // Build airline badge (brand-colored, matches the one in 待出票 tab)
     let airlineBadgeHtml = '';
     if (o.airline) {

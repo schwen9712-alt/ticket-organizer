@@ -56,6 +56,16 @@ const SAMPLES = [
   const b6 = orders.find(o => o.airline === "B6");
   const b6per = b6 && ((Array.isArray(b6.paxPrices) && b6.paxPrices[0]) || b6.basePrice);
   ok("美国境内婴儿免费结算（B6 三人：每人价 ×2 人 ×90%，婴儿 0）", b6 && w.computeFinalPrice(b6) === Math.round(b6per * 2 * 0.9), b6 ? `${w.computeFinalPrice(b6)} = ${b6per}×2×90% · paxPrices ${JSON.stringify(b6.paxPrices)}` : "无 B6 单");
+  // v-FP 算式后约定成交价 → 每人一口价；段行 D0L39 修复
+  {
+    setField("f-agent", "季凯"); setField("f-tableLabel", "A");
+    d.getElementById("rawInput").value = "1.CAI/CHENGYUN\n2.  D0L39   Z   TH24DEC  LAXPVG DK1   1100 1720+1    SEAME  3 1\n3.  DL068   V1  WE27JAN  TPESEA DK1   1055 0536    SEAME  2--\n4.  DL1628 V1  WE27JAN  SEALAX DK1   0720 1015    SEAME -- 3\n\n护照信息\nEL1032838/CHN/29APR05/M/06SEP33/CAI/CHENGYUN/P1\n\nCO26153*0.9=23537.7=23540";
+    await w.parsePNR(); await sleep(100);
+    const cai = (ST().orders || []).find(o => (o.passengers || []).some(p => /CAI\/CHENGYUN/.test(p.name || "")));
+    ok("约定成交价入库为每人一口价 23540（原价 26153 · 90% 保留）", !!cai && cai.flatPriceMode === true && cai.flatPriceCny === 23540 && cai.flatPricePerPax === true && w.computeFinalPrice(cai) === 23540 && cai.basePrice === 26153 && cai.discount === 90,
+      cai ? `flat=${cai.flatPriceMode}/${cai.flatPriceCny}/${cai.flatPricePerPax} final=${w.computeFinalPrice(cai)} base=${cai.basePrice} disc=${cai.discount}` : "无 CAI 单");
+    ok("段行 D0L39 修复后三段入库", !!cai && (cai.segments || []).length === 3 && cai.segments[0].flight === "DL39", cai ? cai.segments.map(s => s.flight).join(",") : "无");
+  }
   const linked = orders.filter(o => o.ticketOrder);
   ok("显式序号自动关联（第一个开/第二个开）", linked.length === 2 && linked.every(o => (o.linkedOrderIds || []).length === 1), linked.map(o => o.ticketOrder + ":" + (o.linkedOrderIds || []).length).join(" "));
   // ── 渲染 ──

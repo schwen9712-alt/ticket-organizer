@@ -878,4 +878,24 @@ eq('BO1 头行金额+89折+商务+五段', [(as1.segs||[]).length, (as1.pax||[])
   const r2 = P("NM1YING/JIANI\n1.  AA2635 R   WE21OCT  DFWONT DK1   1220   1330   321 0\n乘机人：应佳倪\n1. 美国航空AA2635  10月21日  达拉斯 沃斯0 - 洛杉矶安大略T4  12:20出发 - 13:30到达\nTOTAL CNY 5093");
   eq('BP3 中文+GDS 重复段仍合并为 ONT', JSON.stringify((r2.segs||[]).map(s=>[s.cls,s.to])), JSON.stringify([['R','ONT']]));
 }
+// v-FP 识别问题（CAI/CHENGYUN）：GDS 段行航班号混入 0（D0L39）→ DL39；裸护照行；算式后约定成交价 =23540 → 每人一口价
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const FP_CAI = String.raw`1.CAI/CHENGYUN
+2.  D0L39   Z   TH24DEC  LAXPVG DK1   1100 1720+1    SEAME  3 1
+3.  DL068   V1  WE27JAN  TPESEA DK1   1055 0536    SEAME  2--
+4.  DL1628 V1  WE27JAN  SEALAX DK1   0720 1015    SEAME -- 3
+
+护照信息
+EL1032838/CHN/29APR05/M/06SEP33/CAI/CHENGYUN/P1
+
+CO26153*0.9=23537.7=23540`;
+  const r = P(FP_CAI);
+  eq('FP1 段行 D0L39 修复为 DL39 且三段齐', JSON.stringify((r.segs||[]).map(s=>[s.flight,s.cls,s.from,s.to,s.arrTime])), JSON.stringify([['DL39','Z','LAX','PVG','1720+1'],['DL068','V','TPE','SEA','0536'],['DL1628','V','SEA','LAX','1015']]));
+  eq('FP2 裸护照行 生日/性别/效期', [(r.pax||[])[0]?.name, (r.pax||[])[0]?.dob, (r.pax||[])[0]?.gender, (r.pax||[])[0]?.passportExpiry], ['CAI/CHENGYUN','29APR05','MALE','06SEP33']);
+  eq('FP3 原价/折扣/约定成交价', [r.rmb, r.discount, r.flatPrice, (r.unrecognizedLines||[]).length], [26153, 90, 23540, 0]);
+  eq('FP4 字母 O 当 0：DLO39 → DL039', (P("1.  DLO39   Z   TH24DEC  LAXPVG DK1   1100 1720+1").segs||[]).map(s=>s.flight), ['DL039']);
+  eq('FP5 合法航班号不动', (P("1.  UA152  K   SU25OCT  LAXHKG NN1   1210 1915+1    789      E ----").segs||[]).map(s=>s.flight), ['UA152']);
+  eq('FP6 =结果恰等于算式 → 不算一口价；抹零 → 一口价；差太多 → 不算', [P("9600*0.87=8352").flatPrice, P("9600*0.87=8360").flatPrice, P("9600*0.87=9000").flatPrice, P("普通经济 6213*0.9 =5591.7000").flatPrice], [null, 8360, null, null]);
+}
 process.exit(fails ? 1 : 0);
