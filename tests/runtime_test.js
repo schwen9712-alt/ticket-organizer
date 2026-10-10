@@ -40,6 +40,7 @@ const SAMPLES = [
   await sleep(300);   // 启动钩子（DOMContentLoaded/load/setTimeout）跑完
   const bootMs = Date.now() - t0;
   ok("页面启动无未捕获异常", errors.length === 0, errors.slice(0, 3).join(" | ") || `${bootMs}ms`);
+  { const leaks = [...d.body.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()).map(n => n.textContent.trim().slice(0, 20)); const first = d.body.firstElementChild ? d.body.firstElementChild.tagName : ""; ok("页面无属性泄漏（body 无裸文本、首元素非标签残片）", leaks.length === 0 && /^[A-Z]+$/.test(first) && !/^(RECT|PATH|SVG)$/.test(first), leaks.join("|") || first); }
   ok("核心入口存在", ["parsePNR", "renderPendingList", "renderAirlineUsdPanel", "computeFinalPrice", "persistOrdersNow"].every(n => typeof w[n] === "function"));
   ok("标签页标题已初始化", /Ticket Organizer/.test(d.title), d.title);
   // ── 走真实主入口建单 ──

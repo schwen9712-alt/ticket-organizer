@@ -11,7 +11,7 @@
 <meta name="application-name" content="Ticket Organizer">
 <meta name="apple-mobile-web-app-title" content="出票">
 <meta name="description" content="订单整理工具 · 机票代订出票系统">
-<link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg%20xmlns="http://www.w3.org/2000/svg"%20viewBox="0%200%2064%2064"><rect%20width="64"%20height="64"%20rx="14"%20fill="#5E6AD2"/><path%20d="M50%2014%20L36%2030%20L18%2026%20L14%2030%20L28%2036%20L22%2044%20L14%2045%20L12%2048%20L20%2050%20L22%2058%20L25%2056%20L26%2048%20L34%2042%20L40%2056%20L44%2052%20L40%2034%20L52%2020%20Z"%20fill="#fff"/></svg>">
+<link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%235E6AD2%22/%3E%3Cpath%20d=%22M50%2014%20L36%2030%20L18%2026%20L14%2030%20L28%2036%20L22%2044%20L14%2045%20L12%2048%20L20%2050%20L22%2058%20L25%2056%20L26%2048%20L34%2042%20L40%2056%20L44%2052%20L40%2034%20L52%2020%20Z%22%20fill=%22%23fff%22/%3E%3C/svg%3E">
 <meta name="color-scheme" content="light">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1961,7 +1961,7 @@ code:not([class]):not(pre code) {
   position: absolute;
   left: 0; right: 0; bottom: 0;
   height: 6px;
-  background: rgba(255,255,255,0.05);
+  background: rgba(31,35,40,0.06);   /* v-FN 浅底轨道 */
   overflow: visible;
   cursor: help;
 }
@@ -1978,8 +1978,8 @@ code:not([class]):not(pre code) {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.85);
-  text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  color: var(--ink);   /* v-FN 浅底 */
+  text-shadow: none;
   pointer-events: none;
 }
 @media (max-width: 480px) {
@@ -3062,10 +3062,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FM\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FM</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FN</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3515,7 +3515,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
         <span class="v" id="pbScoreboardV">—</span><span class="l" id="pbScoreboardL">今日 vs 同期</span>
       </div>
       <button onclick="openStatsDashboard()" title="查看月度统计、卡主排行（Ctrl+D）" data-i18n="pb.btn.stats"
-        style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;white-space:nowrap;">📊 统计</button>
+        style="background:transparent;border:1px solid var(--line-strong, var(--line));color:var(--ink);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:11px;white-space:nowrap;">📊 统计</button>
     </div>
     <!-- Assignment progress strip (full-width, sits at bottom of banner) -->
     <div class="pb-progress" id="pbProgress" title="">
@@ -3772,7 +3772,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   <!-- Display preferences -->
   <div class="section" style="border-left: 3px solid #8e44ad;">
     <div class="section-title"><span class="num">🎨</span>DISPLAY <span class="zh">显示设置</span></div>
-    <div class="setting-row">
+    <div class="setting-row" style="display:none;" data-pending="v-FN 暗色模式为半成品（令牌未翻转、54 处硬编码白底），亲眼核验后下架，待专版重做">
       <div><div class="label">🌙 暗色模式</div><div class="desc">深色背景，减少眼疲劳</div></div>
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
         <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode(this.checked)" style="accent-color:#8e44ad;width:16px;height:16px;">
@@ -5340,10 +5340,11 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .pending-banner .pb-stat .v {
   font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: var(--ink);   /* v-FN 横幅已是纸色底，白字不可见 */
 }
 .pending-banner .pb-stat .l {
-  opacity: 0.5;
+  opacity: 1;
+  color: var(--muted);   /* v-FN 由 50% 透明白改为实色 muted，对比达标 */
   font-size: 9.5px;
   letter-spacing: 0.05em;
 }
@@ -5369,7 +5370,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-size: 14px;
 }
 .pending-banner .pb-stat.eta .l {
-  color: rgba(200,160,74,0.7);
+  color: var(--accent-deep, var(--accent));
 }
 
 /* ─── Glyph disambiguation for monospace ─────────────────────────────────
@@ -5432,32 +5433,32 @@ input[type="text"], input[type="number"], textarea {
   background: linear-gradient(180deg, transparent 0%, #ff8a7a 50%, transparent 100%);
 }
 .pending-banner .pb-stat.scoreboard.neutral::before {
-  background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
+  background: linear-gradient(180deg, transparent 0%, var(--line-strong, rgba(31,35,40,0.2)) 50%, transparent 100%);
 }
 .pending-banner .pb-stat.scoreboard.ahead .v {
-  color: #79e8a8;
+  color: var(--green);   /* v-FN 浅底用深绿 */
   font-size: 14px;
   font-weight: 800;
 }
 .pending-banner .pb-stat.scoreboard.behind .v {
-  color: #ff8a7a;
+  color: var(--red);   /* v-FN 浅底用深红 */
   font-size: 14px;
   font-weight: 800;
 }
 .pending-banner .pb-stat.scoreboard.neutral .v {
-  color: rgba(255,255,255,0.7);
+  color: var(--ink);
   font-size: 14px;
   font-weight: 700;
 }
 .pending-banner .pb-stat.scoreboard .l {
-  color: rgba(255,255,255,0.42);
+  color: var(--muted);
   font-size: 9px;
 }
 .pending-banner .pb-stat.scoreboard.ahead .l {
-  color: rgba(121,232,168,0.7);
+  color: var(--green);
 }
 .pending-banner .pb-stat.scoreboard.behind .l {
-  color: rgba(255,138,122,0.7);
+  color: var(--red);
 }
 
 /* Daily summary */
@@ -15121,7 +15122,7 @@ function renderAirlineUsdPanel(orders) {
         ${buildAgeDotHTML(o.createdAt)}
         <span class="agent" onclick="event.stopPropagation(); openAgentSwitch(${originalIdx})" style="cursor:pointer;" title="点击快速切换代理（选错无需删单）">${escapeHtml(agent)}</span>
               <span class="airline" style="color:var(--muted); font-size:11px;">${o.tableLabel ? (o.isTableY ? '表A<span style="color:#b88a3a; font-weight:800; margin-left:1px; letter-spacing:0.02em;">·Y</span>' : '表'+escapeHtml(o.tableLabel)) : ''}${o.tableLabel === 'G' ? '<span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-block; margin-left:5px; padding:0 5px; border:1px solid rgba(70,150,80,0.5); background:rgba(70,150,80,0.12); color:#2f7d3f; border-radius:3px; font-size:9.5px; font-weight:700; letter-spacing:0.03em; vertical-align:middle;">♡ 基础·人工</span>' : ''}</span>
-        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(paxText)}</span>${_capRowBadges([tableYBadge, noSplitBadge, releaseBadge, packBadge, noAvailBadge, dobWarnBadge, blacklistBadge, imminentBadge, mixedBadge, aiRowBadge, basicFareBadge, ucBadge, seqNoteBadge, linkedBadge, historyBadge])}</span>
+        <span class="pax-names" style="display:inline-flex; align-items:center; gap:6px; min-width:0;"><span style="flex:0 1 auto; min-width:4.5em; max-width:14em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(paxText)}">${escapeHtml(paxText)}</span>${_capRowBadges([tableYBadge, noSplitBadge, releaseBadge, packBadge, noAvailBadge, dobWarnBadge, blacklistBadge, imminentBadge, mixedBadge, aiRowBadge, basicFareBadge, ucBadge, seqNoteBadge, linkedBadge, historyBadge])}</span>
         <span class="pax">${paxCount}人</span>
         <span class="per-pax">${perPaxText}</span>
         ${amountDisplay}
@@ -19706,11 +19707,8 @@ function toggleDarkMode(on) {
 }
 
 function initDarkMode() {
-  let on = false;
-  try { on = localStorage.getItem('ticket-dark-mode') === '1'; } catch(e) {}
-  const toggle = document.getElementById('darkModeToggle');
-  if (toggle) toggle.checked = on;
-  toggleDarkMode(on);
+  // v-FN 暗色模式下架：不再恢复持久化偏好（半成品：--ink/--paper 未翻转致 Logo/时钟隐形，卡片仍白底）。待专版重做后恢复。
+  document.body.classList.remove('dark-mode');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
