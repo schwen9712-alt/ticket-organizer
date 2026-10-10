@@ -66,6 +66,7 @@
   /* Accent — Linear's purple-blue, used sparingly */
   --accent:        #5E6AD2;
   --accent-deep:   #4752C4;
+  --accent-rgb:    94,106,210; /* rgba(var(--accent-rgb), a) — tints/glows of --accent */
   --accent-light:  rgba(94, 106, 210, 0.1);
 
   /* Status colors — desaturated, professional */
@@ -360,7 +361,7 @@ body {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
   background-image:
-    radial-gradient(circle at 20% 10%, rgba(200, 160, 74, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 20% 10%, rgba(var(--accent-rgb), 0.08) 0%, transparent 40%),
     radial-gradient(circle at 80% 90%, rgba(43, 76, 126, 0.06) 0%, transparent 40%);
 }
 
@@ -874,12 +875,12 @@ textarea.raw-input:focus {
   font-weight: 700;
   letter-spacing: 0.05em;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(200,160,74,0.3);
+  box-shadow: 0 2px 6px rgba(var(--accent-rgb), 0.3);
 }
 .segment-connector .plane {
   font-size: 18px;
   color: var(--accent);
-  filter: drop-shadow(0 1px 2px rgba(200,160,74,0.3));
+  filter: drop-shadow(0 1px 2px rgba(var(--accent-rgb), 0.3));
 }
 .segment-connector .meta {
   font-family: 'JetBrains Mono', monospace;
@@ -1690,8 +1691,8 @@ body.dark-mode .section-title { color: #aac; }
 ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Selection: warm gold highlight that matches the palette ── */
-::selection { background: rgba(200, 160, 74, 0.32); color: var(--ink); }
-::-moz-selection { background: rgba(200, 160, 74, 0.32); color: var(--ink); }
+::selection { background: rgba(var(--accent-rgb), 0.32); color: var(--ink); }
+::-moz-selection { background: rgba(var(--accent-rgb), 0.32); color: var(--ink); }
 
 /* ── Scrollbars: editorial slim & warm (Webkit) ── */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -2216,7 +2217,7 @@ body::before {
 }
 .preview-order-group:hover .seg-date-badge {
   transform: scale(1.04);
-  box-shadow: 0 4px 12px rgba(200,160,74,0.5);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.5);
 }
 
 /* ── Plane icon: gentle bob animation on hover ── */
@@ -2267,9 +2268,9 @@ body::before {
   height: 1px;
   background: linear-gradient(90deg,
     transparent 0%,
-    rgba(200, 160, 74, 0.25) 20%,
-    rgba(200, 160, 74, 0.4) 50%,
-    rgba(200, 160, 74, 0.25) 80%,
+    rgba(var(--accent-rgb), 0.25) 20%,
+    rgba(var(--accent-rgb), 0.4) 50%,
+    rgba(var(--accent-rgb), 0.25) 80%,
     transparent 100%);
   pointer-events: none;
 }
@@ -2341,7 +2342,7 @@ body::before {
   content: '';
   position: absolute;
   inset: -8px;
-  background: radial-gradient(circle, rgba(200,160,74,0.18) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.18) 0%, transparent 70%);
   z-index: -1;
   pointer-events: none;
 }
@@ -2350,12 +2351,12 @@ body::before {
 .agent-group-total strong {
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
-  text-shadow: 0 1px 4px rgba(200,160,74,0.25);
+  text-shadow: 0 1px 4px rgba(var(--accent-rgb), 0.25);
 }
 
 /* ── Drag-and-drop "drop zone" indicator (when dragging image onto card) ── */
 .preview-order-group[style*="outline: 2px dashed"] {
-  background: rgba(200, 160, 74, 0.04) !important;
+  background: rgba(var(--accent-rgb), 0.04) !important;
 }
 
 /* ── Verify modal table rows: subtle zebra striping ── */
@@ -2375,7 +2376,7 @@ body::before {
 #pendingFilterBar.is-stuck {
   box-shadow: 0 4px 14px rgba(12, 27, 42, 0.12), 0 1px 0 var(--line-strong);
   border-color: var(--accent);
-  background: rgba(251, 246, 236, 0.96) !important;
+  background: rgba(250, 250, 249, 0.97) !important;
 }
 #pendingFilterBar.is-stuck::before {
   content: '';
@@ -2630,7 +2631,7 @@ html { scroll-behavior: smooth; }
 .gradient-chip:hover {
   transform: translateY(-2px);
   border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(200,160,74,0.18);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.18);
 }
 .gradient-chip:hover::before { width: 5px; }
 .gradient-chip:active { transform: translateY(0); }
@@ -2775,9 +2776,9 @@ html[data-lang="en"] .zh {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid rgba(255,255,255,0.4);
-  background: rgba(255,255,255,0.1);
-  color: #fff;
+  border: 1.5px solid var(--line-strong);
+  background: transparent;
+  color: var(--muted);
   border-radius: 50%;
   font-size: 13px;
   cursor: pointer;
@@ -2790,9 +2791,9 @@ html[data-lang="en"] .zh {
   font-weight: 700;
 }
 .urgent-btn:hover {
-  background: rgba(255,255,255,0.25);
-  color: #fff;
-  border-color: rgba(255,255,255,0.7);
+  background: rgba(217,63,63,0.08);
+  color: var(--red);
+  border-color: var(--red);
   transform: scale(1.15);
 }
 .urgent-btn.is-urgent {
@@ -2814,16 +2815,15 @@ html[data-lang="en"] .zh {
   50%      { box-shadow: 0 0 0 4px rgba(184,60,44,0.18), 0 0 18px rgba(184,60,44,0.7); }
 }
 
-/* When the header has an urgent order, add a red left edge as anchor */
-.order-collapse-header:has(.urgent-btn.is-urgent) {
-  background: linear-gradient(90deg, rgba(184,60,44,0.18) 0%, var(--ink) 12%) !important;
-  border-left: 4px solid var(--red);
-  padding-left: 10px;
-}
-/* Fallback for browsers without :has() — apply via parent class */
+/* Urgent order: the group's status strip turns red and the row gets a red wash
+   that fades into paper — one anchor, not two strips (v-FO). */
+.preview-order-group.is-urgent { border-left-color: var(--red) !important; }
+.order-collapse-header:has(.urgent-btn.is-urgent),
 .preview-order-group.is-urgent .order-collapse-header {
-  background: linear-gradient(90deg, rgba(184,60,44,0.18) 0%, var(--ink) 12%) !important;
-  border-left: 4px solid var(--red);
+  background: linear-gradient(90deg, rgba(217,63,63,0.09) 0%, #fff 22%) !important;
+}
+.preview-order-group.is-urgent .order-collapse-header:hover {
+  background: linear-gradient(90deg, rgba(217,63,63,0.12) 0%, #fbfbfa 22%) !important;
 }
 
 /* Urgent count chip in the pending banner header */
@@ -2867,7 +2867,7 @@ html[data-lang="en"] .zh {
   margin-left: 8px;
   padding: 3px 10px;
   background: rgba(200, 160, 74, 0.16);
-  color: var(--accent);
+  color: var(--gold);
   border: 1px solid rgba(200, 160, 74, 0.32);
   border-radius: 20px;
   font-family: 'JetBrains Mono', monospace;
@@ -2886,7 +2886,7 @@ html[data-lang="en"] .zh {
 .pb-tabley .y-count {
   font-size: 13px;
   font-weight: 800;
-  color: var(--accent);
+  color: var(--gold);
 }
 .pb-tabley .y-label {
   opacity: 0.72;
@@ -2911,7 +2911,7 @@ html[data-lang="en"] .zh {
   border-radius: var(--r-sm);
 }
 .collapsible-header:hover {
-  background: rgba(200, 160, 74, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 .collapsible-header:hover .collapsible-toggle {
   border-color: var(--accent-deep);
@@ -2933,7 +2933,7 @@ html[data-lang="en"] .zh {
 /* Inline-editable discount cell on the ticket card price row.
    Dashed underline-style hint on hover; click swaps in a number input. */
 .discount-editable:hover {
-  background: rgba(200, 160, 74, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
   border-color: var(--accent-deep) !important;
 }
 @keyframes slideUp {
@@ -2970,8 +2970,8 @@ html[data-lang="en"] .zh {
 .cs-mid { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
 .cs-price { margin-left:auto; flex-shrink:0; font-family:'JetBrains Mono', monospace; font-weight:800; font-size:13px; color:var(--ink); letter-spacing:0.01em; }
 .cs-price-empty { color:var(--muted); font-weight:400; }
-.urgent-btn:not(.is-urgent) { opacity:0.35; transition:opacity .15s; }
-.order-collapse-header:hover .urgent-btn:not(.is-urgent) { opacity:0.8; }
+.urgent-btn:not(.is-urgent) { opacity:0.55; transition:opacity .15s, transform .18s, border-color .18s, color .18s; }
+.order-collapse-header:hover .urgent-btn:not(.is-urgent) { opacity:1; }
 /* ── ⏱ 转机时长行（融入虚线时间轴设计语言）── */
 .layover-row { text-align:center; font-size:12px; color:var(--ink-2); font-weight:600; padding:6px 0; margin:3px 12px; font-family:'JetBrains Mono', monospace; letter-spacing:0.03em; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); }
 .layover-return { font-weight:700; }
@@ -3023,6 +3023,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
 .fchip__sub { font-size:9px; color:var(--muted); }
 .fchip.is-active .fchip__sub { color:rgba(255,255,255,0.7); }
 .fchip--al { font-family:'JetBrains Mono',monospace; letter-spacing:0.04em; }
+/* ── v-FO: shared segmented control + compact select for filter rows ── */
+.segctl { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--r-md); overflow:hidden; flex-shrink:0; background:#fff; font-family:'JetBrains Mono',monospace; }
+.segctl button { padding:5px 12px; font-size:11px; font-weight:700; letter-spacing:0.04em; border:none; cursor:pointer; background:transparent; color:var(--muted); font-family:inherit; line-height:1.3; transition:background var(--t-fast), color var(--t-fast); }
+.segctl button + button { border-left:1px solid var(--line); }
+.segctl button:hover { color:var(--ink); background:rgba(31,35,40,0.04); }
+.segctl button.is-on { background:var(--ink); color:#fff; }
+.segctl--accent button.is-on { background:var(--accent); color:#fff; }
+.fsel { font-size:12px; padding:5px 10px; border:1px solid var(--line-strong); border-radius:var(--r-md); background:#fff; color:var(--ink); cursor:pointer; flex-shrink:0; font-family:inherit; line-height:1.3; transition:border-color var(--t-fast); }
+.fsel:hover, .fsel:focus { border-color:var(--accent); outline:none; }
 .ui-badge--danger { background:var(--red); color:#fff; border-color:var(--red); }
 /* 航司分组头 → 改航司弹层 */
 .al-popover { position:absolute; z-index:950; min-width:280px; max-width:360px; background:var(--paper, #fff); border:1px solid var(--line-strong, var(--line)); border-radius:var(--r-md); box-shadow:var(--shadow-md, 0 8px 24px rgba(0,0,0,0.14)); padding:10px 12px 12px; font-family:inherit; }
@@ -3062,10 +3071,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FN\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FO\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FN</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FO</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -3158,16 +3167,6 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     } catch (e) {}
   }
   setTimeout(_checkLatestVersion, 1500);
-  // ⬆ 回到顶部浮钮（v-DS）：长列表滚动 >600px 显示
-  {
-    const btn = document.createElement('button');
-    btn.id = 'backToTop'; btn.textContent = '↑'; btn.title = '回到顶部';
-    btn.style.cssText = 'position:fixed; right:18px; bottom:22px; width:40px; height:40px; border-radius:50%; border:1px solid var(--line); background:var(--card, #fff); color:var(--ink); font-size:18px; box-shadow:0 4px 14px rgba(0,0,0,0.12); cursor:pointer; display:none; z-index:900;';
-    btn.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
-    document.body.appendChild(btn);
-    let _ticking = false;
-    window.addEventListener('scroll', () => { if (_ticking) return; _ticking = true; requestAnimationFrame(() => { btn.style.display = window.scrollY > 600 ? 'block' : 'none'; _ticking = false; }); }, { passive: true });
-  }
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const ovs = document.querySelectorAll('.verify-modal-overlay');
@@ -3287,7 +3286,7 @@ SUN/KAILAI MS 女 28SEP08
       </div>
       <div class="field" id="f-tableY-field" style="display:none;">
         <label title="表 Y 是表 A 的特殊变体：享 9 折优惠且优先出票。仅表 A 可勾选。">表 Y 优惠</label>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px 10px; background:linear-gradient(135deg, rgba(200,160,74,0.10), rgba(200,160,74,0.02)); border:1px solid rgba(200,160,74,0.35); border-radius:var(--r-sm); font-size:12px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; padding:6px 10px; background:linear-gradient(135deg, rgba(var(--accent-rgb), 0.10), rgba(var(--accent-rgb), 0.02)); border:1px solid rgba(var(--accent-rgb), 0.35); border-radius:var(--r-sm); font-size:12px;">
           <input type="checkbox" id="f-isTableY" onchange="syncDOMToOrder(); renderPreview(); if(typeof renderPendingList==='function')renderPendingList(); if(typeof renderPendingBanner==='function')renderPendingBanner(); if(typeof renderAirlineUsdPanel==='function'){const m=STATE.orders.filter(o=>isMeaningfulOrder(o)&&o.tableLabel!=='G');renderAirlineUsdPanel(m);}" style="margin:0; accent-color:var(--accent-deep);">
           <span style="font-weight:600; color:var(--accent-deep);">⚡ 表 Y · 9 折 · 优先</span>
         </label>
@@ -4169,7 +4168,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   box-shadow: var(--shadow);
 }
 .preview-order-group + .preview-order-group {
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .preview-order-group .order-badge-wrap {
   position: absolute;
@@ -4181,32 +4180,37 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   z-index: 2;
 }
 
-/* Collapse header — replaces floating badge when collapse mode is active */
+/* Collapse header — the row you scan 20× a day (v-FO: light row).
+   It sits on paper like every other row; the dark gradient is reserved for the
+   agent group header above it, so hierarchy reads as group → rows. The group
+   wrapper supplies the 4px status strip on the left, the header draws the rest. */
 .order-collapse-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #0d1f30 0%, var(--ink) 100%);
-  border-radius: var(--r-md) var(--r-md) 0 0;
+  padding: 9px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: none;
+  border-radius: 0 var(--r-md) var(--r-md) 0;
   cursor: pointer;
   user-select: none;
   min-height: 42px;
-  transition: filter var(--t-fast);
+  transition: background var(--t-fast), border-color var(--t-fast);
 }
-.order-collapse-header:hover { filter: brightness(1.2); }
-.order-collapse-header:only-child,
-.order-collapse-header + .order-card-body[style*="none"] ~ * {
-  border-radius: var(--r-md);
+.order-collapse-header:hover { background: #fbfbfa; border-color: var(--line-strong); }
+.order-collapse-header.is-expanded {
+  border-radius: 0 var(--r-md) 0 0;
+  border-bottom-color: transparent;
 }
 .order-collapse-header .collapse-num {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-deep);
   letter-spacing: 0.08em;
   flex-shrink: 0;
-  background: rgba(200,160,74,0.15);
+  background: rgba(var(--accent-rgb), 0.10);
   padding: 2px 7px;
   border-radius: var(--r-sm);
 }
@@ -4216,7 +4220,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 .order-collapse-header .collapse-summary {
   flex: 1;
   font-size: 12px;
-  color: rgba(255,255,255,0.75);
+  color: var(--muted);
   font-family: 'JetBrains Mono', monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -4224,16 +4228,14 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 .order-collapse-header .collapse-chevron {
   font-size: 11px;
-  color: rgba(255,255,255,0.45);
+  color: var(--muted);
+  opacity: 0.7;
   flex-shrink: 0;
   transition: transform 0.18s ease;
 }
 .order-collapse-header.is-expanded .collapse-chevron {
   transform: rotate(180deg);
 }
-/* Collapsed-state styling: airline badge sits naturally; the header keeps its
-   dark gradient. We add a thin 2px accent strip at the very top of the header
-   matching the airline color, but only when the airline badge is present. */
 .order-collapse-header .collapse-airline {
   position: relative;
 }
@@ -4458,7 +4460,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-weight: 700;
   letter-spacing: 0.05em;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(200,160,74,0);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25), 0 0 0 0 rgba(var(--accent-rgb), 0);
   opacity: 0;
   transform: translateY(16px) scale(0.95);
   pointer-events: none;
@@ -4471,7 +4473,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 }
 #backToOverviewBtn:hover {
   background: #1a3050;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 0 4px rgba(200,160,74,0.2);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3), 0 0 0 4px rgba(var(--accent-rgb), 0.2);
   transform: translateY(-2px) scale(1);
 }
 
@@ -4542,7 +4544,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   border-color: var(--accent-deep);
   color: #fff;
   font-weight: 700;
-  box-shadow: 0 1px 4px rgba(200,160,74,0.3);
+  box-shadow: 0 1px 4px rgba(var(--accent-rgb), 0.3);
 }
 .airline-usd-row .order-num {
   font-weight: 700;
@@ -4607,7 +4609,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   position: absolute;
   right: -20px; top: -20px;
   width: 80px; height: 80px;
-  background: radial-gradient(circle, rgba(200,160,74,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.12) 0%, transparent 70%);
   pointer-events: none;
 }
 .agent-group-header:first-child { margin-top: 0; }
@@ -4625,7 +4627,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
-  box-shadow: 0 2px 6px rgba(200,160,74,0.3);
+  box-shadow: 0 2px 6px rgba(var(--accent-rgb), 0.3);
 }
 .agent-group-count {
   color: rgba(255,255,255,0.6);
@@ -4654,9 +4656,9 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   border-color: rgba(46, 125, 82, 0.4);
 }
 .agent-progress-chip.todo {
-  background: rgba(200, 160, 74, 0.18);
+  background: rgba(var(--accent-rgb), 0.18);
   color: var(--accent);
-  border-color: rgba(200, 160, 74, 0.45);
+  border-color: rgba(var(--accent-rgb), 0.45);
 }
 .agent-progress-chip.mixed {
   background: rgba(43, 76, 126, 0.22);
@@ -4778,8 +4780,8 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
 
 /* Finalize box in pending list */
 .finalize-box {
-  background: linear-gradient(160deg, #fffef9 0%, rgba(200,160,74,0.05) 100%);
-  border: 1.5px solid rgba(200,160,74,0.4);
+  background: linear-gradient(160deg, #fffef9 0%, rgba(var(--accent-rgb), 0.05) 100%);
+  border: 1.5px solid rgba(var(--accent-rgb), 0.4);
   border-left: 4px solid var(--accent-deep);
   border-radius: var(--r-md);
   padding: 16px 18px;
@@ -4884,6 +4886,19 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+/* v-FO: stat-card layout — count on top, 售/利 as aligned rows (was one span per line) */
+.branch-chip { min-width: 150px; gap: 4px; }
+.branch-chip strong small { font-size: 11px; font-weight: 600; color: var(--muted); margin-left: 4px; letter-spacing: 0.06em; }
+.branch-chip .bc-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12.5px; }
+.branch-chip .bc-row b { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.branch-chip .bc-row b.pos { color: var(--green); }
+.branch-chip .bc-row b.neg { color: var(--red); }
+.branch-chip--total { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.branch-chip--total .label, .branch-chip--total strong small { color: rgba(255,255,255,0.6); }
+.branch-chip--total strong { color: #fff; }
+.branch-chip--total .bc-row b { color: #fff; }
+.branch-chip--total .bc-row b.pos { color: #7ee2a8; }
+.branch-chip--total .bc-row b.neg { color: #ff9d8f; }
 
 /* Pending summary pointer on new-order tab (compact) */
 .pending-pointer {
@@ -4906,7 +4921,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   position: absolute;
   top: -30px; right: -30px;
   width: 90px; height: 90px;
-  background: radial-gradient(circle, rgba(200,160,74,0.12) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.12) 0%, transparent 70%);
   pointer-events: none;
 }
 .pending-pointer:hover {
@@ -5222,7 +5237,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   position: absolute;
   bottom: -30px; right: -30px;
   width: 120px; height: 120px;
-  background: radial-gradient(circle, rgba(200,160,74,0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.1) 0%, transparent 70%);
   pointer-events: none;
 }
 .ch-detail-header .name {
@@ -5363,7 +5378,7 @@ A135227891USA7004018M2709260698172349&lt;774630" style="width:100%; min-height:5
   top: 2px;
   bottom: 2px;
   width: 1px;
-  background: linear-gradient(180deg, transparent 0%, rgba(200,160,74,0.45) 50%, transparent 100%);
+  background: linear-gradient(180deg, transparent 0%, rgba(var(--accent-rgb), 0.45) 50%, transparent 100%);
 }
 .pending-banner .pb-stat.eta .v {
   color: var(--accent);
@@ -14976,7 +14991,7 @@ function renderAirlineUsdPanel(orders) {
       // 表 Y rows get a subtle gold left-edge accent to draw the eye even before
       // reading the badge.
       if (o.isTableY) {
-        row.style.boxShadow = 'inset 4px 0 0 var(--accent-deep), inset 0 0 0 1px rgba(200,160,74,0.25)';
+        row.style.boxShadow = 'inset 4px 0 0 var(--gold), inset 0 0 0 1px rgba(200,160,74,0.25)';
         row.style.background = 'linear-gradient(90deg, rgba(200,160,74,0.10), rgba(200,160,74,0.02))';
       }
       const _sancRow = _sanctionHits(o.segments || []);
@@ -15445,7 +15460,7 @@ function scrollAndFlash(target) {
   target.style.transition = 'box-shadow 0.4s ease, transform 0.3s ease';
   const origShadow = target.style.boxShadow;
   const origTransform = target.style.transform;
-  target.style.boxShadow = '0 0 0 3px var(--accent), 0 0 24px rgba(200,160,74,0.45), 0 12px 36px rgba(12,27,42,0.22)';
+  target.style.boxShadow = '0 0 0 3px var(--accent), 0 0 24px rgba(var(--accent-rgb),0.45), 0 12px 36px rgba(12,27,42,0.22)';
   target.style.transform = 'scale(1.005)';
   setTimeout(() => {
     target.style.boxShadow = origShadow;
@@ -15462,9 +15477,10 @@ function ensureBackToTopButton() {
   btn.id = 'backToOverviewBtn';
   btn.innerHTML = '↑ 返回顶部';
   btn.onclick = () => {
-    // Prefer scrolling to the airline USD panel, else top of pending tab
+    // On 待出票: jump to the airline USD overview panel; on any other tab: page top (v-FO 全站唯一浮钮)
     const panel = document.getElementById('airlineUsdPanel');
-    if (panel && panel.style.display !== 'none') {
+    const pendingActive = document.getElementById('panel-pending')?.classList.contains('active');
+    if (pendingActive && panel && panel.style.display !== 'none') {
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -15481,14 +15497,9 @@ function setupBackToTopScrollListener() {
   if (window._backToTopListenerInstalled) return;
   window._backToTopListenerInstalled = true;
   window.addEventListener('scroll', () => {
-    // Only relevant on the pending tab
-    const pendingPanel = document.getElementById('panel-pending');
-    if (!pendingPanel || pendingPanel.classList.contains('hidden') || pendingPanel.style.display === 'none') {
-      const btn = document.getElementById('backToOverviewBtn');
-      if (btn) btn.classList.remove('visible');
-      return;
-    }
+    // One floating button for every tab (v-FO: the v-DS duplicate #backToTop was removed)
     const btn = ensureBackToTopButton();
+    btn.textContent = document.getElementById('panel-pending')?.classList.contains('active') ? '↑ 返回总览' : '↑ 回到顶部';
     if (window.scrollY > 400) {
       btn.classList.add('visible');
     } else {
@@ -17808,7 +17819,8 @@ function renderPendingList() {
     filterBar.id = 'pendingFilterBar';
     // Sticky filter bar — when scrolling through 60+ orders, this stays at viewport top
     // with a frosted-glass backdrop so the user can always re-filter without scrolling up.
-    filterBar.style.cssText = 'position:sticky;top:0;z-index:50;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:rgba(251,246,236,0.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow-xs);transition:box-shadow 0.2s ease,border-color 0.2s ease;';
+    filterBar.className = 'filter-bar';
+    filterBar.style.cssText = 'position:sticky;top:0;z-index:50;margin-bottom:12px;background:rgba(250,250,249,0.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:var(--r-md);box-shadow:var(--shadow-xs);transition:box-shadow 0.2s ease,border-color 0.2s ease;';
     area.parentNode.insertBefore(filterBar, area);
   }
 
@@ -17850,29 +17862,31 @@ function renderPendingList() {
   });
   const sortedAgents = Object.entries(agentCounts).sort((a,b) => b[1].count - a[1].count);
 
-  // Filter controls: label + row
-  const filterLabel = document.createElement('div');
-  filterLabel.style.cssText = 'display:flex; align-items:center; gap:8px; width:100%; flex-wrap:wrap;';
+  // ── Filter controls (v-FO): same .filter-bar / .filter-row / .fchip language as the
+  //    USD overview panel. Row 1 = selects + view controls, row 2 = agent chips.
+  const ctlRow = document.createElement('div');
+  ctlRow.className = 'filter-row';
+  ctlRow.style.cssText = 'padding:8px 12px; gap:8px;';
 
   // Airline select (compact)
   const airlineSel = document.createElement('select');
-  airlineSel.style.cssText = 'font-size:12px; padding:5px 10px; border:1.5px solid var(--line); border-radius:var(--r-md); background:#fff; cursor:pointer; flex-shrink:0; font-family:inherit; color:var(--ink); transition:border-color 0.12s;';
+  airlineSel.className = 'fsel';
   airlineSel.innerHTML = `<option value="">${t('filter.allAirlines')}</option>` + airlines.map(v => `<option value="${escapeAttr(v)}" ${cur.airline===v?'selected':''}>${escapeHtml(v)}</option>`).join('');
   airlineSel.onchange = () => { window._pendingFilter={...cur, airline:airlineSel.value}; renderPendingList(); };
-  filterLabel.appendChild(airlineSel);
+  ctlRow.appendChild(airlineSel);
 
   // Label select (compact)
   const labelSel = document.createElement('select');
-  labelSel.style.cssText = 'font-size:12px; padding:5px 10px; border:1.5px solid var(--line); border-radius:var(--r-md); background:#fff; cursor:pointer; flex-shrink:0; font-family:inherit; color:var(--ink); transition:border-color 0.12s;';
+  labelSel.className = 'fsel';
   labelSel.innerHTML = `<option value="">${t('filter.allLabels')}</option>` + labels.map(v => `<option value="${escapeAttr(v)}" ${cur.label===v?'selected':''}>${escapeHtml(v)}</option>`).join('');
   labelSel.onchange = () => { window._pendingFilter={...cur, label:labelSel.value}; renderPendingList(); };
-  filterLabel.appendChild(labelSel);
+  ctlRow.appendChild(labelSel);
 
   // Sort selector — affects order WITHIN each agent group. Status (assigned vs
   // unassigned vs 暂时无位) still wins; this decides ordering among equal-status
   // orders. Persisted to sessionStorage so it survives tab switches.
   const sortSel = document.createElement('select');
-  sortSel.style.cssText = 'font-size:12px; padding:5px 10px; border:1.5px solid var(--line); border-radius:var(--r-md); background:#fff; cursor:pointer; flex-shrink:0; font-family:inherit; color:var(--ink); transition:border-color 0.12s;';
+  sortSel.className = 'fsel';
   const currentSortKey = (() => { try { return sessionStorage.getItem('pendingSortKey') || 'amount-asc'; } catch(e) { return 'amount-asc'; } })();
   sortSel.innerHTML = `
     <option value="amount-asc" ${currentSortKey==='amount-asc'?'selected':''}>${t('sort.amountAsc')}</option>
@@ -17888,59 +17902,9 @@ function renderPendingList() {
     try { sessionStorage.setItem('pendingSortKey', sortSel.value); } catch(e) {}
     renderPendingList();
   };
-  filterLabel.appendChild(sortSel);
+  ctlRow.appendChild(sortSel);
 
-  // Agent chips with count
-  const agentChipsDiv = document.createElement('div');
-  agentChipsDiv.style.cssText = 'display:flex; gap:4px; flex-wrap:wrap; align-items:center; flex:1;';
-
-  // "全部" chip
-  const allChip = document.createElement('button');
-  allChip.style.cssText = `padding:3px 10px; border-radius:14px; font-size:11.5px; font-weight:600; cursor:pointer; transition:all 0.12s;
-    border:1.5px solid ${!window._usdAgentHighlight?'var(--ink)':'var(--line)'};
-    background:${!window._usdAgentHighlight?'var(--ink)':'#fff'};
-    color:${!window._usdAgentHighlight?'var(--paper)':'var(--muted)'};`;
-  allChip.innerHTML = `全部 <span style="font-family:'JetBrains Mono',monospace;font-size:9px;opacity:0.7;">${meaningful.length}</span>`;
-  allChip.onclick = () => {
-    _usdAgentFilter = null;   // v-FM 直赋真变量（原 window.xxx= 无效）
-    window._usdAgentHighlight = null;
-    renderAirlineUsdPanel();
-    applyAgentHighlight(null);
-  };
-  agentChipsDiv.appendChild(allChip);
-
-  sortedAgents.forEach(([agent, stats]) => {
-    const isActive = (window._usdAgentHighlight || '') === agent;
-    const pct = Math.round(stats.assigned / stats.count * 100);
-    const chip = document.createElement('button');
-    chip.style.cssText = `padding:3px 10px; border-radius:14px; font-size:11.5px; font-weight:${isActive?700:500}; cursor:pointer; transition:all 0.12s; position:relative;
-      border:1.5px solid ${isActive?'var(--accent-deep)':'var(--line)'};
-      background:${isActive?'var(--accent-deep)':'#fff'};
-      color:${isActive?'#fff':'var(--ink)'};
-      box-shadow:${isActive?'0 2px 6px rgba(139,105,20,0.25)':'var(--shadow-xs)'};`;
-    chip.title = `${agent}：${stats.count}单，${stats.assigned}已分配，${stats.count-stats.assigned}待分配（${pct}%完成）`;
-    chip.innerHTML = `${escapeHtml(agent)}
-      <span style="margin-left:4px; font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700;
-                   background:${isActive?'rgba(255,255,255,0.25)':'var(--ink)'}; color:${isActive?'#fff':'var(--paper)'};
-                   padding:1px 5px; border-radius:8px;">${stats.count}</span>`;
-    chip.onclick = () => {
-      const newAgent = isActive ? null : agent;
-      _usdAgentFilter = newAgent;   // v-FM 直赋真变量（原 window.xxx= 无效）
-      window._usdAgentHighlight = newAgent;
-      renderAirlineUsdPanel();
-      applyAgentHighlight(newAgent);
-      if (newAgent) {
-        setTimeout(() => {
-          const pendingArea = document.getElementById('pendingArea');
-          if (pendingArea) pendingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 60);
-      }
-    };
-    agentChipsDiv.appendChild(chip);
-  });
-  filterLabel.appendChild(agentChipsDiv);
-
-  // Clear button
+  // Clear button (only when a select filter is active)
   if (cur.airline || cur.agent || cur.label) {
     const clearBtn = document.createElement('button');
     clearBtn.textContent = '✕';
@@ -17952,10 +17916,13 @@ function renderPendingList() {
       try { sessionStorage.removeItem('pendingFilter'); } catch(e) {}
       renderPendingList();
     };
-    filterLabel.appendChild(clearBtn);
+    ctlRow.appendChild(clearBtn);
   }
 
-  filterBar.appendChild(filterLabel);
+  // Spacer pushes the view controls to the right edge
+  const spacer = document.createElement('span');
+  spacer.style.cssText = 'flex:1 1 8px;';
+  ctlRow.appendChild(spacer);
 
   // Apply filter to meaningful list
   const filtered = meaningful.filter(({o}) => {
@@ -17986,55 +17953,87 @@ function renderPendingList() {
       ? `折叠当前可见的 ${expandedCount} 单（保留筛选状态）`
       : `展开当前可见的 ${filteredIds.length} 单`;
     toggleBtn.onclick = () => collapseAllOrders(willCollapse, filteredIds);
-    filterLabel.appendChild(toggleBtn);
+    ctlRow.appendChild(toggleBtn);
   }
 
-  // ── View mode toggle: List vs Gradient ──
-  // Gradient view = orders bucketed by amount tier, each rendered as a sized
-  // rectangle. Helps you spot "where the big tickets are" at a glance instead
-  // of reading every row.
+  // ── View mode toggle: List vs Gradient (segmented control) ──
   const currentMode = (() => { try { return sessionStorage.getItem('pendingViewMode') || 'list'; } catch(e) { return 'list'; } })();
-  const modeWrap = document.createElement('div');
-  modeWrap.style.cssText = 'display:flex; gap:0; border:1px solid var(--line); border-radius:var(--r-md); overflow:hidden; flex-shrink:0; font-family:"JetBrains Mono",monospace;';
-  const mkModeBtn = (val, label, title) => {
+  const mkSeg = (cls) => { const d = document.createElement('div'); d.className = 'segctl' + (cls ? ' ' + cls : ''); return d; };
+  const mkSegBtn = (on, label, title, onClick) => {
     const b = document.createElement('button');
-    b.style.cssText = `padding:5px 12px; font-size:11px; font-weight:700; letter-spacing:0.04em; border:none; cursor:pointer; transition:all 0.15s; background:${currentMode === val ? 'var(--ink)' : '#fff'}; color:${currentMode === val ? 'var(--paper)' : 'var(--muted)'};`;
+    b.type = 'button';
+    if (on) b.classList.add('is-on');
     b.textContent = label;
     b.title = title;
-    b.onclick = () => {
-      try { sessionStorage.setItem('pendingViewMode', val); } catch(e) {}
-      renderPendingList();
-    };
+    b.onclick = onClick;
     return b;
   };
-  modeWrap.appendChild(mkModeBtn('list', '☰ 列表', '完整订单卡片视图'));
-  modeWrap.appendChild(mkModeBtn('gradient', '▦ 梯度', '按金额梯度分组，一眼看全貌'));
-  filterLabel.appendChild(modeWrap);
+  const modeWrap = mkSeg('');
+  const setMode = (val) => () => { try { sessionStorage.setItem('pendingViewMode', val); } catch(e) {} renderPendingList(); };
+  modeWrap.appendChild(mkSegBtn(currentMode === 'list', '☰ 列表', '完整订单卡片视图', setMode('list')));
+  modeWrap.appendChild(mkSegBtn(currentMode === 'gradient', '▦ 梯度', '按金额梯度分组，一眼看全貌', setMode('gradient')));
+  ctlRow.appendChild(modeWrap);
 
   // ── Focus mode toggle: single-expand (accordion) vs multi-expand ──
   // Only shown in list view. Defaults to single — point/tap an order to focus,
   // others auto-collapse. Cmd/Ctrl+click bypasses (or switch to multi mode).
   if (currentMode !== 'gradient') {
     const currentFocusMode = (() => { try { return sessionStorage.getItem('pendingFocusMode') || 'single'; } catch(e) { return 'single'; } })();
-    const focusWrap = document.createElement('div');
-    focusWrap.style.cssText = 'display:flex; gap:0; border:1px solid var(--line); border-radius:var(--r-md); overflow:hidden; flex-shrink:0; font-family:"JetBrains Mono",monospace;';
-    const mkFocusBtn = (val, label, title) => {
-      const b = document.createElement('button');
-      b.style.cssText = `padding:5px 12px; font-size:11px; font-weight:700; letter-spacing:0.04em; border:none; cursor:pointer; transition:all 0.15s; background:${currentFocusMode === val ? 'var(--accent)' : '#fff'}; color:${currentFocusMode === val ? 'var(--ink)' : 'var(--muted)'};`;
-      b.textContent = label;
-      b.title = title;
-      b.onclick = () => {
-        try { sessionStorage.setItem('pendingFocusMode', val); } catch(e) {}
-        renderPendingList();
-      };
-      return b;
-    };
-    focusWrap.appendChild(mkFocusBtn('single', '◉ 单展开', '聚焦模式：点击订单展开详情，其他自动折叠（Cmd/Ctrl+点击可多选）'));
-    focusWrap.appendChild(mkFocusBtn('multi', '◎ 多展开', '多选模式：每张订单独立折叠状态'));
-    filterLabel.appendChild(focusWrap);
+    const focusWrap = mkSeg('segctl--accent');
+    const setFocus = (val) => () => { try { sessionStorage.setItem('pendingFocusMode', val); } catch(e) {} renderPendingList(); };
+    focusWrap.appendChild(mkSegBtn(currentFocusMode === 'single', '◉ 单展开', '聚焦模式：点击订单展开详情，其他自动折叠（Cmd/Ctrl+点击可多选）', setFocus('single')));
+    focusWrap.appendChild(mkSegBtn(currentFocusMode === 'multi', '◎ 多展开', '多选模式：每张订单独立折叠状态', setFocus('multi')));
+    ctlRow.appendChild(focusWrap);
   }
+  filterBar.appendChild(ctlRow);
+
+  // ── Row 2: agent chips (highlight + USD-panel filter, same as the overview panel) ──
+  const agentRow = document.createElement('div');
+  agentRow.className = 'filter-row';
+  agentRow.style.cssText = 'padding:7px 12px;';
+  const agentLbl = document.createElement('span');
+  agentLbl.className = 'filter-row__label';
+  agentLbl.textContent = '代理';
+  agentRow.appendChild(agentLbl);
+
+  const allChip = document.createElement('button');
+  allChip.type = 'button';
+  allChip.className = 'fchip' + (!window._usdAgentHighlight ? ' is-active' : '');
+  allChip.innerHTML = `全部 <span class="fchip__n">${meaningful.length}</span>`;
+  allChip.onclick = () => {
+    _usdAgentFilter = null;   // v-FM 直赋真变量（原 window.xxx= 无效）
+    window._usdAgentHighlight = null;
+    renderAirlineUsdPanel();
+    applyAgentHighlight(null);
+  };
+  agentRow.appendChild(allChip);
+
+  sortedAgents.forEach(([agent, stats]) => {
+    const isActive = (window._usdAgentHighlight || '') === agent;
+    const pct = Math.round(stats.assigned / stats.count * 100);
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'fchip' + (isActive ? ' is-active' : '');
+    chip.title = `${agent}：${stats.count}单，${stats.assigned}已分配，${stats.count-stats.assigned}待分配（${pct}%完成）`;
+    chip.innerHTML = `${escapeHtml(agent)} <span class="fchip__n">${stats.count}</span>`
+      + (stats.count - stats.assigned > 0 ? `<span class="fchip__sub">+${stats.count - stats.assigned}待</span>` : '');
+    chip.onclick = () => {
+      const newAgent = isActive ? null : agent;
+      _usdAgentFilter = newAgent;   // v-FM 直赋真变量（原 window.xxx= 无效）
+      window._usdAgentHighlight = newAgent;
+      renderAirlineUsdPanel();
+      applyAgentHighlight(newAgent);
+      if (newAgent) {
+        setTimeout(() => {
+          const pendingArea = document.getElementById('pendingArea');
+          if (pendingArea) pendingArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 60);
+      }
+    };
+    agentRow.appendChild(chip);
+  });
+  filterBar.appendChild(agentRow);
   // ──────────────────────────────────────────────────────────────────────────
-  // ────────────────────────────────────────────────────────────────────────
   // (Team/employee filter banner removed — _teamConfig.viewMode is always 'all')
 
   const batchActions = document.getElementById('pendingBatchActions');
@@ -23329,7 +23328,7 @@ function buildCardHTML(o, idx) {
   // Looks at each segment's class code and checks if they map to different cabins.
   const mixedCabinInfo = detectMixedCabin(o);
   if (mixedCabinInfo.isMixed) {
-    tags.push(`<span class="tag" style="background:rgba(200,160,74,0.18); color:var(--accent-deep); border-color:rgba(200,160,74,0.4); font-weight:700;" title="${escapeAttr(mixedCabinInfo.tooltip)}">混舱</span>`);
+    tags.push(`<span class="tag" style="background:rgba(var(--accent-rgb),0.12); color:var(--accent-deep); border-color:rgba(var(--accent-rgb),0.35); font-weight:700;" title="${escapeAttr(mixedCabinInfo.tooltip)}">混舱</span>`);
   }
 
   const _sanc = _sanctionHits(o.segments || []);
@@ -23383,7 +23382,7 @@ function buildCardHTML(o, idx) {
 
   // Mixed-cabin informational note — no longer blocks ticketing
   if (mixedCabinInfo.isMixed) {
-    html += `<div style="background:rgba(200,160,74,0.08); border-left:3px solid var(--accent-deep); padding:8px 12px; margin-bottom:10px; border-radius:var(--r-sm); font-size:11.5px; color:var(--ink);">
+    html += `<div style="background:rgba(var(--accent-rgb),0.07); border-left:3px solid var(--accent-deep); padding:8px 12px; margin-bottom:10px; border-radius:var(--r-sm); font-size:11.5px; color:var(--ink);">
       <strong style="color:var(--accent-deep);">ℹ 混舱订单</strong>
       <span style="color:var(--muted); margin-left:6px;">${escapeHtml(mixedCabinInfo.tooltip)}</span>
     </div>`;
@@ -24845,15 +24844,12 @@ function renderBranchSummary() {
   // Total chip first
   const totalChip = document.createElement('div');
   totalChip.className = 'branch-chip';
-  totalChip.style.background = 'var(--ink)';
-  totalChip.style.color = 'var(--paper)';
-  totalChip.style.borderColor = 'var(--ink)';
+  totalChip.classList.add('branch-chip--total');
   totalChip.innerHTML = `
-    <span class="label" style="color:var(--paper); opacity:0.7;">总计</span>
-    <strong style="color:var(--accent);">${ticketed.length}</strong>
-    <span class="label" style="color:var(--paper); opacity:0.7;">单</span>
-    ${hasRev ? `<span class="label" style="color:var(--paper); opacity:0.7; margin-left:6px;">售</span><span style="color:#fff; font-weight:700;">¥${Math.round(totalRev).toLocaleString()}</span>` : ''}
-    ${hasProfit ? `<span class="label" style="color:var(--paper); opacity:0.7; margin-left:6px;">利</span><span style="color:var(--accent); font-weight:700;">${totalProfit>=0?'+':''}¥${Math.round(totalProfit).toLocaleString()}</span>` : ''}
+    <span class="label">总计</span>
+    <strong>${ticketed.length}<small>单</small></strong>
+    ${hasRev ? `<div class="bc-row"><span class="label">售</span><b>¥${Math.round(totalRev).toLocaleString()}</b></div>` : ''}
+    ${hasProfit ? `<div class="bc-row"><span class="label">利</span><b class="${totalProfit>=0?'pos':'neg'}">${totalProfit>=0?'+':''}¥${Math.round(totalProfit).toLocaleString()}</b></div>` : ''}
   `;
   list.appendChild(totalChip);
   // Per-branch chips
@@ -24862,10 +24858,9 @@ function renderBranchSummary() {
     chip.className = 'branch-chip';
     chip.innerHTML = `
       <span class="label">${escapeHtml(branch)}</span>
-      <strong>${g.count}</strong>
-      <span class="label">单</span>
-      ${g.hasRev ? `<span class="label" style="margin-left:6px;">售</span><strong style="color:var(--ink);">¥${Math.round(g.rev).toLocaleString()}</strong>` : ''}
-      ${g.hasProfit ? `<span class="label" style="margin-left:6px;">利</span><strong style="color:${g.profit>=0?'var(--green)':'var(--red)'};">${g.profit>=0?'+':''}¥${Math.round(g.profit).toLocaleString()}</strong>` : ''}
+      <strong>${g.count}<small>单</small></strong>
+      ${g.hasRev ? `<div class="bc-row"><span class="label">售</span><b>¥${Math.round(g.rev).toLocaleString()}</b></div>` : ''}
+      ${g.hasProfit ? `<div class="bc-row"><span class="label">利</span><b class="${g.profit>=0?'pos':'neg'}">${g.profit>=0?'+':''}¥${Math.round(g.profit).toLocaleString()}</b></div>` : ''}
     `;
     list.appendChild(chip);
   });
@@ -25546,7 +25541,7 @@ function renderBillingPanel() {
         <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:12px;">${o.airline||'—'}</td>
         <td style="padding:8px 10px; font-size:11px; color:var(--muted);">${ticketedDate}</td>
         <td style="padding:8px 10px; font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink); text-align:right;">${fmtRmb(rev)}</td>
-        <td style="padding:8px 10px; text-align:center;">
+        <td style="padding:8px 10px; text-align:center; white-space:nowrap;">
           ${flagged ? `
             <button onclick="clearPaymentReviewFlag(${idx})" class="attention-pulse" style="padding:3px 10px; font-size:11px; font-weight:700; border-radius:20px; cursor:pointer; border:1.5px solid var(--warning); background:rgba(217,119,6,0.15); color:var(--warning-deep);" title="${escapeAttr(o.paymentReviewNote || '点击解除')}">⚠ 待复核</button>
             <div style="font-size:9px; color:var(--muted); margin-top:2px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeAttr(o.paymentReviewNote || '')}">${escapeHtml(o.paymentReviewNote || '')}</div>
@@ -26114,9 +26109,9 @@ function renderChasePanel() {
         <div style="font-size:11px;opacity:0.6;margin-bottom:2px;">收入（CNY）</div>
         <div style="font-size:18px;font-weight:700;">¥${Math.round(totalRmb).toLocaleString()}</div>
       </div>
-      <div style="text-align:right;background:${unassigned > 0 ? 'rgba(240,165,0,0.25)' : 'rgba(100,200,100,0.2)'};padding:6px 12px;border-radius:6px;">
-        <div style="font-size:11px;opacity:0.9;margin-bottom:2px;">卡主分配</div>
-        <div style="font-size:16px;font-weight:700;">${unassigned > 0 ? unassigned + ' 单未分配' : '✓ 全部完成'}</div>
+      <div style="text-align:right;background:${unassigned > 0 ? '#FBBF24' : '#86EFAC'};color:#1F2328;padding:6px 14px;border-radius:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.35);white-space:nowrap;">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:0.08em;opacity:0.75;margin-bottom:2px;">卡主分配</div>
+        <div style="font-size:15px;font-weight:800;">${unassigned > 0 ? '⚠ ' + unassigned + ' 单未分配' : '✓ 全部完成'}</div>
       </div>
     </div>`;
   container.appendChild(header);
@@ -26240,7 +26235,7 @@ function renderChasePanel() {
     colHeader.innerHTML = `
       <span class="collapse-num">#${idx+1}</span>
       ${airlineBadgeHtml}
-      <span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-flex;align-items:center;flex-shrink:0;padding:2px 7px;border:1px solid rgba(70,150,80,0.5);background:rgba(70,150,80,0.12);color:#2f7d3f;border-radius:var(--r-sm);font-size:9.5px;font-weight:700;letter-spacing:0.03em;">♡ 基础·人工</span>
+      <span title="基础经济 · 92折 · 需人工客服预定" style="display:inline-flex;align-items:center;flex-shrink:0;padding:2px 8px;border:1px solid rgba(34,134,58,0.45);background:rgba(34,134,58,0.10);color:var(--green);border-radius:var(--r-sm);font-size:11px;font-weight:700;letter-spacing:0.03em;line-height:1.4;">♡ 基础·人工</span>
       ${o.createdAt ? (buildAgeBadge(o.createdAt) ? buildAgeBadge(o.createdAt).outerHTML : '') : ''}
       ${o.waitingForRelease ? '<span style="background:var(--warning);color:#fff;padding:2px 8px;border-radius:10px;font-size:9.5px;font-weight:700;flex-shrink:0;">🔒 放位</span>' : ''}
       <span class="collapse-summary">${escapeHtml([paxNames, route, o.cabin||'', price].filter(Boolean).join('  ·  '))}</span>
