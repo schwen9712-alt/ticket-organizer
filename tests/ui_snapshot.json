@@ -38,6 +38,7 @@
   "_dayWrapStats",
   "_doAgentSwitch",
   "_doRemoveOrder",
+  "_docsTokensToMatch",
   "_drawAppIcon",
   "_ensureFxLayer",
   "_errPush",

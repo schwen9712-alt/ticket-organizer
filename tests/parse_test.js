@@ -927,4 +927,20 @@ SSR DOCS UA HK1 P/CHN/EJ4863304/CHN/16SEP02/F/18OCT31/HU/FANGQING/P1`;
   eq('FS1 基础经济舱 + 标签 + 行李 1件 + 零未识别', [r.cabin, r.basicFare, r.basicFareLabel, r.baggage, r.rmb, (r.unrecognizedLines||[]).length, (r.pax||[])[0]?.name], ['基础经济舱', true, '基础经济', '1件', 3809, 0, 'HU/FANGQING']);
   eq('FS2 行李后缀变体：2PC / 托运行李 / 行李23kg；特价不折叠成基础', [P('经济舱 2PC'), P('基础商务舱 1件托运行李'), P('特价经济，行李23kg')].map(q => [q.cabin, q.basicFare, q.basicFareLabel, q.baggage]), [['经济舱', false, '', '2件'], ['商务舱', true, '基础商务舱', '1件'], ['经济舱', true, '特价经济', '23kg']]);
 }
+// v-FT 识别乘客（FENG/ASHLEY）：DOCS 两个国籍字段都缺 → 分词兜底；「超级10739×0.9」裸「超级」= 超级经济舱
+{
+  const P = (raw) => parseSingleBooking(splitIntoBookings(raw)[0] || raw);
+  const FT_FENG = String.raw`1. DL274 G MO11JAN HNDDTW DK1 1735 1535 359 0 E 3 M
+
+SSR DOCS DL HK1 P/RA3716487/26SEP08/F/10NOV28/FENG/ASHLEY/P1
+超级10739×0.9=9665.1`;
+  const r = P(FT_FENG);
+  eq('FT1 无国籍 DOCS → FENG/ASHLEY 女 26SEP08 效期 10NOV28', JSON.stringify((r.pax||[]).map(p=>[p.name,p.gender,p.dob,p.passportExpiry])), JSON.stringify([['FENG/ASHLEY','FEMALE','26SEP08','10NOV28']]));
+  eq('FT2 段/价/舱/零未识别', [(r.segs||[]).length, r.rmb, r.discount, r.cabin, (r.unrecognizedLines||[]).length], [1, 10739, 90, '超级经济舱', 0]);
+  const v = (t) => JSON.stringify((P(t).pax||[]).map(p=>[p.name,p.gender,p.dob,p.passportExpiry||'',p.forcedType||'']));
+  eq('FT3 FI 婴儿标记 + 复名 + /P2 婴儿', v('SSR DOCS AA HK1 P/CN/EK0000000/CN/15MAY20/FI/01JAN30/LIU/XIAO XIAO/P2  婴儿'), JSON.stringify([['LIU/XIAO XIAO','FEMALE','15MAY20','01JAN30','INFANT']]));
+  eq('FT4 无效期 + /H 持有人尾', v('SSR DOCS UA HK1 P/12345678/01JAN80/M/ZHANG/WEI/H'), JSON.stringify([['ZHANG/WEI','MALE','01JAN80','','']]));
+  eq('FT5 名后数字备注截掉', v('SSR DOCS UA HK1 P/CHN/E12345678/CHN/01JAN80/M/01JAN30/ZHANG/WEI  4400 USD'), JSON.stringify([['ZHANG/WEI','MALE','01JAN80','01JAN30','']]));
+  eq('FT6 规范 DOCS 仍走原正则（姓名/效期不变）', v('SSR DOCS UA HK1 P/CHN/E12345678/CHN/01JAN80/M/01JAN30/ZHANG/WEI'), JSON.stringify([['ZHANG/WEI','MALE','01JAN80','01JAN30','']]));
+}
 process.exit(fails ? 1 : 0);

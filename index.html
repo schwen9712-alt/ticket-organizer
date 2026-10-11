@@ -3077,10 +3077,10 @@ body.dark-mode .fchip__n { background:#2a3550; color:#e0e0e0; }
     <div class="brand">
       <h1>Ticket Organizer</h1>
       <span class="zh">订单整理工具</span>
-      <span onclick="alert('构建版本 v26.10.10-FS\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
+      <span onclick="alert('构建版本 v26.10.10-FT\\n\\n如果这个版本号和你期望的不符，说明浏览器加载的是旧版：\\n1. Ctrl+Shift+R 强制刷新\\n2. 若仍不符，检查 GitHub Actions 的 deploy 是否成功')"
             style="font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--accent-deep); margin-left:8px; letter-spacing:0.05em; cursor:pointer; padding:2px 7px; background:var(--accent-light); border-radius:var(--r-sm); font-weight:600; transition:background var(--t-fast);"
             onmouseover="this.style.background='rgba(94,106,210,0.18)'" onmouseout="this.style.background='var(--accent-light)'"
-            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FS</span>
+            title="构建版本号 · 点击查看部署校验说明" id="buildBadge">✓ v26.10.10-FT</span>
     </div>
     <div class="header-meta">
       <div>TODAY · <span id="todayDate">--</span></div>
@@ -9320,6 +9320,37 @@ function _sameName(a, b) {
   if (!ka.includes('/') || !kb.includes('/')) return ka.replace(/\//g, '') === kb.replace(/\//g, '');
   return false;
 }
+// v-FT DOCS 分词兜底：从 "P/…" 载荷里按语义锚（生日/性别/效期/姓/名）取字段，装成与 SSR 正则同形的匹配数组
+//   [full, dob, gender(M/F), expiry, surname, given, typeWord]；锚不齐（无生日/无性别/姓名不足两段）返回 null
+function _docsTokensToMatch(line) {
+  const pi = String(line || '').search(/\bP\//i);
+  if (pi < 0) return null;
+  let payload = line.slice(pi + 2).trim();
+  let typeWord = '';
+  const typeM = payload.match(/\s*(?:[（(]\s*)?(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT)\s*[）)]?\s*$/i);
+  if (typeM) { typeWord = typeM[1]; payload = payload.slice(0, typeM.index); }
+  const toks = payload.split('/').map(t => t.trim().replace(/\s{2,}/g, ' ')).filter(Boolean);   // 名可含空格（XIAO XIAO），不按空白截断
+  const isDate = (t) => /^\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?$/i.test(t);
+  const dateIdx = toks.map((t, i) => isDate(t) ? i : -1).filter(i => i >= 0);
+  if (!dateIdx.length) return null;
+  const dobIdx = dateIdx[0];
+  const genderIdx = toks.findIndex((t, i) => i > dobIdx && /^(M|F|MI|FI|MA|FA)$/i.test(t));
+  if (genderIdx < 0) return null;
+  const expIdx = dateIdx.find(i => i > genderIdx);
+  const nameStart = (expIdx != null ? expIdx : genderIdx) + 1;
+  const names = [];
+  for (let i = nameStart; i < toks.length; i++) {
+    const t = toks[i];
+    if (/^P\d*$/i.test(t) || /^[HI]$/i.test(t)) break;
+    const nm = t.match(/^([A-Z]+(?:\s[A-Z]+)*)(?:\s+\d.*)?$/i);   // 纯字母（允许单空格分词的复名）；名后跟 " 4400 USD" 之类数字备注则截掉
+    if (!nm) break;
+    names.push(nm[1].toUpperCase());
+    if (nm[0] !== nm[1]) break;
+  }
+  if (names.length < 2) return null;
+  if (!typeWord && /^[MF]I$/i.test(toks[genderIdx])) typeWord = 'INF';   // MI/FI = 婴儿性别标记
+  return [line, toks[dobIdx].toUpperCase(), toks[genderIdx][0].toUpperCase(), expIdx != null ? toks[expIdx].toUpperCase() : '', names[0], names.slice(1).join(' '), typeWord];
+}
 function _ordKey(o) {
   const pax = ((o && o.passengers) || []).map(p => String((p && p.name) || '').toUpperCase().replace(/\s+/g, ' ').trim()).filter(Boolean).sort().join('|');
   const s1 = ((o && o.segments) || [])[0] || {};
@@ -11858,7 +11889,7 @@ function parseSingleBooking(raw) {
     //   ".../28DEC13/M/SUN/JUSTIN/P3"  (DOB/gender/surname/given — no expiry)
     // vs the full ".../07JUL87/F/17MAY31/XU/YIFAN/P1" (DOB/gender/EXPIRY/surname/given).
     // Also tolerate a trailing 儿童/婴儿/CHD/INF tag after the /Pn.
-    const ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\s*\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?(?:[A-Z]{2,3}\/)?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 重复性别 · v-EB 四位年 · v-EN 尾括号 · v-FA 尾斜杠/单字类型
+    let ssrMatch = ssrLine.match(/SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b.*?\bP\/[A-Z]+\/[A-Z0-9]+\s*\/[A-Z]+\/(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/?(?:[A-Z]{2,3}\/)?([MF])\/(?:(\d{1,2}[A-Z]{3}\d{2}(?:\d{2})?)\/)?(?:[MF]\/)?([A-Z][A-Z\s]*?)[\/.]([A-Z][A-Z\s]+?)(?:\/[A-Z]{1,2})?(?:[-\/]P\d*)?\/?(?:\s*[（(][^（）()]*[）)])?(?:\s*(儿童|婴儿|小孩|小儿|成人|大人|童|婴|CHD|CHILD|INF|INFANT|ADT|ADULT))?\s*$/i);   // v-DT 重复性别 · v-EB 四位年 · v-EN 尾括号 · v-FA 尾斜杠/单字类型
     // (_y4to2 已提升至函数顶部)
     // v-DA 变体：六位数字生日 YYMMDD、无效期、无 P 尾（"P/USA/A39321637/USA/761015/M/CHANG/WEYLU"）
     if (!ssrMatch) {
@@ -11878,6 +11909,12 @@ function parseSingleBooking(raw) {
           continue;
         }
       }
+    }
+    // v-FT 兜底：按 "/" 分词的 DOCS 解析——国籍字段缺一个或两个（"P/RA3716487/26SEP08/F/10NOV28/FENG/ASHLEY/P1"）、
+    //   字段顺序微变时，正则形态认不出，但 生日/性别/效期/姓/名 这几个语义锚一定在：按锚定位后装成与正则同形的数组交给下方同一消费逻辑。
+    if (!ssrMatch && /SSR\s+(?:DOC[SA]?|ODCS|DCOS)\b/i.test(ssrLine)) {
+      const tm = _docsTokensToMatch(ssrLine);
+      if (tm) { ssrMatch = tm; _d(trimmed, '🔎 DOCS', `分词兜底 ${tm[4]}/${tm[5]} 生日 ${tm[1]}${tm[3] ? ' 效期 ' + tm[3] : ''}`); }
     }
     if (ssrMatch) {
       const _pad2 = (d) => d.replace(/^(\d)([A-Z]{3}\d{2})$/i, '0$1$2');  // "2MAR71"→"02MAR71"
@@ -13010,10 +13047,10 @@ function parseSingleBooking(raw) {
           }
           // Also sniff cabin from the same line (e.g. "普通经济 9600*0.87")
           if (parsedCabin === undefined) {
-            const cabMatch = trimmed.match(/(普通经济|超级经济|超经|经济舱|经济|商务舱|商务|头等舱|头等)/);
+            const cabMatch = trimmed.match(/(基础经济|普通经济|超级经济|超经|超级|经济舱|经济|商务舱|商务|头等舱|头等)/);   // v-FT "超级10739×0.9" 的裸「超级」= 超级经济
             if (cabMatch) {
               const map = {
-                '普通经济': '经济舱', '超级经济': '超级经济舱', '超经': '超级经济舱',
+                '基础经济': '基础经济舱', '普通经济': '经济舱', '超级经济': '超级经济舱', '超经': '超级经济舱', '超级': '超级经济舱',
                 '经济舱': '经济舱', '经济': '经济舱',
                 '商务舱': '商务舱', '商务': '商务舱',
                 '头等舱': '头等舱', '头等': '头等舱'
